@@ -1,0 +1,330 @@
+From b11a3621c3c1b7a6e511fd3a3431a21ebe4c700e Mon Sep 17 00:00:00 2001
+From: Alexey Spiridonov <snarkmaster@gmail.com>
+Date: Sat, 4 Jul 2015 16:25:57 -0700
+Subject: [PATCH] Build script updates, install more headers, Travis CI install
+
+Summary:
+Builds on D2217441 to also allow easy installation of FBThrift on Travis CI. In passing, I make an attempt to clean up our other install scripts.
+
+Again, I'm indebted to @int's work on `mcrouter`. The goal here is to put similar logic into the packages themselves so that future OSS dependents of `folly`/`fbthrift` can just install them and have a working Travis setup.
+
+Last I checked, `make check` for fbthrift is broken, but once we fix it, this opens the door for having `fbthrift` validate `make && make check && make install` on Travis CI.
+
+Other changes:
+- I needed the header I added in one of Bistro's unit tests, so install it.
+- The other README was redundant and out of date.
+
+Test Plan:
+Added these lines to `install_folly`, ran on the Travis CI-like VM that I made
+```
+git am ~/0001-folly-Install-dependencies-for-Travis-CI.patch
+```
+Observed that fbthrift's dependencies compile, and fbthrift itself compiles.
+
+Subscribers: alandau, bmatheny, yfeldblum, int
+
+FB internal diff: D2217443
+---
+ README.md                         | 13 +++++++----
+ thrift/README                     |  3 +++
+ thrift/build/.gitignore           |  1 +
+ thrift/build/FOLLY_VERSION        |  1 +
+ thrift/{ => build}/deps_centos.sh | 18 +++++-----------
+ thrift/build/deps_common.sh       | 29 +++++++++++++++++++++++++
+ thrift/build/deps_ubuntu_12.04.sh | 45 +++++++++++++++++++++++++++++++++++++++
+ thrift/build/deps_ubuntu_14.04.sh | 10 +++++++++
+ thrift/deps.sh                    | 19 -----------------
+ thrift/doc/README                 | 34 -----------------------------
+ thrift/lib/cpp2/Makefile.am       |  7 ++++++
+ 11 files changed, 110 insertions(+), 70 deletions(-)
+ create mode 100644 thrift/build/.gitignore
+ create mode 100644 thrift/build/FOLLY_VERSION
+ rename thrift/{ => build}/deps_centos.sh (65%)
+ create mode 100644 thrift/build/deps_common.sh
+ create mode 100755 thrift/build/deps_ubuntu_12.04.sh
+ create mode 100755 thrift/build/deps_ubuntu_14.04.sh
+ delete mode 100755 thrift/deps.sh
+ delete mode 100644 thrift/doc/README
+
+diff --git a/README.md b/README.md
+index a478537..a8f1f7d 100644
+--- a/README.md
++++ b/README.md
+@@ -30,14 +30,19 @@ Dependencies
+       libssl-dev
+ ```
+ 
+-For your convenience, a build script is provided for ubuntu 14.04 64-bit:
++For your convenience script are provided to install `fbthrift`'s
++dependencies on several common platforms:
+ 
+ ```sh
+-cd fbthrift/thrift
+-./deps.sh
++cd fbthrift/thrift/
++# Or ./build/deps_ubuntu_12.04.sh or ./build/deps_centos.sh
++./build/deps_ubuntu_14.04.sh  
++autoreconf -if && ./configure && make
+ ```
+ 
+-It will automatically pull down folly and build it, and then configure and build thrift.
++Each `deps_*.sh` script will install a variety of base system packages, as
++well as compile and install into in `/usr/local` some from-source
++dependencies (like `folly`).
+ 
+  - Ubuntu 14.04 64-bit requires the following packages:
+ 
+diff --git a/thrift/README b/thrift/README
+index 8b15156..885ede0 100644
+--- a/thrift/README
++++ b/thrift/README
+@@ -1,3 +1,6 @@
++Older Apache Thrift README -- see README.md for the fbthrift-specific info
++==========================================================================
++
+ Apache Thrift (an Apache Incubator project)
+ 
+ Last Modified: 2012-Jan-10
+diff --git a/thrift/build/.gitignore b/thrift/build/.gitignore
+new file mode 100644
+index 0000000..6912fef
+--- /dev/null
++++ b/thrift/build/.gitignore
+@@ -0,0 +1 @@
++deps/
+diff --git a/thrift/build/FOLLY_VERSION b/thrift/build/FOLLY_VERSION
+new file mode 100644
+index 0000000..0131a13
+--- /dev/null
++++ b/thrift/build/FOLLY_VERSION
+@@ -0,0 +1 @@
++v0.47.0
+diff --git a/thrift/deps_centos.sh b/thrift/build/deps_centos.sh
+similarity index 65%
+rename from thrift/deps_centos.sh
+rename to thrift/build/deps_centos.sh
+index 8a1ca66..71afc8c 100755
+--- a/thrift/deps_centos.sh
++++ b/thrift/build/deps_centos.sh
+@@ -1,3 +1,7 @@
++#!/bin/bash
++
++. "$(dirname "$0")/deps_common.sh"
++
+ sudo yum install -y \
+     openssl-devel \
+     openssl-libs \
+@@ -29,16 +33,4 @@ echo "Fetching double-conversion from git (yum failed)"
+     cd ..
+ fi
+ 
+-git clone https://github.com/facebook/folly
+-cd folly/folly
+-
+-autoreconf --install
+-./configure
+-make -j8
+-cd ../..
+-
+-autoreconf --install
+-$LD_LIBRARY_PATH_SAVED=$LD_LIBRARY_PATH
+-export LD_LIBRARY_PATH="`pwd`/folly/folly/.libs/:$LD_LIBRARY_PATH"
+-CPPFLAGS=" -I`pwd`/folly/" LDFLAGS="-L`pwd`/folly/folly/.libs/" ./configure
+-make -j8
++install_folly centos  # needs git
+diff --git a/thrift/build/deps_common.sh b/thrift/build/deps_common.sh
+new file mode 100644
+index 0000000..31ff30f
+--- /dev/null
++++ b/thrift/build/deps_common.sh
+@@ -0,0 +1,29 @@
++#!/bin/bash
++# Helpers used by deps_*.sh, meant to be sourced.
++
++set -ex
++
++BUILD_DIR="$(readlink -f "$(dirname "$0")")"
++mkdir -p "$BUILD_DIR/deps"
++cd "$BUILD_DIR/deps"
++
++install_folly() {
++  pushd .
++  git clone https://github.com/facebook/folly     
++  cd folly/folly
++  FOLLY_VERSION="$(cat "$BUILD_DIR"/FOLLY_VERSION)"  # on own line for set -e
++  git checkout "$FOLLY_VERSION" 
++  # TODO(#7640974): Remove once the wangle github repo is unbroken.
++  git am "$BUILD_DIR/../../../folly-build.patch"
++  # TODO: write folly dependency scripts for all supported platforms,
++  # instead of having the fbthrift scripts pre-install its dependencies.
++  if [[ -x "./build/deps_$1.sh" ]] ; then
++    "./build/deps_$1.sh"
++  fi
++  autoreconf -if
++  ./configure
++  make
++  sudo make install
++  sudo ldconfig
++  popd
++}
+diff --git a/thrift/build/deps_ubuntu_12.04.sh b/thrift/build/deps_ubuntu_12.04.sh
+new file mode 100755
+index 0000000..3198e8c
+--- /dev/null
++++ b/thrift/build/deps_ubuntu_12.04.sh
+@@ -0,0 +1,45 @@
++#!/bin/bash
++
++# Installs fbthrift's dependencies to /usr/local on a clean Ubuntu 12.04 x64
++# system.  Primarily intended for Travis CI, since most engineers don't run
++# distributions this stale.
++#
++# WARNING: Uses 'sudo' to upgrade your system with impunity:
++#  - Adds several PPAs for missing/outdated dependencies
++#  - Installs several from-source dependencies in /usr/local
++#
++# Library sources & build files end up in fbthrift/thrift/deps.
++
++. "$(dirname "$0")/deps_common.sh"
++
++sudo apt-get install git
++
++# Folly sets up a bunch of other dependencies, so install it right after git.
++install_folly ubuntu_12.04
++
++# Uses PPAs set up by folly.  TODO: According to the fbthrift docs,
++# pkg-config is missing.  However, things seem to build fine...
++sudo apt-get install -y libboost-python1.54-dev libsasl2-dev python-dev \
++   libkrb5-dev libnuma-dev
++
++# Install all the automake packages:
++#  - bison: The base system version is too old, does not make 'thrify.hh'
++#  - flex: Just in case -- the base system version probably does suffice...
++#  - automake: default 1.11.1 has bad bison support, does not make 'thrifty.hh'
++#  - autoconf, libtool: newer so as to be compatible with the new automake
++for url in \
++    http://ftp.gnu.org/gnu/bison/bison-3.0.4.tar.gz \
++    http://downloads.sourceforge.net/project/flex/flex-2.5.37.tar.gz \
++    http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz \
++    http://ftp.gnu.org/gnu/automake/automake-1.15.tar.gz \
++    http://ftp.gnu.org/gnu/libtool/libtool-2.4.6.tar.gz \
++    ; do
++  pkg=$(basename "$url")
++  wget "$url" -O "$pkg"
++  tar xzf "$pkg"
++  pushd "${pkg%.tar.gz}"
++  ./configure
++  make
++  sudo make install
++  popd
++done
+diff --git a/thrift/build/deps_ubuntu_14.04.sh b/thrift/build/deps_ubuntu_14.04.sh
+new file mode 100755
+index 0000000..399706a
+--- /dev/null
++++ b/thrift/build/deps_ubuntu_14.04.sh
+@@ -0,0 +1,10 @@
++#!/usr/bin/env bash
++
++. "$(dirname "$0")/deps_common.sh"
++
++sudo apt-get install -y libdouble-conversion-dev libssl-dev make zip git \
++  autoconf libtool g++ libboost-all-dev libevent-dev flex bison \
++  libgoogle-glog-dev scons libkrb5-dev libsnappy-dev libsasl2-dev \
++  libnuma-dev git
++
++install_folly ubuntu_14.04  # needs git
+diff --git a/thrift/deps.sh b/thrift/deps.sh
+deleted file mode 100755
+index 0d6cd1a..0000000
+--- a/thrift/deps.sh
++++ /dev/null
+@@ -1,19 +0,0 @@
+-#!/usr/bin/env bash
+-
+-sudo apt-get install -yq libdouble-conversion-dev libssl-dev make zip git autoconf libtool g++ libboost-all-dev libevent-dev flex bison libgoogle-glog-dev scons libkrb5-dev libsnappy-dev libsasl2-dev libnuma-dev
+-
+-# Change directory to location of this script
+-cd "$(dirname ${0})"
+-git clone https://github.com/facebook/folly
+-cd folly/folly
+-git fetch
+-git checkout v0.47.0
+-
+-autoreconf --install
+-./configure
+-make -j8
+-cd ../..
+-
+-autoreconf --install
+-CPPFLAGS=" -I`pwd`/folly/" LDFLAGS="-L`pwd`/folly/folly/.libs/" ./configure
+-make -j8
+diff --git a/thrift/doc/README b/thrift/doc/README
+deleted file mode 100644
+index 666fde8..0000000
+--- a/thrift/doc/README
++++ /dev/null
+@@ -1,34 +0,0 @@
+-FBThrift: Facebook's branch of apache thrift
+---------------------------------------------
+-
+-The main focus of this package is the new C++ server, under thrift/lib/cpp2.  This repo also contains a branch of the rest of apache thrift's repo with any changes Facebook has made, however the build system only supports cpp2.
+-
+-Building
+---------
+-
+-For your convenience, a build script is provided for ubuntu 12.10 64-bit:
+-
+-cd fbthrift/thrift
+-./deps.sh
+-
+-It will automatically pull down folly and build it, and then configure and build thrift.
+-
+-Dependencies
+-------------
+-
+- - Facebook's folly library: http://www.github.com/facebook/folly
+-
+- - Ubuntu 12.10 64-bit requires the following packages:
+-
+-    - autoconf
+-    - libtool
+-    - g++
+-    - libboost-dev-all
+-    - libevent-dev
+-    - flex
+-    - bison
+-    - libgoogle-glog-dev
+-    - scons
+-    - libkrb5-dev
+-    - libsnappy-dev
+-    - libsasl2-dev
+\ No newline at end of file
+diff --git a/thrift/lib/cpp2/Makefile.am b/thrift/lib/cpp2/Makefile.am
+index 6c59a9d..50aae43 100644
+--- a/thrift/lib/cpp2/Makefile.am
++++ b/thrift/lib/cpp2/Makefile.am
+@@ -72,6 +72,12 @@ thrift2include_server_HEADERS = \
+ 	server/Cpp2Worker.h \
+ 	server/ThriftServer.h
+ 
++thrift2include_utildir = $(thrift2includedir)/util
++
++thrift2include_util_HEADERS = \
++	util/ScopedServerInterfaceThread.h \
++	util/ScopedServerInterfaceThread-inl.h
++
+ thrift2include_securitydir = $(thrift2includedir)/security
+ 
+ thrift2include_security_HEADERS = \
+@@ -126,6 +132,7 @@ libthriftcpp2_la_SOURCES = Version.cpp \
+ 			   server/Cpp2Connection.cpp \
+ 			   server/Cpp2Worker.cpp \
+ 			   server/ThriftServer.cpp \
++			   util/ScopedServerInterfaceThread.cpp \
+ 			   ../cpp/EventHandlerBase.cpp \
+ 			   ../cpp/transport/THeaderTransport.cpp \
+ 			   ../cpp/util/ScopedServerThread.cpp \
+-- 
+1.9.1
+

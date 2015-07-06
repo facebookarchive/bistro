@@ -1,0 +1,4 @@
+add_gtest(test_benchmark_runner bistro_lib)
+add_gtest(test_kill_orphans bistro_lib)
+add_gtest(test_local_runner bistro_runners)
+add_gtest(test_remote_runner bistro_lib bistro_worker_test)

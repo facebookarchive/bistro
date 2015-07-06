@@ -1,0 +1,175 @@
+From 5349f19d2fe288a3569a4258694aaf200da86440 Mon Sep 17 00:00:00 2001
+From: Alexey Spiridonov <lesha@fb.com>
+Date: Tue, 7 Jul 2015 13:36:16 -0700
+Subject: [PATCH] Install Ubuntu 12.04 LTS dependencies for Travis CI
+
+Summary: This is the first of a series of diffs to get folly, fbthrift, and bistro to run on Ubuntu 12.04 LTS, which is what powers Travis CI.
+
+It's important for folly to be easily usable with Travis CI, since everything C++ depends on it, and we really want all FB open-source projects to be monitored via continuous integration to avoid breaking their OSS builds.
+
+Thanks to @int's work on `mcrouter`, this was considerably easier than it would have been otherwise.
+
+This puts us a hop and a skip away from actually running folly's `make && make check && make install` on Travis CI. Do y'all think this is useful?
+
+Reviewed By: @yfeldblum
+
+Differential Revision: D2217441
+
+Conflicts:
+	README.md
+---
+ README.md                                   | 16 ++++--
+ folly/{ => build}/bootstrap-osx-homebrew.sh |  3 +
+ folly/build/deps_ubuntu_12.04.sh            | 85 +++++++++++++++++++++++++++++
+ 3 files changed, 99 insertions(+), 5 deletions(-)
+ rename folly/{ => build}/bootstrap-osx-homebrew.sh (93%)
+ create mode 100755 folly/build/deps_ubuntu_12.04.sh
+
+diff --git a/README.md b/README.md
+index ab75045..905bfe5 100644
+--- a/README.md
++++ b/README.md
+@@ -18,6 +18,13 @@ Please download googletest from
+ https://googletest.googlecode.com/files/gtest-1.7.0.zip and unzip it in the
+ folly/test subdirectory.
+ 
++Ubuntu 12.04
++------------
++
++This release is old, requiring many upgrades. However, since Travis CI runs
++on 12.04, `folly/build/deps_ubuntu_12.04.sh` is provided, and upgrades all
++the required packages.
++
+ Ubuntu 13.10
+ ------------
+ 
+@@ -69,14 +76,13 @@ In the folly directory, run
+ 
+ OS X
+ ----
+-There is a bootstrap script if you use Homebrew (http://brew.sh/). At the time
+-of writing (OS X Yosemite 10.10.1) the default compiler (clang) has some
+-issues building, but gcc 4.9.2 from Homebrew works fine. (This is taken care
+-of by the bootstrap script.)
++folly is available as a Formula and releases may be built via `brew install folly`.
++
++You may also use `folly/build/bootstrap-osx-homebrew.sh` to build against `master`:
+ 
+ ```
+   cd folly
+-  ./bootstrap-osx-homebrew.sh
++  ./build/bootstrap-osx-homebrew.sh
+   make
+   make check
+ ```
+diff --git a/folly/bootstrap-osx-homebrew.sh b/folly/build/bootstrap-osx-homebrew.sh
+similarity index 93%
+rename from folly/bootstrap-osx-homebrew.sh
+rename to folly/build/bootstrap-osx-homebrew.sh
+index 56e76bf..2bfaeb7 100755
+--- a/folly/bootstrap-osx-homebrew.sh
++++ b/folly/build/bootstrap-osx-homebrew.sh
+@@ -5,6 +5,9 @@
+ # fail fast
+ set -e
+ 
++BASE_DIR="$(cd "$(dirname -- "$0")"/.. ; pwd)"  # folly/folly
++cd "$BASE_DIR"
++
+ brewget() {
+     brew install $@ || brew upgrade $@
+ }
+diff --git a/folly/build/deps_ubuntu_12.04.sh b/folly/build/deps_ubuntu_12.04.sh
+new file mode 100755
+index 0000000..4e3e7d2
+--- /dev/null
++++ b/folly/build/deps_ubuntu_12.04.sh
+@@ -0,0 +1,85 @@
++#!/bin/bash
++
++# Installs folly's dependencies to /usr/local on a clean Ubuntu 12.04 x64
++# system.  Primarily intended for Travis CI, since most engineers don't run
++# distributions this stale.
++#
++# WARNING: Uses 'sudo' to upgrade your system with impunity:
++#  - Adds several PPAs for missing/outdated dependencies
++#  - Installs several from-source dependencies in /usr/local
++#
++# Library sources & build files end up in folly/folly/deps/
++
++set -ex
++
++BUILD_DIR="$(readlink -f "$(dirname "$0")")"
++mkdir -p "$BUILD_DIR/deps"
++cd "$BUILD_DIR/deps"
++
++sudo apt-get install -y python-software-properties  # for add-apt-repository
++sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
++sudo add-apt-repository -y ppa:boost-latest/ppa
++sudo apt-get update
++
++sudo apt-get install -y git gcc-4.8 g++-4.8 libboost1.54-dev autoconf git \
++  libboost-thread1.54-dev libboost-filesystem1.54-dev libssl-dev cmake \
++  libsnappy-dev libboost-system1.54-dev libboost-regex1.54-dev make \
++  libboost-context1.54-dev libtool libevent-dev libgtest-dev binutils-dev
++
++# TODO: According to the folly docs, these system dependencies might be
++# missing.  However, things seem to build fine...
++#  automake autoconf-archive libboost-all-dev liblz4-dev liblzma-dev
++#  zlib1g-dev libjemalloc-dev
++
++sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 50
++sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 50
++
++CMAKE_NAME=cmake-2.8.12.1
++GFLAGS_VER=2.1.1
++GLOG_NAME=glog-0.3.3
++
++# double-conversion
++pushd .
++git clone https://github.com/google/double-conversion
++cd double-conversion
++cmake -DBUILD_SHARED_LIBS=ON .  # Don't use scons instead, it's broken.
++make
++sudo make install
++sudo ldconfig
++popd
++
++# Newer cmake, since the system's 2.8.7 cmake is too old for gflags:
++# https://groups.google.com/forum/#!topic/google-gflags/bu1iIDKn-ok
++pushd .
++wget http://www.cmake.org/files/v2.8/${CMAKE_NAME}.tar.gz \
++  -O ${CMAKE_NAME}.tar.gz
++tar xzf ${CMAKE_NAME}.tar.gz
++cd ${CMAKE_NAME}
++cmake .
++make
++CMAKE="$(readlink -f bin/cmake)"
++popd
++
++# gflags
++pushd .
++wget https://github.com/gflags/gflags/archive/v${GFLAGS_VER}.tar.gz \
++  -O gflags-${GFLAGS_VER}.tar.gz
++tar xzf gflags-${GFLAGS_VER}.tar.gz
++mkdir -p gflags-${GFLAGS_VER}/build/ && cd gflags-${GFLAGS_VER}/build/
++"$CMAKE" .. -DBUILD_SHARED_LIBS:BOOL=ON -DGFLAGS_NAMESPACE:STRING=google
++make
++sudo make install
++sudo ldconfig
++popd
++
++# glog
++pushd .
++wget https://google-glog.googlecode.com/files/${GLOG_NAME}.tar.gz \
++  -O ${GLOG_NAME}.tar.gz
++tar xzf ${GLOG_NAME}.tar.gz
++cd ${GLOG_NAME}
++./configure
++make
++sudo make install
++sudo ldconfig
++popd
+-- 
+1.9.1
+

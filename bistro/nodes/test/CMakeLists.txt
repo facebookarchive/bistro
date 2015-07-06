@@ -1,0 +1,6 @@
+add_gtest(test_manual_fetcher bistro_nodes)
+add_gtest(test_nodes bistro_nodes)
+add_gtest(test_nodes_utils bistro_nodes)
+add_gtest(test_range_label_fetcher bistro_nodes)
+add_gtest(test_add_time_fetcher bistro_nodes)
+add_gtest(test_script_fetcher bistro_nodes)

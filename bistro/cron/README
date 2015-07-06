@@ -1,0 +1,638 @@
+= Bistro Cron =
+
+== Usage ==
+
+```
+#include <boost/date_time/local_time/local_time_types.hpp>
+#include "folly/dynamic.h"
+#include "bistro/bistro/cron/CrontabItem.h"
+boost::local_time::time_zone_ptr tz;  // null for "system tz", or a boost tz
+auto cron_pattern = CrontabItem::fromDynamic(
+  dynamic::object  // At 10am and 8pm every Tuesday (can also parseJson here)
+    ("day_of_week", "Tue")
+    ("hour", {10, 20})
+    ("minute", 0)
+    ("dst_fixes", {"skip", "repeat_use_only_early"})
+  tz
+);
+// Can throw runtime_error if the pattern is malformed.
+folly::Optional<time_t> maybe_time = cron_pattern->findFirstMatch(input_time);
+if (maybe_time.hasValue()) {
+  std::cout << "Next event at " maybe_time.value() << std::endl;
+} else {
+  std::cout << "No more events" << std::endl;
+}
+```
+
+== Overview ==
+
+This C++11 cron library has three layers:
+
+=== Timezone handling using either boost::date_time or POSIX ===
+
+This is important because some applications really need boost's explicit,
+reentrant timezone support, while others are happy to use the system
+timezone (by passing a null timezone pointer).
+
+=== Stateless cron ===
+
+Given a cron-style pattern (e.g. "at 5pm every Tuesday"), and an input_time,
+compute the first time >= input_time that matches the pattern.
+
+It improves on traditional crons in several ways:
+
+* The default configuration format is folly::dynamic / JSON, which makes for
+  readable and extensible configurations.  Since you don't need a manual to
+  understand the schedule, user errors should be less frequent.
+  
+* It supports "epoch", a simple "run every X seconds" mode unavailable in
+  traditional cron.  Combined with a monotonic clock, this is perfect for
+  periodic maintenance tasks -- this style of cron is completely immune to
+  daylight savings and other date-time disruptions.
+
+* Since Daylight Savings Time transitions are a common source of cron-related
+  errors, you are required to specify "dst_fixes" in non-"epoch" cron
+  patterns.  This is a list containing (a) either "skip" or "unskip" for
+  events that would be skipped when DST moves the clock forward, and (b) one
+  of "repeat_use_both", "repeat_use_only_early", or "repeat_use_only_late"
+  to handle events that would be repeated due to DST rewinding the clock.
+  
+* Combining "day_of_week" and "day_of_month" is deliberately unsupported. 
+  In traditional crons, this behaves as "either Tuesday or the 15th of the
+  month", which breaks the usual rule of "selectors compose via AND". 
+  The principle of least surprise demands that this misfeature be removed. 
+  If you need this "either-or" behavior, simply create two CrontabItems.
+
+The library is easy to extend, so if you need to have it parse traditional
+crontab lines, send us a patch.
+
+=== Stateful cron [not implemented, design below] ===
+
+Stateless cron cannot detect timezone changes, system time changes. It also
+cannot gracefully handle events that are late due to your process being
+suspended, or the system experiencing very heavy load.  Keeping a bit of
+state, and using a monotonic clock, it's possible to address all these
+issues in a single wrapper on top of stateless cron.  See 'Stateful cron
+design' for a detailed "how to build this".  A patch would be most welcome!
+
+== Concepts and features ==
+
+=== Crontab items and selectors ===
+
+A CrontabItem represents a sequence of recurring events, a pattern of
+timestamps.  It is configured with a JSON object (or folly::dynamic).
+
+If the object contains the key "epoch", no other keys are allowed. Such an
+item typically represents an event occurring every N seconds in POSIX time
+(timezone is never used).  Here are the possible variations:
+
+```
+{"epoch": {"period": 300}}  // Every 5 minutes, :00, :05, ... :55
+// Every 5 minutes starting at 00:01, Mar 13, 2011 PST (:01, :06, ... :56).
+{"epoch": {"period": 300, "start": 1300003260}}
+// Every 5 minutes ending on 00:00, Mar 13, 2011 PST (starting in 1970 UTC).
+{"epoch": {"period": 300, "end": 1300003260}}
+{"epoch": 2700}  // Once, at 16:45 on Dec 31 1969, PST
+{"epoch": [2700, 5400]}  // Twice, at 16:45 and 17:30 on Dec 31 1969, PST
+```
+
+What follows after "epoch" is a CrontabSelector. As illustrated above,
+selectors can be a range with a stride, a single value, or a list of values. 
+In a range, "start", "end", and "period" are all optional.  The defaults
+are to start with the minimum value (0 for epoch), end at the maximum value
+(system-dependent for epoch), and have a period of 1.
+  
+If "epoch" is not present in a crontab item, the item is assumed to use the
+traditional cron semantics. In this case, you are /required/ to specify a 
+"minute" selector -- e.g. this item fires every minute:
+
+```
+{"minute": {"period": 1}}
+```
+ 
+Additionally, you can use "hour", "day_of_week", "day_of_month", "month",
+and "year" selectors to further restrict your event. All selectors in an 
+item must match for the item to match (they are combined with logical AND).
+Some essential details:
+
+* "minute" is between 0 and 59.
+
+* "hour" is between 0 and 23, 13 meaning 1pm.
+
+* "day_of_week" is between 1 (Sunday) and 7 (Saturday) regardless of your
+  locale. You can use case-insensitive English day abbreviations with 3+
+  letters, e.g.  "Mon", "Tues", "thu", "SUNDAY".
+
+* "day_of_month" can only be used when "day_of_week" is missing. Allowed 
+  values are from 1 to 31, though {"day": 30, "minute": 0} will obviously
+  always skip February.
+
+* "month" is between 1 and 12, or you can use case-insensitive
+  English abbreviations with 3+ letters, e.g. "JAN" or "sEpTe".
+
+* "year" tops out at 9999 because of a boost::date_time limitation.
+ 
+If you specify something nonsensical like the 30th of February,
+findFirstMatch() will inspect up to 50 years before giving up and throwing. 
+We fail loudly instead of returning "no matches" because this can only
+happen due to user error.
+
+CrontabItem parsing can also throw, responding to more straightforward
+configuration errors (bad key names, our-of-range values, etc).
+ 
+=== DST Fixes ===
+
+Why is the "dst_fixes" field mandatory for traditional CrontabItems? Due to
+Daylight Savings Time transitions, local time is not monotonic:
+
+* 1:30am happened twice on Nov 3, 2013 in the US Pacific timezone -- at UTC
+  timestamps 1383467400 and 1383471000.  That's because the local clock was
+  set back 1 hour at POSIX time 1383469200.
+  
+* 2:30am never happened on Mar 10, 2013 in the US Pacific timezone, because
+  the local clock was set forward one hour at POSIX time 1362909600.
+
+This causes all problems for users of traditional crons. The author of the
+schedule doesn't think about the twice-a-year eventuality, and their
+critical daily event ends up running twice in the winter, or not running at
+all in the spring.
+
+Vixie cron implements a nice heuristic depending on the frequency of the
+job, which reduces the odds of this problem occurring.  Search for "Daylight
+Savings" here: http://unixhelp.ed.ac.uk/CGI/man-cgi?crond.  One could add a
+thin wrapper on top of "dst_fixes" to replicate this heuristic (send a
+patch).
+
+However, I think it's better to have the schedule author think about DST
+upfront -- otherwise, they can still be surprised that some days have 23
+hours, and some have 25.
+
+That is why "dst_fixes" is required. Its usage is pretty simple: you provide
+a list of two strings, e.g.:
+
+```
+"dst_fixes": ["unskip", "repeat_use_only_early"]
+```
+
+One of the strings says how to handle events whose local time labels would
+be skipped by DST moving the clock forward. The options are:
+
+* "skip" -- the event does not fire
+
+* "unskip" -- the event that would be skipped fires 1 second before DST sets
+  the clock forward.  Notice that normal events fire on the minute (e.g. 
+  2:31:00), but this one happens on the 59th second in countries where DST
+  transitions fall on the minute.  You shouldn't rely on this behavior.
+
+The other string must specify how to handle events whose local time label is
+repeated by DST moving the clock backwards. The options are:
+
+* "repeat_use_both" -- the event fires twice, once before, and once after
+  the clock gets set back.
+
+* "repeat_use_only_early" -- the event fires once, only before the clock
+  gets set back.
+
+* "repeat_use_only_late" -- the event fires once, only after the clock gets
+  set back.
+  
+DST fixes are specified per-item because, e.g. "skip" makes a lot of sense
+for frequent events, but "unskip" is appropriate for daily events. 
+Similarly, "repeat_use_both" is good for frequent events, while daily events
+are best served by one of the other two options.
+
+== Caveats and worries ==
+
+=== Timezone rule changes after program start ===
+
+Even if your system is always in the same timezone, and never has large time
+shifts, the government can still change the rules.  So, if you're writing a
+long-running program, take care to keep the timezone information current. 
+This has bitten people in the past:
+  http://brian.moonspot.net/2007/03/14/vixie-cron-and-the-new-us-dst/
+
+==== How to keep timezone info fresh ===
+
+* Maybe you don't need to track the local time? Then, you have two options
+  that beat dealing with timezone rules.  Option 1: use the "epoch"
+  selector.  Your events will fire at different local times depending on
+  whether you are in or out of DST, but they will be predictable and
+  correct.  Option 2: you can get the same effect, but with human-readable
+  crontab items, by forcing a timezone with a fixed offset from UTC, e.g.
+  
+```  
+boost::local_time::time_zone_ptr(
+   new boost::local_time::posix_time_zone("MST-07")
+)
+```
+
+* If you use the system timezone: do whatever it takes to get your libc
+  to re-read its timezone DB (potentially even restarting the program).
+
+* If you use boost::date_time: automatically downloading and reading the
+  freshest version of the DB.  Send a patch if you write any code to make
+  this easier.
+
+* Write some code to parse the Linux timezone DB and feed it into 
+  boost::date_time. Then, reread that DB periodically. This has the
+  advantage of letting your system package manager keep the timezone
+  information current, while getting all the predictability and reentrancy
+  benefits of boost::date_time.  If you do this, send a patch.
+
+=== Year 2038 ===
+
+If you want your code to keep working past 2038, you should assert that the
+time_t type is 64-bit.
+
+=== Boost "posix" timezone names are nonstandard ===
+
+There are at least two major ways in which boost::date_time's
+posix_time_zone does not conform to the POSIX timezone parsing spec:
+
+1) The sign on the timezone's offset relative to UTC is flipped. 
+POSIX GMT-5 is Boost GMT+5 and vice versa: 
+  https://svn.boost.org/trac/boost/ticket/3336
+  https://svn.boost.org/trac/boost/ticket/4545
+
+2) Also, POSIX specifies the DST offset relative to UTC, whereas Boost has
+it relative to the standard zone.
+
+For example, both of these compute "Sun Nov 1 01:59:59 EDT 1992" followed by
+"Sun Nov 1 01:00:00 EST 1992":
+
+  export TZ="EST+5EDT+4,M3.2.0,M11.1.0"; date -d@720597599; date -d@720597600
+
+  #include "boost/date_time/local_time/local_time.hpp"
+  #include "boost/date_time/posix_time/posix_time.hpp"
+  int main(int argc, char **argv) {
+    for (time_t t : {720597599, 720597600}) {
+      std::cout << boost::local_time::local_date_time(
+        boost::posix_time::from_time_t(t),
+        boost::local_time::time_zone_ptr(
+          new boost::local_time::posix_time_zone("EST-5EDT1,M3.2.0,M11.1.0")
+        )
+      ) << std::endl;
+    }
+  }
+
+==== How to help ====
+
+Write an adapter that converts POSIX TZ strings to boost TZ names to
+eliminate this confusion.  Contribute it to boost, and/or send us a patch.
+
+=== System timezone behavior is dangerous ===
+
+(You should probably specify a boost timezone if at all practical.)
+
+The system timezone (used when the time_zone_ptr is null) can change
+arbitrarily at any time (or at least the standard is vague on the subject),
+and it can definitely be changed mid-computation by other threads.  This
+could trigger some of the assertions in StandardCrontabItem, causing your
+program to crash, or -- worse yet -- schedule stuff at the wrong time.
+
+==== How to use the system timezone safely ===
+
+* Use boost::date_time timezones if practical.
+
+* Only call timezone-sensitive functions from a single thread.
+
+* Audit cron library code for places of particular vulnerability to system
+  timezone changes (e.g.  the various searches), and see they can be
+  improved.  Patches are welcome.
+
+=== System timezone behavior may not be portable ===
+
+If you use a null time_zone_ptr, you are calling localtime_r() and mktime(). 
+This is akin to playing Russian Roulette with your C library implementation. 
+The standards for those functions are pretty vague.
+
+For example, this library assumes that mktime() & localtime_r() use time_t
+to store seconds since the UTC epoch.  This is a safe assumption on systems
+I know about, but not part of the standard.
+
+Thread-safey is also not clearly promised in the standard. Glibc has a mutex
+in tzset, so it's probably fairly robust.  Regarding clang, Mac OS library
+documentation also mentions thread-safety, but not in a clear way.
+
+All that said, these functions are very old and very fundamental, so they
+probably work okay on major platforms.
+
+
+== Possible improvements ==
+
+This list could be much longer and more detailed -- if you get interested in
+helping with one or more of those things, email us, and we'll provide more
+context.
+
+* In the cron code that does not touch boost timezones, it would be possible
+  to replace ptime with a TimeLabel class (akin to struct tm).  In addition
+  to cleaning up the semantics, this would enable boost::date_time to be an
+  _optional_ dependency, which might be nice for some people. 
+  
+* Add some "iterated" selector types. For example, "iter_month" could let us
+  represent "every 5th month", or "iter_day_of_week" would let you do "every
+  other Tuesday", or "iter_day" could help with "every 3 days".  Practically
+  speaking, most of these can be addressed pretty well by using "epoch".  If
+  you were to implement these new selectors, they should let you specify the
+  starting / ending month / day in a human-readable way.  That would be a
+  nice usability improvement.
+
+* A different selector type could help with representing some holidays. E.g. 
+  to encode "First Tuesday of November", we would also need a
+  "weekday_of_the_month" selector.  See boost::gregorian week_iterator and
+  nth_day_of_the_week_in_month.
+  
+* It would be trivial to add a "seconds" selector, but there are some
+  complications.  First, the client would have to call findFirstMatch at
+  least once per second -- at which point, performance tuning of this code
+  may be meaningful.  Secondly, you will start to be affected by time
+  discontinuities due to NTP clock adjustments, and leap seconds.  If you
+  need really frequent events, the better option is probably to use a
+  monotonic clock with "epoch", and not to worry about hitting precise
+  places on the local clock.
+
+* Some countries (e.g. Japan and Israel) use a non-Gregorian calendar. It's
+  possible to support this using boost::locale, but see "P.S.  Why
+  boost::date_time?" for some context first.  You are welcome to add support
+  for non-Gregorian calendars (just add new subclasses of CrontabItem), but
+  we will be skeptical of patches that add mandatory heavy external
+  dependencies.  So, if you have to depend on ICU, you will have to make
+  your new CrontabItem a compile-time option -- most folks will not use it.
+
+== Stateful cron design ==
+
+=== Goals and overview ===
+
+Cron is intended to fire events on a precise schedule, as close as possible
+to the requested time.  Stateless cron already handles the complication of
+Daylight Savings Time.  However, system time changes, timezone changes, and
+process suspension / system load can all impact cron's ability to fire
+events correctly.  These three exigencies cannot be detected without keeping
+state.  They also require additional policy tools to enable schedule authors
+to react appropriately.
+
+Stateful cron will be a robust wrapper around stateless cron. It should let
+schedule authors gracefully recover from these three disruptions:
+
+* System time changes: big (e.g. manually move the clock by 1 hour, 3 hours,
+  1 year) or small (NTP adjusts the clock by seconds or minutes).
+
+* Timezone changes: when the machine moves from Shanghai to Hawaii, stateful
+  cron should notice and do the right thing.  This should ideally also cover
+  DST rule changes -- so if your current timezone changes its DST shift from
+  +1h to +2h, stateful cron should help your service cope.
+
+* Stopping / resuming the cron process: this is similar to the system time
+  jumping forward, unless the system clock got set back while we were
+  stopped.
+
+When the local time jumps forward, some events will look like they are "in
+the past" without having had a chance to fire.  When time jumps backward,
+some events will be eligible to fire twice.  There is no universally correct
+handling for these.
+ 
+If an event consumer relies on a fixed number of seconds passing between two
+events, a "local time" cron library cannot do anything to help -- even the
+easy case of daylight savings creates anomalous local-time days having 25
+hours and 23 hours.  Clients requiring strict periods between events
+should prefer to use the "epoch" crontab selector to escape timezone
+changes, and a monotonic clock to escape system time changes.  In such a
+setup, stateless cron would be enough -- also, implementing either "skip" or
+"unskip" policies for events missed due to process suspension is so easy
+that it requires no library support.
+
+For everybody else, stateful cron can provide various policies akin to
+"dst_fixes", which specify how to respond to time and timezone changes.
+
+=== Basic requirements for stateful cron ===
+
+Stateful cron needs to have access to the system clock, to a timezone, and
+to a monotonic clock (so that we can reliably detect time changes).  The
+clocks should be provided via callbacks or templates (for testability),
+while timezone setting differs substantially between "system" and "boost" --
+more below.
+
+In order to fire events on-schedule, the stateful cron code should run
+frequently (e.g.  every minute for normal cron, or every second, if you are
+using epoch cron with a 1-second period).
+
+If, due to heavy system load, or process suspension, a long time passes
+between two runs of the stateful cron code, it should have an output queue
+or iterator interface to allow the emission of more than one event.  We'll
+later discuss when it makes sense to skip some events.
+
+A reasonable semantics for the output events would be "emit all events up to
+and including the current system time, modulo any policies for mitigating
+timezone shifts, time shifts, and process suspensions".
+
+For many applications, running cron in a separate thread, and feeding events
+into a thread-safe queue would be a good solution. This should probably be 
+an optional feature provided by the library.
+
+=== Timezone changes ===
+
+==== What is a timezone change? ====
+
+A timezone change is when the system is manually transferred to a different
+timezone, or when a system's timezone rules are modified in a way that
+affects the present moment.  This specifically does not include Daylight
+Savings Time changes, since those are already handled by stateless cron.
+
+The way that a timezone change comes about will depend on whether you are
+using the system timezone or a boost::date_time zone.
+
+Using the system timezone, any other thread of the process could potentially
+trigger a timezone change -- something to be carefully avoided, since
+changing the timezone in the middle of a cron computation has undefined
+results (including potentially triggering assertions and throwing).  For the
+remainder of this section, we assumethat you are calling tzset() in a safe
+way periodically, in order to stay on top of the current timezone rules. 
+The stateful cron implementation should include some implementation of "keep
+the TZ info current", assuming this can be done in a robust way.
+
+Using a boost::date_time timezone, the cron library would actually have to
+explicitly accept a timezone change.  So, stateful Cron must provide a
+setTimezone() method, which may receive a new time_zone_ptr at any time. 
+This is good, because then stateful cron has control of all requisite
+locking, and the TZ change will never be effected mid-computation.
+
+==== Detecting a timezone change ====
+
+So, now imagine: the timezone rules just changed. How does one detect this,
+and/or separate it from "the system time has changed"?
+
+The best signal would be that the GMT offset of the current timezone, at the
+current time, has changed between two invocations of the stateful cron code. 
+There are confounding issues:
+
+* With the system timezone, we can only query the current timezone, not our
+  previous run's timezone.
+
+* Normal DST transitions also change the DST offset, so we are looking for
+  "unexpected" changes to the GMT offset.
+
+* If I manually move the system time across a DST transition, it will also
+  change the GMT offset.
+
+In both cases, therefore, we are not looking for a change in GMT offset
+between "now" and "the previous time we looked".  Rather, we should remember
+the timestamp and GMT offset of the previous time we looked, and recompute
+the offset using our current timezone.  If it hasn't changed, we conclude
+that we're in the same timezone as before.  This heuristic is imperfect,
+since it ignores the GMT offset of the present moment.  Unfortunately, when
+using the systme timezone, there is no way of querying the GMT offset of
+"now" with "our previous run's timezone".  So, this retrospective heuristic
+is probably the best we can do -- better suggestions are welcome.
+
+==== Responding to a timezone change ====
+
+Timezone changes are administrative events that change the definition of
+"local time".  They do not affect "epoch" crontab items at all (code test:
+isTimezoneDependent() returns false).  For "standard" crontab items, the
+easiest strategy is to forget the past and to work with the new timezone. 
+This is equivalent to DST fixes of "skip", "repeat_use_both".
+
+One might potentially introduce "unskip" and "repeat_use_only_early", for
+the cases where the timezone change moves local time a few hours forward or
+back.  Implementing "repeat_use_only_late" is impossible, since unlike DST
+transitions, we have no way of anticipating the timezone change.  Therefore,
+I'll just call the second heuristic "do_not_repeat".
+
+The complication is that schedule authors might want different behaviors
+depending on the size of the timezone change.  If I have a daily event, and
+I move local time back by 3 hours, it seems bad to repeat the event.  So,
+one would want "do_not_repeat" for that case.  But, for the same daily event
+and a timezone shift of 18 hours back, you might as well repeat the event.
+
+Therefore, the policy tool should probably be "unskip if the the shift is
+less than X seconds", and "do not repeat if the shift is less than Y
+seconds".  Since X and Y depend mostly on the frequency of the event, you
+might use the same number for both.  So, a reasonable policy tool is:
+
+```
+"max_shift_seconds_for_unskip_and_do_not_repeat": 7200,
+```
+
+If local time moves forward less than 2 hours, we will fire all events that
+would have happened in that time immediately after the shift (in contrast
+with "dst_fixes" whose "unskip" fires just before the shift).  Conversely,
+if local time moves back less than 2 hours, we will not re-run events
+falling on the local times that got repeated.
+
+Much like "dst_fixes", this policy should be specified per-crontab item, and
+should be mandatory (see the reasons in the 'DST Fixes' section).
+
+Naturally, this section only applies to timezone-sensitive crontab items, so
+that the "epoch" selector ought not to track the GMT offset.
+
+=== Process suspensions or system load ===
+
+Imagine that you have an event that fires every 5-10 minutes (e.g. in some
+complex pattern).  If your process blocks for 30 seconds, and an event was
+supposed to fire in that period, we should fire the event as soon as the
+process unblocks.  The same goes if the process is suspended for 2 minutes. 
+However, with a 4- or 15- minute suspension, it becomes more reasonable to
+just skip the event(s) that we missed.
+
+So, the setting we developed for timezone changes would also apply here. 
+For the described scenario, setting
+
+```
+"max_shift_seconds_for_unskip_and_do_not_repeat": 150,
+```
+
+would be a good choice. We catch up on stale events that are less than 2.5
+minutes old, but skip anything older than that.
+
+The implementation is also pretty easy. Stateful cron remembers the last
+system timestamp that it had processed, and when it gets run again, it tries
+to catch up to the new system timestamp.  Events that are too old simply get
+discarded. 
+
+There's the small complication of how this interacts with system time
+changes.  If the process is suspended for 1 hour, during which the system
+time is set back 1 hour, then stateful cron would see the monotonic clock
+jump forward 1 hour, but no other changes.  In this case, the "time between
+runs" A and the "system time change" B cancel out, and we should proceed as
+if nothing happened.  This shows you must look at (B - A) when reacting to
+system time changes, and that you need to carefully test interactions
+between different disruptions.
+
+This section applies both to timezone-sensitive and timezone-insensitive
+items.  Of course, for timezone-sensitive ones, we must also track the local
+time changes.  You should think about, and test scenarios similar to this
+one: your process is suspended for A seconds, during which the local time
+moves by B seconds, while the system time moves by C seconds.  The
+arithmetic won't be too hard, but you must take care.
+
+=== System time changes ===
+
+To detect system time changes, simply compare (system_clock -
+prev_system_clock) with (monotonic_clock - prev_monotonic_clock).  The
+difference is the system time change.
+
+It should come as no surprise that the same policy tool of
+"max_shift_seconds_for_unskip_and_do_not_repeat" would do the trick here.
+
+Implementation-wise, you should be sure to test that system time changes of
+a few seconds are effectively ignored by your code (this is important since
+NTP can trigger frequent small-scale time adjustments).  This should not
+require special logic -- it should just be a consequence of
+"max_shift_seconds_for_unskip_and_do_not_repeat" being set much higher. 
+Another good test case is that of a frequent event (whose
+"max_shift_seconds..." is appropriately low) seeing the system time change
+by a year.  A good implementation should handle this quickly (without
+iterating through a million events), and should only send the most recent
+"max_shift_seconds..." worth of events to the client.
+
+Like process suspensions, this affects all crontab item types. Also, as
+mentioned before, carefully test interactions with process suspension, and
+timezone changes.
+
+=== A design modification ===
+
+Instead of exposing a "max_shift_seconds..." policy, a lower-level stateful
+cron API coudl just export events that are labelled "skipped" or "already
+fired", with a "shift_seconds" field, letting the user trivially implement
+the "max_shift_seconds...".  This is a nice and extensible implementation
+choice, but I think that even then, you should provide the
+"max_shift_seconds..." wrapper on top.
+
+== P.S. Why boost::date_time? ==
+
+POSIX date-time functions are simple to use, but are rife with practical
+issues: implementations vary, standards-compliance varies, and thread-safety
+varies.  In particular, you cannot reliably use them to query arbitrary
+timezones.  Yes, some hackery with tzset() and environment variables can be
+attempted, but that is too fragile a path for a library to take.
+
+There are three major open-source C++ libraries that attempt to bring some
+uniformity to date-time handling: ICU, boost::locale (partly based on ICU),
+and boost::date_time. The latter won by elimination.
+
+* ICU is huge and hard to use. It's much too heavy for a cron library.
+
+* boost::locale has perhaps the nices API of the bunch, but the library is
+  of questionable maturity, e.g. https://svn.boost.org/trac/boost/ticket/9584
+  The documentation is scant, and does not precisely define the behavior.
+  It's therefore not obvious that thought has been put into covering edge 
+  cases properly, which means that we can't count on the library for
+  mission-critical tasks. Last, but not least, some important features
+  are only available when boost::locale is linked against ICU, increasing
+  the dependency weight dramatically.
+  
+* boost::date_time has been around for much longer than boost::locale (at
+  least 2001 vs 2011).  As a consequence, its API is not as modern and
+  clean, but it has precise, detailed documentation, and there is evidence
+  that edge cases are covered.  It also has issues (see the section 'Boost
+  "posix" timezone names are nonstandard'), but these are reasonable
+  deviations from a standard, rather than crazy/incorrect behaviors.
+
+As a bonus, using boost::date_time instead of the system timezone makes it
+easier to add new features -- e.g.  an "nth day-of-the-week in the month"
+selector (see 'Possible improvements' for others).
+  
+N.B. None of the three libraries is able to read the Linux system timezone
+database, which is really annoying, since one is forced to put work into
+keeping the timezone rules current.  See 'How to keep timezone info fresh'
+for some ideas.

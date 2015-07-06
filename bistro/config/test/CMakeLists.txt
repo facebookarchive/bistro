@@ -1,0 +1,8 @@
+add_gtest(test_backoff bistro_config)
+add_gtest(test_config bistro_config)
+add_gtest(test_config_utils bistro_config)
+add_gtest(test_file_config_loader bistro_config)
+add_gtest(test_job_filters bistro_config)
+add_gtest(test_job bistro_config)
+add_gtest(test_node bistro_config)
+add_gtest(test_task_placement bistro_config)

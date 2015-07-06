@@ -1,0 +1,2 @@
+add_gtest(test_remote_worker bistro_remote)
+add_gtest(test_remote_worker_state bistro_remote)

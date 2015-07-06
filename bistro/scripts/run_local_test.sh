@@ -1,0 +1,49 @@
+#!/bin/bash -e
+#
+# This runs a simple integration test / scheduler benchmark.
+#
+
+D=$(dirname `readlink -f "$0"`)
+
+CONFIG_FILE="$1"
+FLAG=""
+if [[ "$CONFIG_FILE" == "" ]] ; then
+  CONFIG_FILE="$D/test_configs/simple"
+  FLAG="--benchmark_run"
+else
+  shift
+fi
+
+# Decide if we're using CMake or the FB build system
+BISTRO_BINARY="$D/../../../_bin/bistro/bistro/server/bistro"
+if [[ -x "$BISTRO_BINARY" ]] ; then
+  PHABRICATOR_DOMAIN="phabricator.fb.com"
+else
+  PHABRICATOR_DOMAIN="[YOUR PHABRICATOR DOMAIN]"
+  # Try the release binary, then default to the debug binary
+  BISTRO_BINARY="$D/../build/Release/bistro/bistro/server/bistro"
+  if [[ ! -x "$BISTRO_BINARY" ]] ; then
+    BISTRO_BINARY="$D/../build/Debug/bistro/bistro/server/bistro"
+  fi
+fi
+
+cat <<EOF
+Test instance starting!
+
+You can Ctrl-Z, bg, and watch the logs via:
+  tail -f /tmp/bistro_log
+The web UI is here:
+  https://$PHABRICATOR_DOMAIN/bistro/jobs?fetcher=monitor2_http&hostport_source=hp&hostport_data=$HOSTNAME%3A8080
+EOF
+
+echo
+set -x
+"$BISTRO_BINARY" \
+  --config_file="$CONFIG_FILE" \
+  $FLAG \
+  --monitor_update_ms=1000 \
+  --config_update_ms=2000 \
+  --nodes_update_ms=5000 \
+  --nodes_retry_ms=5000 \
+  "$@" \
+> /tmp/bistro_log 2>&1

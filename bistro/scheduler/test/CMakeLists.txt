@@ -1,0 +1,6 @@
+add_gtest(test_job_dependency bistro_scheduler)
+add_gtest(test_long_tail bistro_scheduler)
+add_gtest(test_level_for_tasks bistro_scheduler)
+add_gtest(test_round_robin bistro_scheduler)
+add_gtest(test_ranked_priority bistro_scheduler)
+add_gtest(test_randomized_priority bistro_scheduler)

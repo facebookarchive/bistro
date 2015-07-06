@@ -1,0 +1,23 @@
+{
+
+"bistro_settings" : {
+  "resources": {
+    "instance": {"concurrency": {"limit": 3, "default": 1}}
+  },
+  "nodes" : {
+    "levels": [ "level1", "level2"],
+    "node_source": "manual",
+    "node_source_prefs": {
+      "node1": ["node11", "node12"],
+      "node2": ["node21", "node22"]
+    }
+  },
+  "enabled" : true
+},
+
+"bistro_job->simple_job" : {
+  "owner" : "test",
+  "enabled" : true
+}
+
+}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns#">
+<head>
+    <meta charset="utf-8">
+    <title>Bistro | {{ page.title }}</title>
+    <link rel="stylesheet" href="/bistro/static/bistro.css" type="text/css"/>
+    <link rel="stylesheet" href="/bistro/static/pygments.css" type="text/css"/>
+    <meta name="viewport" content="width=device-width">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Bistro | {{ page.title }}" />
+    <meta property="og:description" content="Bistro: A fast, flexible toolkit for scheduling and running tasks">
+</head>
+<body>
+
+<header class="topbar"><nav class="width">
+<a href="/bistro/index.html">
+  <h1 class="v{{ page.content | size | modulo: 36 }}">Bistro</h1></a>
+    <ul>
+<!-- XXX add these soon
+      <li><a href="/bistro/docs/getting-started.html"
+          {% if (page.id != 'about-bistro') and (page.sectionid == 'docs') %}
+          class="active" {% endif %}>
+          Docs
+      </a></li>
+      <li><a href="/bistro/blog/"{% if page.sectionid == 'blog' %} class="active"{% endif %}>Blog</a></li>
+-->      
+      <li><a href="http://github.com/facebook/bistro">GitHub</a>
+    </ul>
+</nav></header>

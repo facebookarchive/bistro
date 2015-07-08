@@ -1,0 +1,20 @@
+- title: Quick start
+  items:
+  - id: why-bistro
+    title: Why Bistro?
+  - id: getting-started
+    title: Getting started
+- title: Guides
+  items:
+  - id: how-bistro-works
+    title: How Bistro works
+  - id: logging
+    title: Logging
+  - id: best-practices
+    title: Best practices
+- title: Extending Bistro
+  items:
+  - id: config-loaders
+    title: Configuration loaders
+  - id: node-fetchers
+    title: Node fetchers

@@ -60,7 +60,7 @@ targets are explained here:
    http://cmake.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools
 The 'runtests' argument optionally runs Bistro's unit tests.
 
-== Your first Bistro run ==
+## Your first Bistro run
 
 This is just one simple demo, but Bistro is a very flexible tool. Refer to
 https://bistro.io for more in-depth information.

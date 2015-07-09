@@ -1,91 +1,9 @@
 <header class='hero'><div class='width'>
-    <h1>
-       Bistro
-    </h1>
-    <p>A fast, flexible toolkit for scheduling and running distributed tasks</p>
-    <div class="buttons-unit">
-<!-- XXX add soon
-      <a href="/bistro/docs/getting-started.html" class="button">Get Started</a>
--->      
-      <a href="http://github.com/facebook/bistro" class="button">GitHub</a>
-      <a href="/bistro/static/bistro_ATC_final.pdf" class="button">USENIX ATC'15 paper</a>
+    <div class='fresco-header'></div>
+    <div>
+      <p>An image management library</p>
+      <div class="buttons-unit">
+        <a href="/docs/index.html#_" class="button">Get Started</a>
+      </div>
     </div>
 </div></header>
-
-
-<header class='subhero'><div class='width'>
-    <section class="panel3">
-      <h3>Work on storage serving live traffic</h3>
-      <p>
-
-      Your tasks may consume the same data resources (disk IOPs, CPU, ...)
-      as your live traffic.  Bistro only starts tasks if the relevant
-      resource slots are available on the data hosts, rack switches, or any
-      other physical bottleneck, which might otherwise impact live traffic.
-
-      </p><p>
-      
-      Bistro does not dictate how you store your data.  At Facebook, we have
-      used it with:
-
-      <ul>
-      <li><a href="https://www.mysql.com">MySQL</a> and 
-          <a href="https://www.postgresql.org">PostgreSQL</a> databases</li>
-      <li>Files on <a href="https://www.gluster.org/">GlusterFS</a></li>
-      <li><a href="https://hbase.apache.org/">HBase</a> regions</li>
-      <li><a href="https://www.usenix.org/conference/osdi14/technical-sessions/presentation/muralidhar">
-      	  f4 Blob Storage System</a></li>
-      </ul>
-      </p>
-    </section>
-    <section class="panel3">
-      <h3>Divide work in space or time</h3>
-      <p>
-
-      Map your work over <i>nodes</i> &mdash; Bistro's way of modeling
-      multi-part computations, e.g.
-      <ul>
-      <li><i>prioritized workqueue</i>: 1 node per job</li>
-      <li><i>map-only jobs</i>: nodes are map shards</li>
-      <li><i>sharded, replicated database</i>: a <a
-            href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">
-          DAG</a> of nodes &mdash; the DB hosts are sinks (for tracking
-          resources), and DB instances are children of their hosts</li>
-      <li><i>periodic work</i> (like <tt>cron</tt>): a data node has
-          a child node for each time period
-      </ul>
-
-      If needed, <a href="https://en.wikipedia.org/wiki/MapReduce">
-      MapReduce</a> computations can be modeled as a sequence of 3 dependent
-      jobs: map, shuffle, reduce.
-      
-      </p>
-    </section>
-    <section class="panel3">
-      <h3>Flexible, extensible, scriptable</h3>
-      <ul>
-      <li>Concise JSON configuration</li>
-      <li>Command-line tooling</li>
-      <li>Tunable, scalable web UI</li>
-      <li>REST-style scheduler API</li>
-      <li>Customizable via small plugins<ul></ul></li>
-      <li>
-        Powerful job model
-        <ul>
-        <li>dependencies</li>
-        <li>priorities</li>
-        <li>host placement</li>
-        <li>node filters</li>
-        </ul>
-      </li>
-      <li>
-        Many deployment styles
-        <ul>
-        <li>one scheduler, many workers</li>
-        <li>sharded share-nothing workers, with results aggregated by the UI</li>
-        <li>multi-scheduler/multi-worker</li>
-        </ul>
-      </li>
-      </ul>
-    </section>
-<div/></header>

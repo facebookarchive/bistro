@@ -1,14 +1,13 @@
 ---
-layout: default
+layout: home
 title: A fast, flexible toolkit for scheduling and running distributed tasks
 id: home
 hero: true
 ---
 
-Bistro is a toolkit for making services that schedule and execute tasks.  It
-is an engineer's tool --- your clients need to do large amounts of
-computation, and your goal is to make a system that handles them easily,
-perfomantly, reliably.
+{% include content/gridblocks.html data_source=site.data.features grid_type="threeByGridBlockLeft" %}
+
+## Why Use Bistro?
 
 You should consider using Bistro instead of rolling your own solution,
 because in our experience at Facebook, every heavily used task-execution
@@ -45,55 +44,55 @@ There is already a lot of code, with which to play, so you have any thoughts
 note</a>!  Open-source projects thrive and grow on encouragement and
 feedback.
 
-## Case study: data-parallel tasks with data <b>and</b> worker resources
+## Case study: data-parallel tasks with data **and** worker resources
 
 While Bistro is a capable traditional task queue, one of its more unique
 features is the ability to account not just for the resources of the
 machines executing the tasks, but also for any bottlenecks imposed by the
-<i>data being queried</i>.
+*data being queried*.
 
 Here is a simple example:
 
  * Your data resides on 500 database hosts serving live traffic.
  * Each database host has 10-20 logical databases.
- * The hosts have enough performance headroom to run at most <i>two</i> 
+ * The hosts have enough performance headroom to run at most *two* 
    batch tasks per host, without impacting production traffic.
  * You have some batch jobs, which must process all the databases.
  * Bistro will use 1 scheduler, and a worker pool of 100 machines.
 
-#### Levels
+### Levels
 
 To configure Bistro in such a setup, first describe the structure of the
-computation in terms of <i>nodes</i> at several levels:
+computation in terms of *nodes* at several levels:
 
- * Database <tt>host</tt> nodes --- to limit tasks per DB host.
- * Logical <tt>database</tt> nodes, each connected to its DB host node.
+ * Database `host` nodes --- to limit tasks per DB host.
+ * Logical `database` nodes, each connected to its DB host node.
    A running task locks its logical DB.
- * If remote worker hosts are in use, a node per <tt>worker</tt> host is
+ * If remote worker hosts are in use, a node per `worker` host is
    automatically created.
  * If global concurrency constraints are desired, a top-level scheduler
-   <tt>instance</tt> node is also available.
+   `instance` node is also available.
 
 In a typical setup, each running task associates with one node on each level:
 
- * <tt>database</tt>: The logical DB is the work shard being processed.
- * <tt>host</tt>: What host to query for data?
- * <tt>worker</tt>: Where is the process running?
+ * `database`: The logical DB is the work shard being processed.
+ * `host`: What host to query for data?
+ * `worker`: Where is the process running?
 
-#### Resources
+### Resources
 
 Before running jobs, define resources for the nodes at various levels:
 
- * <tt>host</tt> nodes should be protected from excessive queries to
+ * `host` nodes should be protected from excessive queries to
    avoid slowing down live production traffic --- allocate 2
-   <tt>host_concurrency</tt> slots to honor the requirement above.
- * typical <tt>worker</tt> resources might be, e.g. <tt>cpu_cores</tt>,
-   <tt>ram_giagabytes</tt>, etc.  Bistro supports non-uniform resource
+   `host_concurrency` slots to honor the requirement above.
+ * typical `worker` resources might be, e.g. `cpu_cores`,
+   `ram_giagabytes`, etc.  Bistro supports non-uniform resource
    availability among its worker hosts.
 
-#### Nodes
+### Nodes
 
-Hosts fail, and therefore our <tt>host</tt> to <tt>database</tt> mapping
+Hosts fail, and therefore our `host` to `database` mapping
 will change continuously.  To deal with this, Bistro continuously polls for
 node updates --- it can periodically run your "node fetcher" script, or read
 a file, or poll a custom in-process plugin.  One of the standard plugins
@@ -102,14 +101,14 @@ When nodes change, tasks are started on the new nodes, and stopped on the
 deleted ones.  Bistro's node model also naturally accommodates database
 replicas.
 
-#### Jobs
+### Jobs
 
 Lastly, specify the jobs to run --- a path to a binary will suffice, and the
-binary will be run against every <tt>database</tt> node found above.  Many
+binary will be run against every `database` node found above.  Many
 other job options and metadata are available.  You can even implement your
 tasks as custom RPC requests.
 
-#### Ready to go
+### Ready to go
 
 The above configuration is continuously polled from a file (or other
 configuration source) by the Bistro scheduler.  Bistro's worker processes
@@ -145,20 +144,3 @@ or two for:
  * Detailed feature documentation
  * Ways to deploy, integrate, and extend Bistro
  * How to contribute to the project
-
-{::comment}
-XXX TODOs:
- - Add a #gethelp anchor, for README.md to link to.
-   => fb group, issue tracker
- - replace <a <i <b and other < with markdown syntax
- - add instructions on how to start code a la what's in README.md
- - extend the "Flexible" section?
-
-You can configure it to do useful work out-of-the-box, without writing new
-code.  As more plugins are written, its utility as a toolkit will increase.
-
-= Bistro as a library =
-
-Another way to think about Bistro is --- it is a library, which you can
-use to build various kinds of distributed computing services
-{:/comment}

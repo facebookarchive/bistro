@@ -1,0 +1,43 @@
+- title: Work on storage serving live traffic
+  text: >
+    Your tasks may consume the same data resources (disk IOPs, CPU, ...) as your live traffic. Bistro only starts tasks if the relevant resource slots are available on the data hosts, rack switches, or any other physical bottleneck, which might otherwise impact live traffic.
+    Bistro does not dictate how you store your data. At Facebook, we have used it with:
+
+      + [MySQL](https://www.mysql.com) and [PostgreSQL](https://www.postgresql.org) databases
+      + Files on [GlusterFS](https://www.gluster.org/)
+      + [HBase](https://hbase.apache.org/) regions
+      + [f4 Blob Storage System](https://www.usenix.org/conference/osdi14/technical-sessions/presentation/muralidhar)
+  
+- title: Divide work in space or time
+  text: >
+    Map your work over _nodes_ — Bistro's way of modeling multi-part computations, e.g.
+
+      *   _prioritized workqueue_: 1 node per job
+      *   _map-only jobs_: nodes are map shards
+      *   _sharded, replicated database_: a [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of nodes — the DB hosts are sinks (for tracking resources), and DB instances are children of their hosts
+      *   _periodic work_ (like <tt>cron</tt>): a data node has a child node for each time period
+
+    If needed, [MapReduce](https://en.wikipedia.org/wiki/MapReduce) computations can be modeled as a sequence of 3 dependent jobs: map, shuffle, reduce.
+  
+- title: Flexible, extensible, scriptable
+  text: >
+      *   Concise JSON configuration  
+      
+      *   Command-line tooling  
+      
+      *   Tunable, scalable web UI  
+      
+      *   REST-style scheduler API  
+      
+      *   Customizable via small plugins  
+      
+      *   Powerful job model
+          *   dependencies
+          *   priorities
+          *   host placement
+          *   node filters
+          
+      *   Many deployment styles
+          *   one scheduler, many workers
+          *   sharded share-nothing workers, with results aggregated by the UI
+          *   multi-scheduler/multi-worker

@@ -1,16 +1,12 @@
-{% include header.html %}
+<!DOCTYPE html>
+<html>
+  {% include head.html %}
+  <body>    
+    {% include nav.html alwayson=true %}
+    <div class="navPusher">
+      {{ content }}
+      {% include footer.html %}
+    </div>
+  </body>
 
-{% if page.hero %}
-  {% include hero.html %}
-{% endif %}
-
-<section class='content'><div class='width'>
-
-<article>
-
-{{ content }}
-
-</article>
-
-</div></section>
-{% include footer.html %}
+</html>

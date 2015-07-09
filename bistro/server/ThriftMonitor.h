@@ -1,3 +1,12 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #pragma once
 
 #include <memory>
@@ -8,7 +17,7 @@
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
 #include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
 #include "common/fb303/cpp/FacebookBase2.h"
-#include "folly/Synchronized.h"
+#include <folly/Synchronized.h>
 
 namespace facebook {
 namespace concurrency {

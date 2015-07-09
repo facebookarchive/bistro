@@ -1,11 +1,21 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #include "bistro/bistro/remote/RemoteWorker.h"
+
 #include <folly/Logging.h>
 #include <folly/json.h>
+#include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/Exception.h"
-#include "thrift/lib/cpp2/protocol/DebugProtocol.h"
 
 DEFINE_bool(
   allow_bump_unhealthy_worker, false,

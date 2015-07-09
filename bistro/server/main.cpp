@@ -1,5 +1,15 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #include <glog/logging.h>
 #include <folly/ScopeGuard.h>
+#include <thrift/lib/cpp2/server/ThriftServer.h>
 
 #include "bistro/bistro/Bistro.h"
 #include "bistro/bistro/config/FileConfigLoader.h"
@@ -14,7 +24,6 @@
 #include "bistro/bistro/statuses/SQLiteTaskStore.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/utils/BackgroundThreads.h"
-#include "thrift/lib/cpp2/server/ThriftServer.h"
 
 DEFINE_int32(server_port, 13131, "Server port");
 DEFINE_string(config_file, "", "File to use for resource and job config");

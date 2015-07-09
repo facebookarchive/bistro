@@ -1,4 +1,18 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #include "bistro/bistro/server/ThriftMonitor.h"
+
+#include <folly/experimental/AutoTimer.h>
+#include <folly/json.h>
+#include <thrift/lib/cpp2/protocol/DebugProtocol.h>
+#include <thrift/lib/cpp2/server/ThriftServer.h>
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/ConfigLoader.h"
@@ -14,10 +28,6 @@
 #include "bistro/bistro/runners/TaskRunner.h"
 #include "bistro/bistro/thrift/ThriftConversion.h"
 #include "bistro/bistro/utils/Exception.h"
-#include <folly/experimental/AutoTimer.h>
-#include "folly/json.h"
-#include "thrift/lib/cpp2/protocol/DebugProtocol.h"
-#include "thrift/lib/cpp2/server/ThriftServer.h"
 
 namespace facebook { namespace bistro {
 

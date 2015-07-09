@@ -1,13 +1,22 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
+#include <folly/Memory.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <memory>
+#include <thrift/lib/cpp2/server/ThriftServer.h>
 
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
 #include "bistro/bistro/utils/service_clients.h"
 #include "bistro/bistro/utils/server_socket.h"
 #include "bistro/bistro/worker/BistroWorkerHandler.h"
-#include "folly/Memory.h"
-#include "thrift/lib/cpp2/server/ThriftServer.h"
 
 // TODO: It would be useful to periodically re-read this host:port from a
 // file to ensure your scheduler can survive machine failures.

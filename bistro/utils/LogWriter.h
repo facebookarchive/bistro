@@ -1,3 +1,12 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #pragma once
 
 #include <atomic>
@@ -9,8 +18,8 @@
 #include "bistro/bistro/utils/BackgroundThreadMixin.h"
 #include "bistro/bistro/utils/EnumHash.h"
 #include "bistro/bistro/utils/ProcessRunner.h"  // for enum class LogTable
-#include "folly/Range.h"
-#include "folly/Synchronized.h"
+#include <folly/Range.h>
+#include <folly/Synchronized.h>
 
 namespace facebook { namespace bistro {
 

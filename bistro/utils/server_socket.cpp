@@ -1,3 +1,12 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #include "bistro/bistro/utils/server_socket.h"
 
 #include <arpa/inet.h>
@@ -16,15 +25,15 @@ DEFINE_string(
   "is specified, tries IPv6 first, then IPv4."
 );
 DEFINE_bool(server_disable_ipv6, false, "See --server_inet_interface.");
-DEFINE_string( 
-  server_address, "", 
-  "Listen on this IPv4 or IPv6 address. Defaults to empty, meaning: try to " 
-  "guess the interface and the address. See also --server_inet_interface." 
-); 
-DEFINE_int32( 
-  server_port, 0, 
+DEFINE_string(
+  server_address, "",
+  "Listen on this IPv4 or IPv6 address. Defaults to empty, meaning: try to "
+  "guess the interface and the address. See also --server_inet_interface."
+);
+DEFINE_int32(
+  server_port, 0,
   "Listen on this port. Defaults to zero, meaning: pick a random free port."
-); 
+);
 
 namespace facebook { namespace bistro {
 
@@ -168,7 +177,7 @@ std::pair<folly::AsyncServerSocket::UniquePtr, cpp2::ServiceAddress>
     addr.ip_or_host = FLAGS_server_address;
   }
 
-  // Pick the port  
+  // Pick the port
   folly::AsyncServerSocket::UniquePtr socket(new folly::AsyncServerSocket);
   if (FLAGS_server_port == 0) {
     socket->bind(folly::SocketAddress(addr.ip_or_host, 0));

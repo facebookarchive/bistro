@@ -1,15 +1,24 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #pragma once
 
 #include <boost/noncopyable.hpp>
 #include <folly/Synchronized.h>
 #include <memory>
 #include <thread>
+#include <thrift/lib/cpp/async/TEventBase.h>
 
 #include "bistro/bistro/remote/RemoteWorkers.h"
 #include "bistro/bistro/runners/TaskRunner.h"
 #include "bistro/bistro/scheduler/ResourceVector.h"
 #include "bistro/bistro/utils/BackgroundThreadMixin.h"
-#include "thrift/lib/cpp/async/TEventBase.h"
 
 namespace folly {
   class dynamic;

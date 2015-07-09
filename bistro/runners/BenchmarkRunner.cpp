@@ -1,4 +1,15 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #include "bistro/bistro/runners/BenchmarkRunner.h"
+
+#include <folly/Random.h>
 
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/Node.h"
@@ -25,7 +36,7 @@ BenchmarkRunner::BenchmarkRunner()
       while (!queue_.empty() && queue_.top().due_ <= cur) {
         queue_.top().cb_(
           queue_.top().rt_,
-          ((double) rand() / (RAND_MAX)) > FLAGS_test_failure_rate
+          folly::Random::randDouble01() > FLAGS_test_failure_rate
               ? TaskStatus::done()
               : TaskStatus::errorBackoff("testing")
         );

@@ -1,8 +1,22 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #include "bistro/bistro/worker/BistroWorkerHandler.h"
 
 #include <boost/filesystem.hpp>
 #include <folly/experimental/AutoTimer.h>
+#include <folly/File.h>
+#include <folly/json.h>
+#include <folly/Random.h>
 #include <limits>
+#include <thrift/lib/cpp2/protocol/DebugProtocol.h>
+#include <thrift/lib/cpp2/server/ThriftServer.h>
 
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
 #include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
@@ -13,11 +27,6 @@
 #include "bistro/bistro/utils/LogWriter.h"
 #include "bistro/bistro/utils/service_clients.h"
 #include "bistro/bistro/if/gen-cpp2/worker_types.h"
-#include "folly/File.h"
-#include "folly/json.h"
-#include "folly/Random.h"
-#include "thrift/lib/cpp2/protocol/DebugProtocol.h"
-#include "thrift/lib/cpp2/server/ThriftServer.h"
 
 DEFINE_string(
   shard_id, "",

@@ -1,10 +1,19 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #include "bistro/bistro/utils/LogWriter.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 
-#include "folly/Conv.h"
-#include "folly/String.h"
+#include <folly/Conv.h>
+#include <folly/String.h>
 #include "bistro/bistro/utils/Exception.h"
 #include "bistro/bistro/utils/LogLines.h"
 #include <folly/experimental/AutoTimer.h>

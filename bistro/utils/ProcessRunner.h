@@ -1,3 +1,12 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
 #pragma once
 
 #include <boost/filesystem/path.hpp>
@@ -7,10 +16,10 @@
 
 #include "bistro/bistro/utils/TemporaryFile.h"
 #include "bistro/bistro/utils/KillableSubprocess.h"
-#include "folly/Conv.h"
-#include "folly/Optional.h"
-#include "folly/Subprocess.h"
-#include "folly/Synchronized.h"
+#include <folly/Conv.h>
+#include <folly/Optional.h>
+#include <folly/Subprocess.h>
+#include <folly/Synchronized.h>
 
 DECLARE_int32(child_sigterm_wait_ms);
 

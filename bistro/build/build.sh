@@ -31,46 +31,6 @@ update_file() {
   fi
 }
 
-update_fb303_stubs() {
-  echo "Making fb303 stubs in $(pwd)/common/fb303"
-  MY_TEMP="$(mktemp)"
-  cat <<EOF > "$MY_TEMP"
-namespace cpp facebook.fb303
-namespace cpp2 facebook.fb303.cpp2
-enum fb_status {
-  DEAD = 0,
-  STARTING = 1,
-  ALIVE = 2,
-  STOPPING = 3,
-  STOPPED = 4,
-  WARNING = 5,
-}
-
-service FacebookService {
-  fb_status getStatus()
-}
-EOF
-  update_file "$MY_TEMP" common/fb303/if/fb303.thrift
-  cat <<EOF > "$MY_TEMP"
-#pragma once
-#include <string>
-namespace facebook { namespace fb303 {
-class FacebookBase2 : virtual public cpp2::FacebookServiceSvIf {
-public:
-  explicit FacebookBase2(std::string name) {}
-  virtual fb303::cpp2::fb_status getStatus() {
-    return fb303::cpp2::fb_status::ALIVE;
-  }
-  virtual fb303::cpp2::fb_status sync_getStatus() {
-    return fb303::cpp2::fb_status::ALIVE;
-  }
-};
-}}
-EOF
-  update_file "$MY_TEMP" common/fb303/cpp/FacebookBase2.h
-  rm -f "$MY_TEMP"
-}
-
 # TODO: This neither deletes generated files nor auto-updates CMakeLists.txt
 update_thrift() {
   echo "Checking if Thrift-generated sources changed"
@@ -79,7 +39,7 @@ update_thrift() {
   TMP_DIR="$(mktemp -d)"
   for f in "$@" ; do
     python -mthrift_compiler.main -o "$TMP_DIR" --gen cpp2:stack_arguments \
-      -I ../.. "$f"
+      -I ../.. -I "$BUILD_DIR/fbinclude" "$f"
   done
   for f in "$TMP_DIR/gen-cpp2"/* ; do
     update_file "$f" "$OUT_DIR${f#$TMP_DIR}"
@@ -107,13 +67,9 @@ fetch_gtest() {
 
 fetch_gtest
 
-# fb303 should probably be part of Bistro's source distro instead?
-cd "$BUILD_DIR/../../.."
-update_fb303_stubs
-
 # Hacky way to build Thrift until we have a proper CMake module to do it.
 cd "$BUILD_DIR/.."
-update_thrift if if/*.thrift ../../common/fb303/if/fb303.thrift 
+update_thrift if if/*.thrift build/fbinclude/common/fb303/if/fb303.thrift 
 
 D="$BUILD_DIR/$1"
 mkdir -p "$D"

@@ -1,5 +1,9 @@
-# All our includes have the form "bistro/bistro/..."
-include_directories("${PROJECT_SOURCE_DIR}/../../")
+include_directories(
+  # Our includes start with "bistro/bistro/"
+  "${PROJECT_SOURCE_DIR}/../.."
+  # A hack to include a stub for some FB-specific includes under "common/".
+  "${PROJECT_SOURCE_DIR}/build/fbinclude"
+)
 
 add_definitions(-std=gnu++0x -Wno-deprecated)
 

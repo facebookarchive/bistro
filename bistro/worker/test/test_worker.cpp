@@ -45,7 +45,7 @@ TEST(TestWorker, HandleNormal) {
   BistroWorkerTestThread worker(&scheduler);
   // initial state is NEW
   EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
-  sleep(2); // takes about 1s to get healthcheck task sent/processed/notified
+  sleep(3); // takes about 1s to get healthcheck task sent/processed/notified
   EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
 
   // TODO 5486195 run the following test with a mocked scheduler for
@@ -99,7 +99,7 @@ TEST(TestWorker, HandleKillTask) {
   FLAGS_heartbeat_period_sec = 1; // minimum wait, using 0 would get socket err
   ThriftMonitorTestThread scheduler;
   BistroWorkerTestThread worker(&scheduler);
-  sleep(2); // takes about 1s to get healthcheck task sent/processed/notified
+  sleep(3); // takes about 1s to get healthcheck task sent/processed/notified
 
   cpp2::RunningTask rt[2];
   for (int i=0; i<2; i++) {

@@ -10,14 +10,13 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
-#include <folly/experimental/AutoTimer.h>
+#include <folly/Synchronized.h>
 #include <queue>
 #include <chrono>
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/runners/TaskRunner.h"
 #include "bistro/bistro/utils/BackgroundThreadMixin.h"
-#include <folly/Synchronized.h>
 
 namespace facebook { namespace bistro {
 

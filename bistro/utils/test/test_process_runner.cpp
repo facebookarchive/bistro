@@ -13,7 +13,6 @@
 #include <folly/Memory.h>
 #include <folly/ScopeGuard.h>
 #include <folly/dynamic.h>
-#include <folly/experimental/AutoTimer.h>
 #include <folly/json.h>
 #include <sys/file.h>
 #include <thread>

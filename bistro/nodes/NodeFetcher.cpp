@@ -10,7 +10,6 @@
 #include "bistro/bistro/nodes/NodeFetcher.h"
 
 #include <chrono>
-#include <folly/experimental/AutoTimer.h>
 #include <unordered_map>
 
 #include "bistro/bistro/config/Node.h"

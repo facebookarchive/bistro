@@ -188,7 +188,7 @@ LogLines LogWriter::getJobLogs(
   }
 
   // Run the query
-  folly::AutoTimer<>("Query: '", query, debug_where_args);  // prints extra ", '"
+  folly::AutoTimer<>("Query: '", query, debug_where_args);
   LogLines res;
   // Assuming that micro-optimizing the "" case is pointless, but did not test.
   boost::regex re(regex_filter);

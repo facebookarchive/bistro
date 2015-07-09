@@ -10,15 +10,14 @@
 #include "bistro/bistro/config/Config.h"
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <folly/experimental/AutoTimer.h>
+#include <folly/Conv.h>
+#include <folly/Memory.h>
+#include <folly/json.h>
 #include <limits>
 #include <thread>
 
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/utils/Exception.h"
-#include <folly/Conv.h>
-#include <folly/Memory.h>
-#include <folly/json.h>
 
 // Future: remove this once there is nobody using this.
 DEFINE_bool(

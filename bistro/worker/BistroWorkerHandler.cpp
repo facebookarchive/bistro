@@ -267,7 +267,8 @@ void BistroWorkerHandler::runTask(
     config,  // Job config argument -- DO: elide the extra copy?
     jobsDir_ / rt.job,  // Working directory for the task
     [this](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-      folly::AutoTimer<> timer("Task update queue was slow", 0.1);  // 10 tasks / sec
+      folly::AutoTimer<> timer("Task update queue was slow");
+      timer.setMinTimeToLog(0.1);  // 10 tasks / sec
       notifyFinishedQueue_.blockingWrite(folly::make_unique<NotifyData>(
         TaskID{rt.job, rt.node}, std::move(status)
       ));
@@ -318,7 +319,9 @@ void BistroWorkerHandler::notifyIfTasksNotRunning(
 
   // Send out the status updates for the non-running tasks
   for (auto& rt : not_running_tasks) {
-    folly::AutoTimer<> timer("Queued 'was not running' update for ", debugString(rt));
+    folly::AutoTimer<> timer(
+      "Queued 'was not running' update for ", debugString(rt)
+    );
     notifyNotRunningQueue_.blockingWrite(std::move(rt));
   }
   if (not_running_tasks.empty()) {

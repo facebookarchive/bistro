@@ -20,7 +20,6 @@
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/statuses/TaskStore.h"
 #include "bistro/bistro/statuses/TaskStatusObserver.h"
-#include <folly/experimental/AutoTimer.h>
 
 DEFINE_int32(
   log_status_changes_every_ms, 0,

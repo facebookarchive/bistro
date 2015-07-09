@@ -9,14 +9,13 @@
  */
 #include "bistro/bistro/runners/TaskRunner.h"
 
-#include <folly/experimental/AutoTimer.h>
+#include <folly/Random.h>
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
-#include <folly/Random.h>
 
 namespace facebook { namespace bistro {
 

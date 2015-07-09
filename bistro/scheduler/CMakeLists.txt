@@ -1,5 +1,5 @@
 add_library(
-  bistro_scheduler STATIC
+  lib_bistro_scheduler STATIC
   RankedPrioritySchedulerPolicy.cpp
   RandomizedPrioritySchedulerPolicy.cpp
   RoundRobinSchedulerPolicy.cpp
@@ -9,13 +9,13 @@ add_library(
   utils.cpp
 )
 bistro_link_libraries(
-  bistro_scheduler
-  bistro_config
-  bistro_flags
-  bistro_if
-  bistro_utils
-  bistro_nodes
-  bistro_statuses
+  lib_bistro_scheduler
+  lib_bistro_config
+  lib_bistro_flags
+  lib_bistro_if
+  lib_bistro_utils
+  lib_bistro_nodes
+  lib_bistro_statuses
 )
 
 add_subdirectory(test)

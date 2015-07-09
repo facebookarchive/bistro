@@ -1,14 +1,14 @@
 add_library(
-  bistro_statuses STATIC
+  lib_bistro_statuses STATIC
   TaskStatus.cpp
   TaskStatusSnapshot.cpp
   TaskStatuses.cpp
   SQLiteTaskStore.cpp
 )
 bistro_link_libraries(
-  bistro_statuses
-  bistro_config
-  bistro_sqlite
+  lib_bistro_statuses
+  lib_bistro_config
+  lib_bistro_sqlite
 )
 
 add_subdirectory(test)

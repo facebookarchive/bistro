@@ -1,3 +1,3 @@
-add_gtest(test_crontab_selector bistro_cron)
-add_gtest(test_epoch_crontab_item bistro_cron)
-add_gtest(test_standard_crontab_item bistro_cron)
+add_gtest(test_crontab_selector lib_bistro_cron)
+add_gtest(test_epoch_crontab_item lib_bistro_cron)
+add_gtest(test_standard_crontab_item lib_bistro_cron)

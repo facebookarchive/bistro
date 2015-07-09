@@ -1,12 +1,12 @@
 add_library(
-  bistro_monitor STATIC
+  lib_bistro_monitor STATIC
   Monitor.cpp
 )
 bistro_link_libraries(
-  bistro_monitor
-  bistro_config
-  bistro_flags
-  bistro_nodes
-  bistro_statuses
-  bistro_utils
+  lib_bistro_monitor
+  lib_bistro_config
+  lib_bistro_flags
+  lib_bistro_nodes
+  lib_bistro_statuses
+  lib_bistro_utils
 )

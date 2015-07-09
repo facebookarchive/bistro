@@ -1,5 +1,5 @@
 add_library(
-  bistro_nodes STATIC
+  lib_bistro_nodes STATIC
   NodeFetcher.cpp
   Nodes.cpp
   NodesLoader.cpp
@@ -9,10 +9,10 @@ add_library(
   ScriptFetcher.cpp
 )
 bistro_link_libraries(
-  bistro_nodes
-  bistro_config
-  bistro_cron
-  bistro_utils
+  lib_bistro_nodes
+  lib_bistro_config
+  lib_bistro_cron
+  lib_bistro_utils
 )
 
 add_subdirectory(test)

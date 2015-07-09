@@ -1,5 +1,5 @@
 add_library(
-  bistro_config STATIC
+  lib_bistro_config STATIC
   Config.cpp
   FileConfigLoader.cpp
   Job.cpp
@@ -11,6 +11,6 @@ add_library(
   ConfigLoader.cpp
   RemoteWorkerSelectorType.cpp
 )
-bistro_link_libraries(bistro_config bistro_utils)
+bistro_link_libraries(lib_bistro_config lib_bistro_utils)
 
 add_subdirectory(test)

@@ -24,15 +24,15 @@ else
 fi
 
 # Decide if we're using CMake or the FB build system
-BISTRO_BINARY="$D/../../../_bin/bistro/bistro/server/bistro"
+BISTRO_BINARY="$D/../../../_bin/bistro/bistro/server/bistro_scheduler"
 if [[ -x "$BISTRO_BINARY" ]] ; then
   PHABRICATOR_DOMAIN="phabricator.fb.com"
 else
   PHABRICATOR_DOMAIN="[YOUR PHABRICATOR DOMAIN]"
   # Try the release binary, then default to the debug binary
-  BISTRO_BINARY="$D/../build/Release/bistro/bistro/server/bistro"
+  BISTRO_BINARY="$D/../build/Release/bistro/bistro/server/bistro_scheduler"
   if [[ ! -x "$BISTRO_BINARY" ]] ; then
-    BISTRO_BINARY="$D/../build/Debug/bistro/bistro/server/bistro"
+    BISTRO_BINARY="$D/../build/Debug/bistro/bistro/server/bistro_scheduler"
   fi
 fi
 

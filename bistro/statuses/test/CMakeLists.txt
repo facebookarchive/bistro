@@ -1,3 +1,3 @@
-add_gtest(test_sqlite_task_store bistro_statuses)
-add_gtest(test_task_status bistro_statuses)
-add_gtest(test_task_statuses bistro_statuses bistro_nodes)
+add_gtest(test_sqlite_task_store lib_bistro_statuses)
+add_gtest(test_task_status lib_bistro_statuses)
+add_gtest(test_task_statuses lib_bistro_statuses lib_bistro_nodes)

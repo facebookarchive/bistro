@@ -1,5 +1,5 @@
 add_library(
-  bistro_runners STATIC
+  lib_bistro_runners STATIC
   BenchmarkRunner.cpp
   LocalRunner.cpp
   NoOpRunner.cpp
@@ -7,13 +7,13 @@ add_library(
   TaskRunner.cpp
 )
 bistro_link_libraries(
-  bistro_runners
-  bistro_config
-  bistro_if
-  bistro_nodes
-  bistro_remote
-  bistro_statuses
-  bistro_utils
+  lib_bistro_runners
+  lib_bistro_config
+  lib_bistro_if
+  lib_bistro_nodes
+  lib_bistro_remote
+  lib_bistro_statuses
+  lib_bistro_utils
 )
 
 add_subdirectory(test)

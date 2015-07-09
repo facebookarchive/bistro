@@ -1,10 +1,10 @@
 add_library(
-  bistro_sqlite STATIC
+  lib_bistro_sqlite STATIC
   Database.cpp
   Statement.cpp
 )
 bistro_link_libraries(
-  bistro_sqlite
+  lib_bistro_sqlite
 )
 
-add_gtest(test_sqlite bistro_sqlite)
+add_gtest(test_sqlite lib_bistro_sqlite)

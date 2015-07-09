@@ -1,5 +1,5 @@
 add_library(
-  bistro_utils STATIC
+  lib_bistro_utils STATIC
   BackgroundThreads.cpp
   hostname.cpp
   LogWriter.cpp
@@ -13,9 +13,9 @@ add_library(
   shell.cpp
 )
 bistro_link_libraries(
-  bistro_utils
-  bistro_if
-  bistro_sqlite
+  lib_bistro_utils
+  lib_bistro_if
+  lib_bistro_sqlite
 )
 
 add_subdirectory(test)

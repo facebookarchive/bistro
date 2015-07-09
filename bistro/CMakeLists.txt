@@ -20,33 +20,33 @@ add_subdirectory(utils)
 add_subdirectory(worker)
 
 add_library(
-  bistro_lib STATIC
+  lib_bistro STATIC
   Bistro.cpp
 )
 bistro_link_libraries(
-  bistro_lib
-  bistro_config
-  bistro_cron
-  bistro_if
-  bistro_monitor
-  bistro_nodes
-  bistro_runners
-  bistro_scheduler
-  bistro_server
-  bistro_sqlite
-  bistro_statuses
-  bistro_utils
+  lib_bistro
+  lib_bistro_config
+  lib_bistro_cron
+  lib_bistro_if
+  lib_bistro_monitor
+  lib_bistro_nodes
+  lib_bistro_runners
+  lib_bistro_scheduler
+  lib_bistro_server
+  lib_bistro_sqlite
+  lib_bistro_statuses
+  lib_bistro_utils
 )
 
-add_executable(bistro server/main.cpp)
-target_link_libraries(bistro bistro_lib)
+add_executable(bistro_scheduler server/main.cpp)
+target_link_libraries(bistro_scheduler lib_bistro)
 
 add_executable(bistro_worker worker/main.cpp)
-target_link_libraries(bistro_worker bistro_worker_lib)
+target_link_libraries(bistro_worker lib_bistro_worker)
 
 add_executable(bistro_benchmark benchmark/db_scraping_benchmark.cpp)
 target_link_libraries(
   bistro_benchmark
-  bistro_lib
+  lib_bistro
   libfollybenchmark.so
 )

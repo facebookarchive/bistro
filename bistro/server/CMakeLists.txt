@@ -1,7 +1,7 @@
 # This line is here to appease update_cmake.sh -- this is the main binary:
 #   main.cpp
 add_library(
-  bistro_server STATIC
+  lib_bistro_server STATIC
   Connection.cpp
   HTTPServer.cpp
   HTTPMonitor.cpp
@@ -9,10 +9,10 @@ add_library(
 )
 
 bistro_link_libraries(
-  bistro_server
-  bistro_config
-  bistro_if
-  bistro_thrift
+  lib_bistro_server
+  lib_bistro_config
+  lib_bistro_if
+  lib_bistro_thrift
 )
 
 add_subdirectory(test)

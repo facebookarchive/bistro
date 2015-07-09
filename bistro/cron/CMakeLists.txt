@@ -1,13 +1,13 @@
 add_library(
-  bistro_cron STATIC
+  lib_bistro_cron STATIC
   StandardCrontabItem.cpp
   CrontabSelector.cpp
   EpochCrontabItem.cpp
   CrontabItem.cpp
 )
 bistro_link_libraries(
-  bistro_cron
-  bistro_cron_utils
+  lib_bistro_cron
+  lib_bistro_cron_utils
 )
 
 add_subdirectory(test)

@@ -1,13 +1,13 @@
 # Appease update_cmake.sh:  main.cpp
 add_library(
-  bistro_worker_lib STATIC
+  lib_bistro_worker STATIC
   BistroWorkerHandler.cpp
 )
 bistro_link_libraries(
-  bistro_worker_lib
-  bistro_if
-  bistro_statuses
-  bistro_utils
+  lib_bistro_worker
+  lib_bistro_if
+  lib_bistro_statuses
+  lib_bistro_utils
 )
 
 add_subdirectory(test)

@@ -1,6 +1,6 @@
 <div id="fixed_header" class="fixedHeaderContainer{% if include.alwayson %} visible{% endif %}">
   <header>
-    <a href="{{ site.url }}{{ site.baseurl }}">
+    <a href="{{ site.baseurl }}/">
       <img src="{{ site.baseurl }}/static/logo.png" height="30" alt="">
       <h2>{{ site.title }}</h2>
     </a>
@@ -9,7 +9,7 @@
         <ul>
           {% for item in site.data.nav %}
           <li class="navItem {% if page.collection == item.category or page.category == item.category %}navItemActive{% endif %}">
-            <a href={{ item.href }}>{{ item.title }}</a>
+            <a href="{{ item.href | uri_escape}}">{{ item.title }}</a>
           </li>
           {% endfor %}
         </ul>

@@ -15,7 +15,7 @@
       *   _prioritized workqueue_: 1 node per job
       *   _map-only jobs_: nodes are map shards
       *   _sharded, replicated database_: a [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of nodes — the DB hosts are sinks (for tracking resources), and DB instances are children of their hosts
-      *   _periodic work_ (like <tt>cron</tt>): a data node has a child node for each time period
+      *   _periodic work_ (like `cron`): a data node has a child node for each time period
 
     If needed, [MapReduce](https://en.wikipedia.org/wiki/MapReduce) computations can be modeled as a sequence of 3 dependent jobs: map, shuffle, reduce.
   

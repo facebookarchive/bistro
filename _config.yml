@@ -4,13 +4,13 @@ title: Bistro
 tagline: A toolkit for making services that schedule and execute tasks.
 fbappid: ""
 gacode: "UA-44373548-11"
-description: Bistro is an engineer's tool - your clients need to do large amounts of computation, and your goal is to make a system that handles them easily, performantly, and reliably.
+description: Bistro is an engineer's tool &mdash; your clients need to do large amounts of computation, and your goal is to make a system that handles them easily, performantly, and reliably.
 baseurl: /bistro
 url: http://facebook.github.io
 ghrepo: "facebook/bistro"
 
 # Build settings
-markdown: redcarpet
+markdown: kramdown  # redcarpet segfaults like crazy :'(
 highlighter: pygments
 
 collections:
@@ -24,8 +24,9 @@ collections:
 sass:
   style: :compressed
 
+# Currently unused, since we are on kramdown
 redcarpet:
-  extensions: [with_toc_data]
+  extensions: [with_toc_data, smart]
 
 color:
   # Provides colour for background of top header of homepage

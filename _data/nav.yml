@@ -1,3 +1,9 @@
+- title: Docs
+  href: docs
+  category: docs
+- title: Support
+  href: support.html
+  category: support
 - title: GitHub
   href: http://github.com/facebook/bistro
   category: github

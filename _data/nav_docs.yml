@@ -2,12 +2,22 @@
   items:
   - id: why-bistro
   - id: getting-started
-- title: Guides
+
+- title: Case Studies
   items:
-  - id: how-bistro-works
-  - id: logging
-  - id: best-practices
-- title: Extending Bistro
-  items:
-  - id: config-loaders
-  - id: node-fetchers
+  - id: case-study-db
+  - id: case-study-queue
+
+# XXX To be written soon --
+# - title: Guides
+#   items:
+#   - id: key-concepts
+#   - id: config-source
+#   - id: config-scheduler
+#   - id: config-job
+#   - id: persistence
+#   - id: execution
+#   - id: data-shards
+#   - id: logging
+#   - id: best-practices
+

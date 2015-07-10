@@ -9,24 +9,8 @@ hero: true
 
 ## Why Use Bistro?
 
-You should consider using Bistro instead of rolling your own solution,
-because in our experience at Facebook, every heavily used task-execution
-service eventually has to build out a very similar set of layers:
-
-* **Execution shell:** Start, wait for, kill tasks
-* **Worker pool:** Maintain the distributed state of what tasks are running where
-* **Data model:** Currently available tasks; resource accounting
-* **Configuration:** Add/remove jobs; tune parameters
-* **Persistence:** If the service crashes, don't forget task completions
-* **Scheduling logic:** Priorities; dependencies; resource constraints;
-host placement
-* **Task logs:** Make logs accessible, while controlling disk usage
-* **Command-line tools:** Scriptable, yet friendly
-* **Web UI:** Minimal learning curve; great for visualizing data
-* **RPC API:** When command-line scripting is too slow or clunky
-
-Bistro provides all of the above, and improves continuously, so instead of
-re-inventing, you can focus on innovating.
+{% capture why_bistro %}{% include why-bistro.md %}{% endcapture %}
+{{ why_bistro | markdownify }}
 
 ## Early-release software
 
@@ -40,107 +24,98 @@ href="https://travis-ci.org/facebook/bistro">Travis CI</a>, so they should
 work out of the box.
 
 There is already a lot of code, with which to play, so you have any thoughts
---- <a href="https://www.facebook.com/groups/bistro.scheduler/">send us a
+--- <a href="https://www.facebook.com/groups/bistro.scheduler/">write us a
 note</a>!  Open-source projects thrive and grow on encouragement and
 feedback.
 
-## Case study: data-parallel tasks with data **and** worker resources
+## As flexible as a library
 
-While Bistro is a capable traditional task queue, one of its more unique
-features is the ability to account not just for the resources of the
-machines executing the tasks, but also for any bottlenecks imposed by the
-*data being queried*.
+Although Bistro comes as a ready-to-deploy service, it may be helpful to
+think of it as a library.  In our experience at Facebook, many teams'
+distributed computing needs are highly individual, requiring more
+customization over time.
 
-Here is a simple example:
+Luckily, Bistro can adapt to your needs in three different ways.
 
- * Your data resides on 500 database hosts serving live traffic.
- * Each database host has 10-20 logical databases.
- * The hosts have enough performance headroom to run at most *two* 
-   batch tasks per host, without impacting production traffic.
- * You have some batch jobs, which must process all the databases.
- * Bistro will use 1 scheduler, and a worker pool of 100 machines.
+**1. Configuration**: most aspects of a Bistro deployment can be tuned:
 
-### Levels
+{::comment} XXX Linkify these headings once written -- 
+ * [Configuration](docs/config-source/):
+ * [Persistence](docs/persistence/):
+ * [Code execution](docs/execution/):
+ * [Data shards](docs/data-shards/):
+{:/comment}
 
-To configure Bistro in such a setup, first describe the structure of the
-computation in terms of *nodes* at several levels:
+ * Configuration: 
+   continuously re-read a file, or a more custom solution
+ * Persistence: 
+   use no database, SQLite, or something fancier
+ * Code execution: 
+   run alongside the scheduler, or on remote workers
+ * Data shards: 
+   manually configured, periodic, or script-generated
 
- * Database `host` nodes --- to limit tasks per DB host.
- * Logical `database` nodes, each connected to its DB host node.
-   A running task locks its logical DB.
- * If remote worker hosts are in use, a node per `worker` host is
-   automatically created.
- * If global concurrency constraints are desired, a top-level scheduler
-   `instance` node is also available.
-
-In a typical setup, each running task associates with one node on each level:
-
- * `database`: The logical DB is the work shard being processed.
- * `host`: What host to query for data?
- * `worker`: Where is the process running?
-
-### Resources
-
-Before running jobs, define resources for the nodes at various levels:
-
- * `host` nodes should be protected from excessive queries to
-   avoid slowing down live production traffic --- allocate 2
-   `host_concurrency` slots to honor the requirement above.
- * typical `worker` resources might be, e.g. `cpu_cores`,
-   `ram_giagabytes`, etc.  Bistro supports non-uniform resource
-   availability among its worker hosts.
-
-### Nodes
-
-Hosts fail, and therefore our `host` to `database` mapping
-will change continuously.  To deal with this, Bistro continuously polls for
-node updates --- it can periodically run your "node fetcher" script, or read
-a file, or poll a custom in-process plugin.  One of the standard plugins
-creates and removes nodes corresponding to time intervals, akin to Cron. 
-When nodes change, tasks are started on the new nodes, and stopped on the
-deleted ones.  Bistro's node model also naturally accommodates database
-replicas.
-
-### Jobs
-
-Lastly, specify the jobs to run --- a path to a binary will suffice, and the
-binary will be run against every `database` node found above.  Many
-other job options and metadata are available.  You can even implement your
-tasks as custom RPC requests.
-
-### Ready to go
-
-The above configuration is continuously polled from a file (or other
-configuration source) by the Bistro scheduler.  Bistro's worker processes
-need only minimal configuration --- tell them how to connect to the
-scheduler, and you are in business (they do have plenty of advanced
-reliability-related settings).  
-
-You can then interact with the scheduler (and tasks) via HTTP REST, via a
-command-line tool, or via a web UI.
-
-Read our <a href="/bistro/static/bistro_ATC_final.pdf">USENIX ATC'15
-paper</a> for a more principled explanation of this resource model.  Note
-that the model Bistro implements in practice is an extension of the
-"resource forest model" that is the focus of the paper.  Bistro's data model
-is being refined and improved, so in the future you can expect it to handle
-even more applications with ease.
-
-## Flexible along many dimensions
-
-A Bistro deployment can be tuned in a variety of ways:
+**2. Plugins**: Bistro's architecture is highly pluggable, so adding your
+own code is a cinch:
  
- * Persistence: no database is required, but any can be integrated
- * Code execution: co-located with the scheduler, or on remote workers
- * Configuration: live-update files, or a more custom solution
- * Data shards: manually configured, periodic, or script-generated
+ * Can't find the right scheduling policy? Write your own <a
+   href="https://github.com/facebook/bistro/blob/master/bistro/scheduler/LongTailSchedulerPolicy.cpp">
+   in about 50 lines of C++</a>.
+ * <a href="https://github.com/facebook/bistro/blob/master/bistro/statuses/SQLiteTaskStore.h">
+   Need a different DB</a>?
+   <a href="https://github.com/facebook/bistro/blob/master/bistro/nodes/ScriptFetcher.h">
+   Shard source</a>?
+   <a href="https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h">
+   Configuration source</a>?
 
-## Check back soon!
+Every plugin you <a
+href="https://github.com/facebook/bistro/blob/master/CONTRIBUTING.md">
+contribute back to the community</a> makes the next person's customization
+easier.
 
-We are literally putting together this as you read, so check back in a week
-or two for:
+**3. Embedding**: Or, link just the pieces you want into your custom
+application.  Need a <a
+href="https://github.com/facebook/bistro/tree/master/bistro/cron"> C++ cron
+library</a>?  An optionally-persistent <a
+href="https://github.com/facebook/bistro/tree/master/bistro/statuses">task
+status store</a>?
 
- * A "Getting Started" guide
- * Detailed feature documentation
- * Ways to deploy, integrate, and extend Bistro
- * How to contribute to the project
+## Getting help, and helping out
+
+### Questions and bug reports
+
+To <a href="support.html">contact the maintainers</a>, post in <a
+href="https://www.facebook.com/groups/bistro.scheduler">this Facebook
+Group</a> or <a href="https://github.com/facebook/bistro/issues/new">file a
+Github Issue</a>.
+
+{% capture help_tips %}{% include help-tips.md %}{% endcapture %}
+{{ help_tips | markdownify }}
+
+### Contributions
+
+We gladly welcome contributions to both code and documentation --- whether
+you refactor a whole module, or fix one misspelling.  Please send <a
+href="https://github.com/facebook/bistro/compare/">pull requests</a> for
+code against the <a
+href="https://github.com/facebook/bistro/tree/master">master branch</a> and
+for the website or documentation against the <a
+href="https://github.com/facebook/bistro/tree/gh-pages">gh-pages branch</a>.
+
+Our <a
+href="https://github.com/facebook/bistro/blob/master/CONTRIBUTING.md">
+CONTRIBUTING.md</a> aims to expedite the acceptance of your pull request. 
+It includes a 15-line C++ style guide, and explains Facebook's streamlined
+<a href="https://code.facebook.com/cla">contributor license agreement</a>.
+
+## Case study: data-parallel job with data **and** worker resources
+
+{% capture case_study %}{% include case-study-db.md %}{% endcapture %}
+{{ case_study | markdownify }}
+
+## License
+
+Bistro is
+[BSD-licensed](https://github.com/facebook/bistro/blob/master/LICENSE).  We
+also provide an [additional patent
+grant](https://github.com/facebook/bistro/blob/master/PATENTS).

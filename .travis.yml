@@ -6,3 +6,4 @@ env:
  - TARGET=Release
 install: ./bistro/build/deps_ubuntu_12.04.sh
 script: ./bistro/build/build.sh $TARGET runtests
+sudo: true

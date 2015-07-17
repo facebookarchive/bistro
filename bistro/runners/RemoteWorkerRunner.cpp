@@ -297,14 +297,20 @@ LogLines RemoteWorkerRunner::getJobLogs(
 
   event_base->loopForever();  // Execute scheduled work, and wait for finish_fn
 
-  // Sort the merged results from all the workers
-  sort(
-    res.lines.begin(),
-    res.lines.end(),
-    [is_ascending](const LogLine& a, const LogLine& b) {
-      return (!is_ascending) ^ (a.lineID < b.lineID);
-    }
-  );
+  // Sort the merged results from all the workers.
+  if (is_ascending) {
+    sort(
+      res.lines.begin(),
+      res.lines.end(),
+      [](const LogLine& a, const LogLine& b) { return a.lineID < b.lineID; }
+    );
+  } else {
+    sort(
+      res.lines.begin(),
+      res.lines.end(),
+      [](const LogLine& a, const LogLine& b) { return a.lineID > b.lineID; }
+    );
+  }
 
   return res;
 }

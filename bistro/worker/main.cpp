@@ -54,6 +54,10 @@ int main(int argc, char* argv[]) {
   auto my_socket_and_addr = getServerSocketAndAddress();
   auto server = std::make_shared<apache::thrift::ThriftServer>();
   auto handler = std::make_shared<BistroWorkerHandler>(
+    [](const char*, const cpp2::BistroWorker&, const cpp2::RunningTask*) {
+      // Do not log state transitions. This would be a good place to hook up
+      // a popular OSS tool for collecting operational charts.
+    },
     [server, scheduler_addr](folly::EventBase* event_base) {
       return getAsyncClientForAddress<cpp2::BistroSchedulerAsyncClient>(
         event_base,

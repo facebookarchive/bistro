@@ -73,7 +73,8 @@ cpp2::BistroWorkerException BistroWorkerException(Args&&... args) {
 
 cpp2::BistroWorker makeWorker(
     const cpp2::ServiceAddress& addr,
-    int32_t locked_port) {
+    int32_t locked_port,
+    BistroWorkerHandler::LogStateTransitionFn log_state_transition_fn) {
 
   // This delay ensures that RemoteWorker::processHeartbeat will never see
   // two workers on the same host & port with the same start time.
@@ -94,17 +95,20 @@ cpp2::BistroWorker makeWorker(
   worker.id.rand = folly::Random::rand64(folly::ThreadLocalPRNG());
   worker.heartbeatPeriodSec = FLAGS_heartbeat_period_sec;
   LOG(INFO) << "Worker is ready: " << debugString(worker);
+  log_state_transition_fn("initializing", worker, nullptr);
   return worker;
 }
 
 }  // anonymous namespace
 
 BistroWorkerHandler::BistroWorkerHandler(
+    LogStateTransitionFn log_state_transition_fn,
     SchedulerClientFn scheduler_client_fn,
     const string& worker_command,
     const cpp2::ServiceAddress& addr,
     int32_t locked_port)
   : fb303::FacebookBase2("BistroWorker"),
+    logStateTransitionFn_(log_state_transition_fn),
     schedulerClientFn_(scheduler_client_fn),
     workerCommand_(worker_command),
     taskQueue_(
@@ -114,7 +118,7 @@ BistroWorkerHandler::BistroWorkerHandler(
     notifyFinishedQueue_(100000),
     notifyNotRunningQueue_(10000),
     jobsDir_(boost::filesystem::path(FLAGS_data_dir) / "/jobs"),
-    worker_(makeWorker(addr, locked_port)),
+    worker_(makeWorker(addr, locked_port, logStateTransitionFn_)),
     state_(RemoteWorkerState(worker_.id.startTime)),
     gotNewSchedulerInstance_(true),
     canConnectToMyself_(false) {
@@ -272,8 +276,10 @@ void BistroWorkerHandler::runTask(
       notifyFinishedQueue_.blockingWrite(folly::make_unique<NotifyData>(
         TaskID{rt.job, rt.node}, std::move(status)
       ));
+      logStateTransitionFn_("completed_task", worker_, &rt);
     }
   );
+  logStateTransitionFn_("queued_task", worker_, &rt);
 }
 
 void BistroWorkerHandler::notifyIfTasksNotRunning(
@@ -336,6 +342,7 @@ void BistroWorkerHandler::requestSuicide(
 
   throwOnInstanceIDMismatch("requestSuicide", scheduler, worker);
   LOG(WARNING) << "Scheduler requested suicide";
+  logStateTransitionFn_("scheduler_requested_suicide", worker_, nullptr);
   suicide();
 }
 
@@ -346,6 +353,7 @@ void BistroWorkerHandler::killTask(
     const cpp2::BistroInstanceID& worker) {
 
   throwOnInstanceIDMismatch("killTask", scheduler, worker);
+  logStateTransitionFn_("kill_task_request", worker_, &rt);
   SYNCHRONIZED(runningTasks_) {
     auto it = runningTasks_.find(TaskID{rt.job, rt.node});
     if (it == runningTasks_.end()) {
@@ -372,10 +380,12 @@ void BistroWorkerHandler::killTask(
     FLAGS_use_soft_kill ? cpp2::KillMethod::SOFT : cpp2::KillMethod::HARD,
     status_filter
   );
+  logStateTransitionFn_("killed_task", worker_, &rt);
 }
 
 void BistroWorkerHandler::suicide() {
   LOG(WARNING) << "Committing suicide";
+  logStateTransitionFn_("suicide", worker_, nullptr);
   _exit(1);
   // Rationale: As written, suicide is fast and fail-safe. A desirable
   // alternative would be to take a few seconds to soft-kill all the child
@@ -461,6 +471,7 @@ chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
         worker_.id
       );
     } catch (const exception& e) {
+      logStateTransitionFn_("scheduler_failed_to_acknowledge", worker_, &rt);
       LOG(ERROR) << "Unable to return status to scheduler: " << e.what();
       notifyFinishedQueue_.blockingWrite(std::move(nd));
       return chrono::seconds(1);
@@ -473,6 +484,7 @@ chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
     if (rt.job == kHealthcheckTaskJob && nd->status.isDone()) {
       state_->timeLastGoodHealthcheckSent_ = rt.invocationID.startTime;
     }
+    logStateTransitionFn_("acknowledged_by_scheduler", worker_, &rt);
   }
   return chrono::seconds(0);
 }
@@ -520,6 +532,23 @@ chrono::seconds BistroWorkerHandler::notifyNotRunning() noexcept {
   return chrono::seconds(0);
 }
 
+void BistroWorkerHandler::setState(
+    RemoteWorkerState* state,
+    RemoteWorkerState::State new_state,
+    time_t cur_time) {
+  if (new_state != RemoteWorkerState::State::HEALTHY
+      && state->state_ == RemoteWorkerState::State::HEALTHY) {
+    LOG(WARNING) << "Became unhealthy";
+    state->timeBecameUnhealthy_ = cur_time;
+    logStateTransitionFn_("became_unhealthy", worker_, nullptr);
+  } else if (new_state == RemoteWorkerState::State::HEALTHY
+             && state->state_ != RemoteWorkerState::State::HEALTHY) {
+    LOG(INFO) << "Became healthy";
+    logStateTransitionFn_("became_healthy", worker_, nullptr);
+  }
+  state->state_ = new_state;
+}
+
 chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
   if (!canConnectToMyself_) {
     // Make a transient event base since we only use it for one sync call.
@@ -541,6 +570,7 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
         << debugString(worker_.addr) << ": " << e.what();
       return chrono::seconds(1);
     }
+    logStateTransitionFn_("listening", worker_, nullptr);
   }
   try {
     cpp2::SchedulerHeartbeatResponse res;
@@ -551,6 +581,7 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
     gotNewSchedulerInstance_ = schedulerState_->id != res.id;
     if (gotNewSchedulerInstance_) {
       LOG(INFO) << "Connected to new scheduler " << debugString(res);
+      logStateTransitionFn_("connected_to_new_scheduler", worker_, nullptr);
     }
 
     SYNCHRONIZED(state_) {
@@ -575,9 +606,9 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
         state_ = RemoteWorkerState(cur_time);
       }
       state_.timeLastHeartbeatReceived_ = cur_time;
-      // Normally, this gets overwritten by the healthcheck() thread, but
-      // this is the only way to get out of RemoteWorkerState::State::NEW.
-      state_.state_ = RemoteWorkerState::State(res.workerState);
+      // Normally, the healthcheck thread overwrites state_.state_, but this
+      // is the only way to get out of RemoteWorkerState::State::NEW.
+      setState(&state_, RemoteWorkerState::State(res.workerState), cur_time);
 
       // Update scheduler timeouts _inside_ the state_ lock, so that from
       // the point of view of healthcheck(), both the state & timeouts
@@ -589,6 +620,7 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
     }
   } catch (const exception& e) {
     LOG(ERROR) << "Unable to send heartbeat to scheduler: " << e.what();
+    logStateTransitionFn_("error_sending_heartbeat", worker_, nullptr);
   }
   return chrono::seconds(worker_.heartbeatPeriodSec);
 }
@@ -612,22 +644,16 @@ chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
           // scheduler would lose it.
           - scheduler_state.workerCheckInterval
       );
-      if (new_state != RemoteWorkerState::State::HEALTHY
-          && state_.state_ == RemoteWorkerState::State::HEALTHY) {
-        LOG(WARNING) << "Became unhealthy";
-        state_.timeBecameUnhealthy_ = cur_time;
-      } else if (new_state == RemoteWorkerState::State::HEALTHY
-                 && state_.state_ != RemoteWorkerState::State::HEALTHY) {
-        LOG(INFO) << "Became healthy";
-      }
-      state_.state_ = new_state;
+      setState(&state_, new_state, cur_time);
     }
     if (state_->state_ == RemoteWorkerState::State::MUST_DIE) {
       LOG(ERROR) << "Scheduler was about to lose this worker; quitting.";
+      logStateTransitionFn_("suicide_unhealthy_too_long", worker_, nullptr);
       suicide();
     }
-  } catch (const exception& e) {
+  } catch (const exception& e) {  // This could have been a CHECK...
     LOG(ERROR) << "Failed to update worker health state: " << e.what();
+    logStateTransitionFn_("health_checker_bug", worker_, nullptr);
     suicide();
   }
   return chrono::seconds(1);  // This is cheap, so check often.

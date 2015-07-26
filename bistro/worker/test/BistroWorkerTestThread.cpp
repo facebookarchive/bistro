@@ -34,6 +34,9 @@ BistroWorkerTestThread::BistroWorkerTestThread(
 
   auto socket_and_addr = getServerSocketAndAddress();
   workerPtr_ = make_shared<BistroWorkerHandler>(
+    [](
+      const char*, const cpp2::BistroWorker& worker, const cpp2::RunningTask*
+    ) {},
     bind(
       &ThriftMonitorTestThread::getClient,
       scheduler,

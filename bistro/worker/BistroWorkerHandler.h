@@ -43,7 +43,13 @@ class BistroWorkerHandler : public cpp2::BistroWorkerSvIf,
   )> SchedulerClientFn;
 
 public:
+  // IMPORTANT: This logger MUST be thread-safe, noexcept, and fast.
+  typedef std::function<
+    void (const char*, const cpp2::BistroWorker&, const cpp2::RunningTask*)
+  > LogStateTransitionFn;
+
   BistroWorkerHandler(
+    LogStateTransitionFn,
     SchedulerClientFn,
     const std::string& worker_command,
     // How can external clients connect to this worker?
@@ -120,6 +126,7 @@ private:
   // worker, use it in RunningTask, etc.  (job, node are required)
   typedef std::pair<std::string, std::string> TaskID;
 
+  LogStateTransitionFn logStateTransitionFn_;
   SchedulerClientFn schedulerClientFn_;
   const std::string workerCommand_;
 
@@ -142,6 +149,9 @@ private:
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker
   ) const;
+
+  // Helper for heartbeat & healthcheck -- state_ must be locked.
+  void setState(RemoteWorkerState*, RemoteWorkerState::State, time_t);
 
   // Background threads
   std::chrono::seconds notifyFinished() noexcept;

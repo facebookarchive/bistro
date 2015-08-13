@@ -4,7 +4,7 @@ cpp_unittest(
         'test_parallel_processor.cpp',
     ],
     deps = [
-        '@/common/init',
+        '@/common/init:init',
     ],
 )
 

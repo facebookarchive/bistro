@@ -9,7 +9,7 @@ cpp_library(
         '@/bistro/bistro/runners:runners_lib',
         '@/bistro/bistro/monitor:monitor_lib',
         '@/thrift/lib/cpp/concurrency:numa2',
-        '@/thrift/lib/cpp/util',
+        '@/thrift/lib/cpp/util:util',
         '@/thrift/lib/cpp2:server',
     ],
 )

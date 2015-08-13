@@ -8,7 +8,7 @@ cpp_library(
         '@/bistro/bistro/if:worker_if-cpp2',
         '@/bistro/bistro/statuses:statuses_lib',
         '@/bistro/bistro/utils:utils_lib',
-        '@/servicerouter/client/cpp2',
+        '@/servicerouter/client/cpp2:cpp2',
     ],
 )
 

@@ -24,10 +24,6 @@
 #include <memory>
 #include <string>
 
-namespace apache { namespace thrift {
-  class TEventBaseManager;
-} }
-
 namespace facebook { namespace bistro {
 
 namespace cpp2 {

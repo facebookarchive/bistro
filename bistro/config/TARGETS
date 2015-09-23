@@ -10,7 +10,6 @@ cpp_library(
         'Node.cpp',
         'SchedulerType.cpp',
         'RemoteWorkerSelectorType.cpp',
-        'utils.cpp',
     ],
     deps = [
         '@/bistro/bistro/if:common-cpp2',

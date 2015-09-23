@@ -9,7 +9,6 @@
  */
 #pragma once
 
-#include "bistro/bistro/config/utils.h"
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/utils/LogLines.h"
 #include "bistro/bistro/scheduler/ResourceVector.h"

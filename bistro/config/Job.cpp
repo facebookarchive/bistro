@@ -10,8 +10,8 @@
 #include "bistro/bistro/config/Job.h"
 
 #include "bistro/bistro/config/Config.h"
-#include "bistro/bistro/config/utils.h"
 #include "bistro/bistro/config/Node.h"
+
 #include <folly/json.h>
 
 namespace facebook { namespace bistro {
@@ -73,7 +73,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
       if (!it->second.isObject()) {
         throw BistroException("'config' must be an object for ", name);
       }
-      update(config_, it->second);
+      config_.update(it->second);
     }
 
     it = d.find("backoff");

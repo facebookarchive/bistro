@@ -9,7 +9,6 @@
  */
 #include "bistro/bistro/thrift/ThriftConversion.h"
 
-#include "bistro/bistro/config/utils.h"
 #include <folly/json.h>
 
 namespace facebook { namespace bistro {

@@ -11,7 +11,6 @@
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Job.h"
-#include "bistro/bistro/config/utils.h"
 #include "bistro/bistro/config/Node.h"
 
 using namespace facebook::bistro;

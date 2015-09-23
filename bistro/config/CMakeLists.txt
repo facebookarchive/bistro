@@ -7,7 +7,6 @@ add_library(
   JobFilters.cpp
   Node.cpp
   SchedulerType.cpp
-  utils.cpp
   ConfigLoader.cpp
   RemoteWorkerSelectorType.cpp
 )

@@ -19,16 +19,6 @@ cpp_unittest(
 )
 
 cpp_unittest(
-    name = 'test_config_utils',
-    srcs = [
-        'test_config_utils.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/config:config_lib',
-    ],
-)
-
-cpp_unittest(
     name = 'test_node',
     srcs = [
         'test_node.cpp',

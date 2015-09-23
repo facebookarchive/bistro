@@ -1,6 +1,5 @@
 add_gtest(test_backoff lib_bistro_config)
 add_gtest(test_config lib_bistro_config)
-add_gtest(test_config_utils lib_bistro_config)
 add_gtest(test_file_config_loader lib_bistro_config)
 add_gtest(test_job_filters lib_bistro_config)
 add_gtest(test_job lib_bistro_config)

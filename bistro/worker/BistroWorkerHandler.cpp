@@ -552,7 +552,7 @@ void BistroWorkerHandler::setState(
 chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
   if (!canConnectToMyself_) {
     // Make a transient event base since we only use it for one sync call.
-    apache::thrift::async::TEventBase evb;
+    EventBase evb;
     try {
       // Make a dummy request to myself to see if the server is up and
       // accessible via the external address to be used for heartbeats.

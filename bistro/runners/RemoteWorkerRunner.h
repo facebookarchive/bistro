@@ -13,7 +13,7 @@
 #include <folly/Synchronized.h>
 #include <memory>
 #include <thread>
-#include <thrift/lib/cpp/async/TEventBase.h>
+#include <folly/io/async/EventBase.h>
 
 #include "bistro/bistro/remote/RemoteWorkers.h"
 #include "bistro/bistro/runners/TaskRunner.h"
@@ -163,7 +163,7 @@ private:
   // used to queue and process "fire and forget" async communications with
   // the workers, i.e.  runTask, healthcheck, requestSuicide.  In contrast,
   // getJobLogs runs synchronously in the request handler's thread.
-  std::unique_ptr<apache::thrift::async::TEventBase> eventBase_;
+  std::unique_ptr<folly::EventBase> eventBase_;
   std::thread eventBaseThread_;
 
   // When the scheduler restarts, don't start running tasks right away,

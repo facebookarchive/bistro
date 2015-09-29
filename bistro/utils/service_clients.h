@@ -30,7 +30,7 @@ namespace facebook { namespace bistro {
  */
 template<typename ThriftClient>
 std::shared_ptr<ThriftClient> getAsyncClientForAddress(
-  apache::thrift::async::TEventBase* event_base,
+  folly::EventBase* event_base,
   const cpp2::ServiceAddress& addr,
   int connect_timeout_ms = 0,
   int send_timeout_ms = 0,
@@ -76,11 +76,11 @@ struct FanOutRequestToServicesResults {
   )> ExceptFunc;
   typedef std::function<void(
     std::vector<std::unique_ptr<ResultType>>&& results,
-    apache::thrift::async::TEventBase* event_base
+    folly::EventBase* event_base
   )> FinishFunc;
 
   int numReferences_;
-  apache::thrift::async::TEventBase* eventBase_;
+  folly::EventBase* eventBase_;
   // Store all functions here to guarantee their lifetimes
   SendFunc sendFn_;
   RecvFunc recvFn_;
@@ -90,7 +90,7 @@ struct FanOutRequestToServicesResults {
 
   // Starts with one reference. Call removeReference() to self-destruct.
   FanOutRequestToServicesResults(
-      apache::thrift::async::TEventBase* event_base,
+      folly::EventBase* event_base,
       SendFunc&& send_fn,
       RecvFunc&& recv_fn,
       ExceptFunc&& except_fn,
@@ -124,7 +124,7 @@ struct FanOutRequestToServicesResults {
  * fan-out is complete. Sample usage:
  *
  *   fanOutRequestToServices<cpp2::MyThriftAsyncClient, cpp2::MyReturnType>(
- *     apache::thrift::async::TEventBaseManager::get()->getEventBase(),
+ *     EventBaseManager::get()->getEventBase(),
  *     &cpp2::MyThriftAsyncClient::callback_myMethod,
  *     &cpp2::MyThriftAsyncClient::recv_myMethod,
  *     [](exception_ptr ex, const string& service) {
@@ -136,7 +136,7 @@ struct FanOutRequestToServicesResults {
  *     },
  *     [](
  *       vector<unique_ptr<cpp2::MyReturnType>>&& results,
- *       apache::thrift::async::TEventBase* evb
+ *       EventBase* evb
  *     ) {
  *       // Do whatever you want with the results
  *       evb->terminateLoopSoon();
@@ -146,7 +146,7 @@ struct FanOutRequestToServicesResults {
  *     my_method_arg2
  *   );
  *   // Execute scheduled work, and wait for finish_fn
- *   apache::thrift::async::TEventBaseManager::get()
+ *   EventBaseManager::get()
  *     ->getEventBase()->loopForever();
  *
  * NOTE(facebook): This is a minimal, low-performance clone of SRAggregator2
@@ -160,7 +160,7 @@ template<
   typename... ARGS
 >
 void fanOutRequestToServices(
-  apache::thrift::async::TEventBase* event_base,
+  folly::EventBase* event_base,
   SendFunc&& send_fn,
   RecvFunc&& recv_fn,
   typename FanOutRequestToServicesResults<

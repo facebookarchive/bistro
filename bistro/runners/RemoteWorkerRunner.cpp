@@ -47,8 +47,8 @@ RemoteWorkerRunner::RemoteWorkerRunner(
     std::shared_ptr<Monitor> monitor)
   : workerLevel_(StringTable::NotFound),
     taskStatuses_(task_statuses),
-    eventBase_(new TEventBase()),
-    eventBaseThread_(bind(&TEventBase::loopForever, eventBase_.get())),
+    eventBase_(new folly::EventBase()),
+    eventBaseThread_(bind(&folly::EventBase::loopForever, eventBase_.get())),
     inInitialWait_(true),
     startTime_(time(nullptr)),
     monitor_(monitor) {
@@ -223,7 +223,7 @@ LogLines RemoteWorkerRunner::getJobLogs(
 
   // Use this thread's EventBase so that we can loopForever() to wait.
   auto* event_base =
-    apache::thrift::async::TEventBaseManager::get()->getEventBase();
+    folly::EventBaseManager::get()->getEventBase();
 
   // Query all the workers for their logs
   fanOutRequestToServices<cpp2::BistroWorkerAsyncClient, cpp2::LogLines>(
@@ -247,7 +247,7 @@ LogLines RemoteWorkerRunner::getJobLogs(
     // FinishFunc: a callback for when all workers have been processed.
     [is_ascending, line_id, &res](
       vector<unique_ptr<cpp2::LogLines>>&& results,
-      apache::thrift::async::TEventBase* evb
+      folly::EventBase* evb
     ) {
       // Find the most restrictive nextLineID among all hosts
       for (const auto& log : results) {
@@ -872,7 +872,7 @@ void RemoteWorkerRunner::killTask(
 
   // Make a synchronous kill request so that the client knows when the kill
   // succeeds or fails.  This can take 10 seconds or more.
-  apache::thrift::async::TEventBase evb;
+  folly::EventBase evb;
   getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(
     &evb,
     maybe_worker->addr,

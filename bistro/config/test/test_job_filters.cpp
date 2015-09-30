@@ -73,9 +73,10 @@ TEST(TestJobFilters, HandleBlacklistRegex) {
 TEST(TestJobFilters, HandleTagWhitelist) {
   JobFilters filters(dynamic::object("tag_whitelist", {"abc", "car"}));
   Node no_tags("no_tags");
-  Node one_tag("one_tag", 0, false, nullptr, {"abc"});
-  Node two_tags("two_tags", 0, false, nullptr, {"abc", "car"});
-  Node three_tags("three_tags", 0, false, nullptr, {"abc", "car", "ah"});
+  Node one_tag("one_tag", 0, false, nullptr, Node::TagSet{"abc"});
+  Node two_tags("two_tags", 0, false, nullptr, Node::TagSet{"abc", "car"});
+  Node three_tags("three_tags", 0, false, nullptr,
+    Node::TagSet{"abc", "car", "ah"});
 
   EXPECT_FALSE(filters.doesPass("", no_tags));
   EXPECT_TRUE(filters.doesPass("", one_tag));

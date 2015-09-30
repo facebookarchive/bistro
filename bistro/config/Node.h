@@ -10,16 +10,16 @@
 #pragma once
 
 #include <boost/iterator/iterator_facade.hpp>
-#include <boost/noncopyable.hpp>
 #include <boost/range/iterator_range.hpp>
 #include <boost/strong_typedef.hpp>
+#include <folly/Synchronized.h>
+#include <folly/sorted_vector_types.h>
 #include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 #include "bistro/bistro/utils/SymbolTable.h"
-#include <folly/Synchronized.h>
 
 namespace facebook { namespace bistro {
 
@@ -30,22 +30,26 @@ namespace detail {
   class NodeParentIterator;
 }
 
-class Node : boost::noncopyable {
-
+class Node {
 public:
+  using TagSet = folly::sorted_vector_set<std::string>;
 
   BOOST_STRONG_TYPEDEF(int, ID);
 
   explicit Node(
-    const std::string& name,
-    const int level = 0,
-    const bool enabled = false,
+    std::string name,
+    int level = 0,
+    bool enabled = false,
     const Node* = nullptr,
-    const std::unordered_set<std::string>& = std::unordered_set<std::string>()
+    TagSet tags = TagSet()
   );
 
+  // move-only, no copies
   Node(Node&&) = default;
   Node& operator=(Node&&) = default;
+
+  Node(const Node&) = delete;
+  Node& operator=(const Node&) = delete;
 
   boost::iterator_range<detail::NodeParentIterator> traverseUp() const;
   std::vector<std::string> getPathToNode() const;
@@ -57,7 +61,7 @@ public:
   inline int level() const { return level_; }
   inline bool enabled() const { return enabled_; }
   inline const Node* parent() const { return parent_; }
-  inline const std::unordered_set<std::string>& tags() const { return tags_; }
+  inline const TagSet& tags() const { return tags_; }
 
   bool hasTags(const std::unordered_set<std::string>& tags) const;
 
@@ -69,8 +73,7 @@ private:
   int level_;
   bool enabled_;
   const Node* parent_;
-  std::unordered_set<std::string> tags_;
-
+  TagSet tags_;
 };
 
 typedef std::shared_ptr<const Node> NodePtr;

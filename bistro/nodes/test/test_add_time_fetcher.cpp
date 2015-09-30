@@ -68,7 +68,7 @@ void fetch(double t, initializer_list<dynamic> items, Nodes *nodes) {
 
 void check_schedule(  // Negative expected times mean "disabled node"
   time_t cur_time, initializer_list<dynamic> items, vector<time_t> exp_times,
-  vector<unordered_set<string>> exp_tags = {}
+  vector<Node::TagSet> exp_tags = {}
 ) {
   Nodes nodes;
   fetch(cur_time, items, &nodes);
@@ -91,7 +91,7 @@ void check_schedule(  // Negative expected times mean "disabled node"
 
   vector<string> names;
   vector<bool> enabled;
-  vector<unordered_set<string>> tags;
+  vector<Node::TagSet> tags;
   for (const auto &node : sorted_nodes) {
     EXPECT_EQ(1, node->level());
     EXPECT_EQ(nodes.getInstance(), node->parent());
@@ -194,7 +194,8 @@ TEST(TestAddTimeFetcher, TestMultiItemWithTags) {
         ("cron", obj("epoch", obj("period", 3)("start", 2))),
     },
     {23, 25, 26, 27, 29},
-    {{"x"}, {"x"}, {"y"}, {"x"}, {"x", "y"}}
+    {Node::TagSet{"x"}, Node::TagSet{"x"}, Node::TagSet{"y"},
+     Node::TagSet{"x"}, Node::TagSet{"x", "y"}}
   );
 }
 

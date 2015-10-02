@@ -48,8 +48,8 @@ TaskRunnerResponse try_to_schedule(
 
   const auto ret = cb(job_ptr, node_ptr);
   if (ret == TaskRunnerResponse::RanTask) {
-    for (const auto& pair : new_resources_by_node) {
-      resources_by_node[pair.first] = pair.second;
+    for (auto&& pair : new_resources_by_node) {
+      resources_by_node[pair.first] = std::move(pair.second);
     }
   }
   return ret;

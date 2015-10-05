@@ -19,8 +19,9 @@
 #include <thrift/lib/cpp2/server/ThriftServer.h>
 
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
-#include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
+#include "bistro/bistro/if/gen-cpp2/common_constants.h"
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
+#include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
 #include "bistro/bistro/remote/RemoteWorker.h"
 #include "bistro/bistro/utils/hostname.h"
 #include "bistro/bistro/utils/LogLines.h"
@@ -40,9 +41,6 @@ DEFINE_int32(
   "scheduler's startup wait MUST be at least a couple of heartbeat periods "
   "long to allow all pre-existing workers to connect before it starts "
   "to run tasks."
-);
-DEFINE_string(
-  data_dir, "/data/bistro", "Where to create status pipes and job directories"
 );
 DEFINE_string(
   log_db_file_name, "task_logs.sql3",  // matches LocalRunner
@@ -94,6 +92,7 @@ cpp2::BistroWorker makeWorker(
   // pretty useless if rand correlated with startTime.
   worker.id.rand = folly::Random::rand64(folly::ThreadLocalPRNG());
   worker.heartbeatPeriodSec = FLAGS_heartbeat_period_sec;
+  worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
   LOG(INFO) << "Worker is ready: " << debugString(worker);
   log_state_transition_fn("initializing", worker, nullptr);
   return worker;
@@ -102,6 +101,7 @@ cpp2::BistroWorker makeWorker(
 }  // anonymous namespace
 
 BistroWorkerHandler::BistroWorkerHandler(
+    const boost::filesystem::path& data_dir,
     LogStateTransitionFn log_state_transition_fn,
     SchedulerClientFn scheduler_client_fn,
     const string& worker_command,
@@ -111,13 +111,10 @@ BistroWorkerHandler::BistroWorkerHandler(
     logStateTransitionFn_(log_state_transition_fn),
     schedulerClientFn_(scheduler_client_fn),
     workerCommand_(worker_command),
-    taskQueue_(
-      boost::filesystem::path(FLAGS_data_dir) / ("/" + FLAGS_log_db_file_name),
-      boost::filesystem::path(FLAGS_data_dir) / "/pipes"
-    ),
+    taskQueue_(data_dir / FLAGS_log_db_file_name, data_dir / "pipes"),
     notifyFinishedQueue_(100000),
     notifyNotRunningQueue_(10000),
-    jobsDir_(boost::filesystem::path(FLAGS_data_dir) / "/jobs"),
+    jobsDir_(data_dir / "jobs"),
     worker_(makeWorker(addr, locked_port, logStateTransitionFn_)),
     state_(RemoteWorkerState(worker_.id.startTime)),
     gotNewSchedulerInstance_(true),
@@ -536,6 +533,7 @@ void BistroWorkerHandler::setState(
     RemoteWorkerState* state,
     RemoteWorkerState::State new_state,
     time_t cur_time) {
+  // Future: this is inside a Synchronized lock, so LOG() is very costly.
   if (new_state != RemoteWorkerState::State::HEALTHY
       && state->state_ == RemoteWorkerState::State::HEALTHY) {
     LOG(WARNING) << "Became unhealthy";
@@ -577,7 +575,9 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
     schedulerClientFn_(
       folly::EventBaseManager::get()->getEventBase()
     )->sync_processHeartbeat(res, worker_);
-
+    enforceWorkerSchedulerProtocolVersion(
+      worker_.protocolVersion, res.protocolVersion
+    );
     gotNewSchedulerInstance_ = schedulerState_->id != res.id;
     if (gotNewSchedulerInstance_) {
       LOG(INFO) << "Connected to new scheduler " << debugString(res);

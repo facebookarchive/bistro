@@ -14,7 +14,6 @@
 #include "bistro/bistro/remote/RemoteWorker.h"
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
-#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 
 using namespace facebook::bistro;
 using namespace folly::test;

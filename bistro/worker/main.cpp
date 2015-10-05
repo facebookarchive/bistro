@@ -23,6 +23,9 @@
 DEFINE_string(scheduler_host, "", "Scheduler's hostname.");
 DEFINE_int32(scheduler_port, 0, "Scheduler's thrift port.");
 DEFINE_string(worker_command, "", "Command to run for the worker.");
+DEFINE_string(
+  data_dir, "/data/bistro", "Where to create status pipes and job directories"
+);
 
 static const bool scheduler_host_validator = google::RegisterFlagValidator(
   &FLAGS_scheduler_host,
@@ -54,6 +57,7 @@ int main(int argc, char* argv[]) {
   auto my_socket_and_addr = getServerSocketAndAddress();
   auto server = std::make_shared<apache::thrift::ThriftServer>();
   auto handler = std::make_shared<BistroWorkerHandler>(
+    FLAGS_data_dir,
     [](const char*, const cpp2::BistroWorker&, const cpp2::RunningTask*) {
       // Do not log state transitions. This would be a good place to hook up
       // a popular OSS tool for collecting operational charts.

@@ -10,6 +10,7 @@
 #pragma once
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
+#include "bistro/bistro/if/gen-cpp2/common_constants.h"
 
 #ifndef INT64_MIN
 # define INT64_MIN std::numeric_limits<int64_t>::min()
@@ -146,6 +147,7 @@ struct RemoteWorkerState {
     r.workerCheckInterval = workerCheckInterval();
     // Tells the worker when the scheduler moved it from NEW to HEALTHY.
     r.workerState = static_cast<int32_t>(state_);
+    r.protocolVersion = cpp2::common_constants::kProtocolVersion();
     return r;
   }
 

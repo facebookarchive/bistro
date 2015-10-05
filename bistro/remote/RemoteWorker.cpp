@@ -13,6 +13,7 @@
 #include <folly/json.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/Exception.h"
@@ -50,11 +51,32 @@ namespace {
 using apache::thrift::debugString;
 using namespace std;
 
+bool checkWorkerSchedulerProtocolVersion(int16_t worker, int16_t scheduler) {
+  // In the future, this check can allow some limited backward/forward
+  // compatibility for specific versions (as needed).
+  return worker == scheduler;
+}
+
+void enforceWorkerSchedulerProtocolVersion(int16_t worker, int16_t scheduler) {
+  if (!checkWorkerSchedulerProtocolVersion(worker, scheduler)) {
+    throw std::runtime_error(folly::to<std::string>(
+      "Worker-scheduler protocol version mismatch: ", worker,
+      " is not compatible with ", scheduler
+    ));
+  }
+}
+
 folly::Optional<cpp2::SchedulerHeartbeatResponse>
 RemoteWorker::processHeartbeat(
     RemoteWorkerUpdate* update,
     const cpp2::BistroWorker& w_new) {
 
+  // We should never get here (since that means the worker is already added
+  // to our pool), so CHECK instead of throwing.
+  CHECK(checkWorkerSchedulerProtocolVersion(
+    w_new.protocolVersion, cpp2::common_constants::kProtocolVersion()
+  )) << "Worker & scheduler protocol mismatch: " << w_new.protocolVersion
+    << " vs " << cpp2::common_constants::kProtocolVersion();
   const auto& w_cur = worker_;
   // We'll have to kill the old worker, unless the new process is running on
   // the same machine and listening on the same port as the old.
@@ -199,7 +221,7 @@ void RemoteWorker::recordFailedTask(
     const cpp2::RunningTask& rt,
     const TaskStatus& status) noexcept {
 
-   CHECK(!status.isRunning() && !status.isDone());
+  CHECK(!status.isRunning() && !status.isDone());
   // DO: Consider CHECKing that the task is currently in 'runningTasks_'?
   // DO: Maybe also CHECK that the task is not in unsureIfRunningTasks_?
   CHECK(recordNonRunningTaskStatusImpl(rt, status));

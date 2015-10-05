@@ -13,13 +13,9 @@
 #include <thrift/lib/cpp2/async/HeaderClientChannel.h>
 #include <thrift/lib/cpp/async/TAsyncSocket.h>
 
-#include "bistro/bistro/server/test/ThriftMonitorTestThread.h"
-#include "bistro/bistro/worker/BistroWorkerHandler.h"
 #include "bistro/bistro/utils/server_socket.h"
 #include "bistro/bistro/utils/service_clients.h"
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
-
-DECLARE_string(data_dir);
 
 namespace facebook { namespace bistro {
 
@@ -28,20 +24,21 @@ using namespace std;
 using namespace apache::thrift;
 
 BistroWorkerTestThread::BistroWorkerTestThread(
-  ThriftMonitorTestThread* scheduler) {
-  // TODO 5437837 uses separate directories so we can start multiple workers
-  FLAGS_data_dir = dataDir_.getPath().native();
+    BistroWorkerHandler::SchedulerClientFn scheduler_client_fn) {
 
   auto socket_and_addr = getServerSocketAndAddress();
   workerPtr_ = make_shared<BistroWorkerHandler>(
-    [](
-      const char*, const cpp2::BistroWorker& worker, const cpp2::RunningTask*
-    ) {},
-    bind(
-      &ThriftMonitorTestThread::getClient,
-      scheduler,
-      std::placeholders::_1
-    ),
+    dataDir_.getPath().native(),  // each worker runs in its own directory
+    [](const char* m, const cpp2::BistroWorker&, const cpp2::RunningTask* rt) {
+      // Makes it easy to wait for events using waitForRegexOnFd()
+      if (!rt) {
+        LOG(INFO) << "worker state change: " << m;
+      } else {
+        LOG(INFO) << "worker task state change: " << m
+          << " - " << rt->job << " / " << rt->node;
+      }
+    },
+    std::move(scheduler_client_fn),
     "",
     socket_and_addr.second,
     socket_and_addr.second.port

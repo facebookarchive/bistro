@@ -14,6 +14,8 @@ namespace py facebook.bistro.common
 // Marks LogLines that are not authentic log lines, but which instead store
 // some kind of error or warning about the log line fetching process.
 const i64 kNotALineID = -1;
+// The current protocol version, by default we reject connections from others.
+const i16 kProtocolVersion = 0;
 
 // Both members are required because we keep hundreds of millions of these
 // in memory, and therefore don't want to waste bits on the __isset field.
@@ -139,6 +141,7 @@ struct BistroWorker {
 
   // Make it unnecessary to manually set this config for the scheduler.
   5: i32 heartbeatPeriodSec,  // The scheduler adds a grace period
+  6: i16 protocolVersion = 0,  // Default must stay at 0
 }
 
 struct SchedulerHeartbeatResponse {
@@ -157,6 +160,7 @@ struct SchedulerHeartbeatResponse {
   5: i32 workerCheckInterval,
   // Tells the worker when the scheduler moved it from NEW to HEALTHY.
   6: i32 workerState,
+  7: i16 protocolVersion = 0,  // Default must stay at 0
 }
 
 enum KillMethod {

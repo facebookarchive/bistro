@@ -319,6 +319,7 @@ cpp2::SchedulerHeartbeatResponse RemoteWorkerRunner::processWorkerHeartbeat(
     const cpp2::BistroWorker& worker,
     RemoteWorkerUpdate update) {
 
+  // Throws on protocol version mismatch, does not add worker to pool.
   auto r = workers_->processHeartbeat(&update, worker);
   // This will often result in the healthcheck or getRunningTasks arriving
   // before the heartbeat response does (meaning the worker does not yet

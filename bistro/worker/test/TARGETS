@@ -20,6 +20,7 @@ cpp_unittest(
     ],
     deps = [
         ':bistro_worker_test_lib',
+        '@/folly/experimental:test_util',
         '@/bistro/bistro/server/test:thrift_monitor_test_thread_lib',
     ],
 )

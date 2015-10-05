@@ -13,6 +13,7 @@
 
 #include "bistro/bistro/remote/RemoteWorkerState.h"
 #include "bistro/bistro/utils/TemporaryFile.h"
+#include "bistro/bistro/worker/BistroWorkerHandler.h"
 
 namespace facebook { namespace bistro {
 
@@ -28,7 +29,7 @@ class BistroWorkerHandler;
  */
 class BistroWorkerTestThread {
 public:
-  explicit BistroWorkerTestThread(ThriftMonitorTestThread*);
+  explicit BistroWorkerTestThread(BistroWorkerHandler::SchedulerClientFn);
 
   std::shared_ptr<cpp2::BistroWorkerAsyncClient> getClient();
 
@@ -43,10 +44,10 @@ public:
   cpp2::BistroInstanceID getSchedulerID() const;
 
 private:
-  apache::thrift::util::ScopedServerThread sst_;
   std::shared_ptr<BistroWorkerHandler> workerPtr_;
 
   TemporaryDir dataDir_;
+  apache::thrift::util::ScopedServerThread sst_;  // Destroy threads first
 };
 
 }}

@@ -33,18 +33,17 @@ namespace cpp2 {
 class BistroWorkerHandler : public cpp2::BistroWorkerSvIf,
                             public fb303::FacebookBase2,
                             BackgroundThreadMixin {
-
+public:
   typedef std::function<std::shared_ptr<cpp2::BistroSchedulerAsyncClient>(
     folly::EventBase* event_base
   )> SchedulerClientFn;
-
-public:
   // IMPORTANT: This logger MUST be thread-safe, noexcept, and fast.
   typedef std::function<
     void (const char*, const cpp2::BistroWorker&, const cpp2::RunningTask*)
   > LogStateTransitionFn;
 
   BistroWorkerHandler(
+    const boost::filesystem::path& data_dir,
     LogStateTransitionFn,
     SchedulerClientFn,
     const std::string& worker_command,

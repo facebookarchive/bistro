@@ -29,6 +29,11 @@ const std::string kHealthcheckTaskJob = "__BISTRO_HEALTH_CHECK__";
 // This special node ID for healthcheck tasks signals that the worker is new.
 const std::string kHealthcheckTaskNewWorkerNode = "__NEW_WORKER__";
 
+// True if protocol versions are compatible, false otherwise.
+bool checkWorkerSchedulerProtocolVersion(int16_t worker, int16_t scheduler);
+// Throws on protocol version mismatches.
+void enforceWorkerSchedulerProtocolVersion(int16_t worker, int16_t scheduler);
+
 /**
  * Implements the stateful protocol used by the scheduler to interact with a
  * single remote worker (see README.worker_protocol).

@@ -25,6 +25,12 @@ RemoteWorkers::processHeartbeat(
     RemoteWorkerUpdate* update,
     const cpp2::BistroWorker& worker) {
 
+  // It's best not to add the bad worker to the pool, so check outside of
+  // RemoteWorker.  At present, we do not tell that worker to commit
+  // suicide, so version mismatches will cause lots of logspam.
+  enforceWorkerSchedulerProtocolVersion(
+    worker.protocolVersion, cpp2::common_constants::kProtocolVersion()
+  );
   const auto& shard = worker.shard;
   auto worker_it = workerPool_.find(shard);
   // Make a RemoteWorker if the shard is new

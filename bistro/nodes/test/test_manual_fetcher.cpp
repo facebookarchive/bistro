@@ -72,16 +72,16 @@ TEST(TestManualFetcher, HandleValid) {
   NodesLoader::_fetchNodesImpl(config, &nodes);
 
   auto instance = nodes.getInstance();
-  auto node1 = nodes.getNodeVerySlow("node1");
+  auto node1 = getNodeVerySlow(nodes, "node1");
   ASSERT_EQ(instance, node1->parent());
 
-  auto node2 = nodes.getNodeVerySlow("node2");
+  auto node2 = getNodeVerySlow(nodes, "node2");
   ASSERT_EQ(instance, node2->parent());
 
-  auto node11 = nodes.getNodeVerySlow("node11");
+  auto node11 = getNodeVerySlow(nodes, "node11");
   ASSERT_EQ(node1.get(), node11->parent());
 
-  auto node112 = nodes.getNodeVerySlow("node112");
+  auto node112 = getNodeVerySlow(nodes, "node112");
   ASSERT_EQ(node11.get(), node112->parent());
 }
 

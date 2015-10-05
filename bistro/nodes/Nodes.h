@@ -71,9 +71,6 @@ public:
     return nodes_.front().get();
   }
 
-  // EXTREMELY INEFFICIENT; used only in unit tests.
-  NodePtr getNodeVerySlow(const std::string& name) const;
-
   std::vector<NodePtr>::const_iterator begin() const {
     return nodes_.begin();
   }

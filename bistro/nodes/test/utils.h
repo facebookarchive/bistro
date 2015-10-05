@@ -19,4 +19,13 @@ iterate_non_instance_nodes(const Nodes& n) {
   return boost::make_iterator_range(n.begin() + 1, n.end());
 }
 
+NodePtr getNodeVerySlow(const Nodes& nodes, const std::string& name) {
+  for (const auto& node : nodes) {
+    if (node->name() == name) {
+      return node;
+    }
+  }
+  return nullptr;
+}
+
 }}

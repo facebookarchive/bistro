@@ -13,6 +13,7 @@
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
+#include "bistro/bistro/nodes/test/utils.h"
 #include "bistro/bistro/utils/TemporaryFile.h"
 
 using namespace facebook::bistro;
@@ -104,10 +105,10 @@ TEST(TestScriptFetcher, HandleParentArgument) {
   NodesLoader::_fetchNodesImpl(config, &nodes);
 
   ASSERT_EQ(5, nodes.size());
-  auto n1 = nodes.getNodeVerySlow("node1:foo");
+  auto n1 = getNodeVerySlow(nodes, "node1:foo");
   ASSERT_EQ(2, n1->level());
   ASSERT_EQ("node1", n1->parent()->name());
-  auto n2 = nodes.getNodeVerySlow("node2:foo");
+  auto n2 = getNodeVerySlow(nodes, "node2:foo");
   ASSERT_EQ(2, n2->level());
   ASSERT_EQ("node2", n2->parent()->name());
 }

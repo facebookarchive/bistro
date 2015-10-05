@@ -50,13 +50,4 @@ Nodes::LevelIterRange Nodes::iterateOverLevel(NodeLevel level) const {
   );
 }
 
-NodePtr Nodes::getNodeVerySlow(const std::string& name) const {
-  for (const auto& n : nodes_) {
-    if (n->name() == name) {
-      return n;
-    }
-  }
-  return nullptr;
-}
-
 }}

@@ -50,7 +50,7 @@ JobFilters::JobFilters(const folly::dynamic& d) {
   jt = d.find("tag_whitelist");
   if (jt != d.items().end()) {
     for (const auto& item : jt->second) {
-      tagWhitelist_.insert(item.asString().toStdString());
+      tagWhitelist_.emplace_back(item.asString().toStdString());
     }
   }
 
@@ -133,7 +133,7 @@ void JobFilters::setFractionOfNodes(double f) {
 
 bool JobFilters::isNonTriviallyEmpty() const {
   // We might have a configuration that is actually 'empty' (always matches)
-  // even if some filters are set (if they are set it trivial values).
+  // even if some filters are set (if they are set to trivial values).
   return
     whitelist_.empty()
     && whitelistRegex_.empty()

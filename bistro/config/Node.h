@@ -16,7 +16,6 @@
 #include <folly/sorted_vector_types.h>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "bistro/bistro/utils/SymbolTable.h"
@@ -63,7 +62,7 @@ public:
   inline const Node* parent() const { return parent_; }
   inline const TagSet& tags() const { return tags_; }
 
-  bool hasTags(const std::unordered_set<std::string>& tags) const;
+  bool hasTags(const std::vector<std::string>& tags) const;
 
 private:
   friend class detail::NodeParentIterator;

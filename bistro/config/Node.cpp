@@ -46,7 +46,7 @@ vector<string> Node::getPathToNode() const {
   return v;
 }
 
-bool Node::hasTags(const unordered_set<string>& tags) const {
+bool Node::hasTags(const vector<string>& tags) const {
   for (const auto& t : tags) {
     if (tags_.count(t)) {
       return true;

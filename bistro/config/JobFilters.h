@@ -55,7 +55,7 @@ private:
   boost::regex whitelistRegex_;
   std::unordered_set<std::string> blacklist_;
   boost::regex blacklistRegex_;
-  std::unordered_set<std::string> tagWhitelist_;
+  std::vector<std::string> tagWhitelist_;
   double fractionOfNodes_;
   size_t fractionCutoff_;
   bool isEmpty_;

@@ -177,7 +177,6 @@ TEST_F(TestWorker, HandleKillTask) {
 
   worker.getClient()->sync_killTask(
     rt[0],
-    cpp2::KilledTaskStatusFilter::NONE,
     worker.getSchedulerID(),
     worker.getWorker().id
   );

@@ -114,8 +114,7 @@ SubprocessTaskQueue::Task::Task(
     ) {
 }
 
-namespace {  // Helpers for kill() & work()
-
+namespace {  // Helper for kill() & work()
 Optional<string> killViaMethod(ProcessRunner& runner, cpp2::KillMethod m) {
   switch (m) {
     case cpp2::KillMethod::SOFT:
@@ -127,63 +126,11 @@ Optional<string> killViaMethod(ProcessRunner& runner, cpp2::KillMethod m) {
       return none;
   }
 }
-
-TaskStatus filterStatusForceDoneOr(
-    cpp2::KilledTaskStatusFilter filter,
-    TaskStatus status) {
-  switch (filter) {
-    case cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_FAILED:
-      return TaskStatus::failed(folly::make_unique<folly::dynamic>(
-        folly::dynamic::object
-        ("message", "Killed & coerced to 'failed' by since task was not done")
-        ("actual_status", status.toDynamicNoTime())
-      ));
-    case cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE_BACKOFF:
-      return TaskStatus::incompleteBackoff(folly::make_unique<folly::dynamic>(
-        folly::dynamic::object
-        ("message",
-         "Killed & coerced to 'incomplete_backoff' since task was not done")
-        ("actual_status", status.toDynamicNoTime())
-      ));
-    case cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE:
-      return TaskStatus::incomplete(folly::make_unique<folly::dynamic>(
-        folly::dynamic::object
-        ("message", "Killed & coerced to 'incomplete' since task was not done")
-        ("actual_status", status.toDynamicNoTime())
-      ));
-    default:
-      ;  // Fall through
-  }
-  // Abort since we already pre-filtered the status!
-  LOG(FATAL) << "Bad status filter:" << static_cast<int>(filter);
-  return std::move(status);  // Not reached.
-}
-
-TaskStatus filterStatus(
-    cpp2::KilledTaskStatusFilter filter,
-    TaskStatus status) {
-  switch (filter) {
-    case cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_FAILED:
-    case cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE_BACKOFF:
-    case cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE:
-      if (status.isDone()) {
-        break;
-      }
-      return filterStatusForceDoneOr(filter, std::move(status));
-    case cpp2::KilledTaskStatusFilter::NONE:
-      break;
-    default:  // Maybe this worker doesn't support the new filter type?
-      LOG(ERROR) << "Unknown status filter: " << static_cast<int>(filter);
-  }
-  return std::move(status);
-}
-
 }  // anonymous namespace
 
 void SubprocessTaskQueue::kill(
     shared_ptr<Task> task,
-    cpp2::KillMethod kill_method,
-    cpp2::KilledTaskStatusFilter status_filter) {
+    cpp2::KillMethod kill_method) {
 
   // This is a no-op if the ProcessRunner has already exited.  E.g. we would
   // get 'none' here if kill() runs between wait() and idToTask_.erase() in
@@ -197,18 +144,15 @@ void SubprocessTaskQueue::kill(
   // Thanks to "if (!was_killed)" below, callback_ & timer_ don't need locks.
 
   // Parse the task's status string.
-  auto status = filterStatus(
-    status_filter,
-    raw_status.empty()
-      // Task backs off, but its backoff counter is not advanced. Good for
-      // preempting or restarting running tasks for whatever reason.
-      ? TaskStatus::incompleteBackoff(folly::make_unique<folly::dynamic>(
-          dynamic::object("exception", "Task killed, no status returned")
-        ))
-      : TaskStatus::fromString(raw_status)
-  );
+  auto status = raw_status.empty()
+    // Task backs off, but its backoff counter is not advanced. Good for
+    // preempting or restarting running tasks for whatever reason.
+    ? TaskStatus::incompleteBackoff(folly::make_unique<folly::dynamic>(
+        dynamic::object("exception", "Task killed, no status returned")
+      ))
+    : TaskStatus::fromString(raw_status);
 
-  // Log the runtime, and the post-filter task status
+  // Log the runtime, and the task status
   task->timer_.log(
     "Task ", debugString(task->runningTask_), " killed with status '",
     status.toJson(), "' (raw text '", raw_status, "')"
@@ -221,8 +165,7 @@ void SubprocessTaskQueue::kill(
 void SubprocessTaskQueue::killTask(
     const string& job,
     const string& node,
-    cpp2::KillMethod kill_method,
-    cpp2::KilledTaskStatusFilter status_filter) {
+    cpp2::KillMethod kill_method) {
 
   auto maybe_task = idToTask_->get(job, node);
   if (!maybe_task.hasValue()) {
@@ -230,7 +173,7 @@ void SubprocessTaskQueue::killTask(
   }
   // The task will be deleted from this map by work().
 
-  kill(*maybe_task, kill_method, status_filter);
+  kill(*maybe_task, kill_method);
 }
 
 chrono::milliseconds SubprocessTaskQueue::work() noexcept {

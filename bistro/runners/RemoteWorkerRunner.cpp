@@ -848,8 +848,7 @@ void RemoteWorkerRunner::fetchRunningTasksForNewWorkers(
 
 void RemoteWorkerRunner::killTask(
     const std::string& job,
-    const std::string& node,
-    cpp2::KilledTaskStatusFilter status_filter) {
+    const std::string& node) {
 
   // Look up the running task
   const Job::ID job_id(Job::JobNameTable.asConst()->lookup(job));
@@ -880,7 +879,7 @@ void RemoteWorkerRunner::killTask(
     0,  // default connect timeout
     0,  // default send timeout
     300000  // 5 minute receive timeout
-  )->sync_killTask(*maybe_rt, status_filter, schedulerID_, maybe_worker->id);
+  )->sync_killTask(*maybe_rt, schedulerID_, maybe_worker->id);
 }
 
 }}

@@ -186,27 +186,10 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
     return "forgiven";
   }
   if (handler == "kill_task") {
-    auto status_filter_str = d.getDefault(
-      "status_filter", "force_done_or_failed"
-    ).asString().toStdString();
-    cpp2::KilledTaskStatusFilter status_filter;
-    if (status_filter_str == "force_done_or_failed") {
-      status_filter = cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_FAILED;
-    } else if (status_filter_str == "force_done_or_incomplete_backoff") {
-      status_filter =
-        cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE_BACKOFF;
-    } else if (status_filter_str == "force_done_or_incomplete") {
-      status_filter = cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE;
-    } else if (status_filter_str == "none") {
-      status_filter = cpp2::KilledTaskStatusFilter::NONE;
-    } else {
-      throw BistroException("Unknown status_filter: ", status_filter_str);
-    }
-    // Throws on failure
-    taskRunner_->killTask(
+    // Ignoring "status_filter", since it is now deprecated.
+    taskRunner_->killTask(  // Throws on failure
       d["job_id"].asString().toStdString(),
-      d["node_id"].asString().toStdString(),
-      status_filter
+      d["node_id"].asString().toStdString()
     );
     return "killed";
   }

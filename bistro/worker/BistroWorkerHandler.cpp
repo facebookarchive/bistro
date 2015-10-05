@@ -345,7 +345,6 @@ void BistroWorkerHandler::requestSuicide(
 
 void BistroWorkerHandler::killTask(
     const cpp2::RunningTask& rt,
-    cpp2::KilledTaskStatusFilter status_filter,
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker) {
 
@@ -374,8 +373,7 @@ void BistroWorkerHandler::killTask(
   taskQueue_.killTask(
     rt.job,
     rt.node,
-    FLAGS_use_soft_kill ? cpp2::KillMethod::SOFT : cpp2::KillMethod::HARD,
-    status_filter
+    FLAGS_use_soft_kill ? cpp2::KillMethod::SOFT : cpp2::KillMethod::HARD
   );
   logStateTransitionFn_("killed_task", worker_, &rt);
 }

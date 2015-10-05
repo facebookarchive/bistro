@@ -291,9 +291,7 @@ service BistroWorker extends fb303.FacebookService {
    */
   void killTask(
     1: common.RunningTask rt,
-    // When we kill a task, the SIGTERM gives it an opportunity to return a
-    // status string.  This filter allows us to modify the status handling.
-    2: common.KilledTaskStatusFilter status_filter,
+    // 2: DEPRECATED
     // Verifying these IDs is pretty redundant given the running task
     // invocation ID, but better safe than sorry, and it might anyhow be a
     // sensible thing to do if Bistro gets speculative execution.

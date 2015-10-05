@@ -190,51 +190,10 @@ TEST(TestLocalRunner, HandleKill) {
     });
   };
 
-  runner.killTask("job", "node0", cpp2::KilledTaskStatusFilter::NONE);
-  assertTaskKilledNoFilter(0);
-  assertTasksRunningFromNode(1);  // Other tasks are unaffected.
-
-  runner.killTask(
-    "job", "node1",
-    cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE_BACKOFF
-  );
-  ASSERT_EQ(2, status_seqs[1]->size());
-  assertTaskOnNode(1, 1, "incomplete_backoff", [](const TaskStatus& status) {
-    return status.bits() == kIncompleteBackoffBits
-      && status.backoffDuration().seconds == 60  // See JobBackoffSettings.cpp
-      && status.data()
-      && status.data()->count("actual_status")
-      && !status.data()->count("exception")
-      && status.data()->at("message")
-        == "Killed & coerced to 'incomplete_backoff' since task was not done";
-  });
-  assertTasksRunningFromNode(2);  // Other tasks are unaffected.
-
-  runner.killTask(
-    "job", "node2", cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE
-  );
-  // Even though it's "incomplete", it will not respawn since we aren't
-  // running a real scheduling loop here.
-  ASSERT_EQ(2, status_seqs[2]->size());
-  assertTaskOnNode(2, 1, "incomplete", [](const TaskStatus& status) {
-    return status.bits() == TaskStatusBits::Incomplete;
-  });
-  assertTasksRunningFromNode(3);  // Other tasks are unaffected.
-
-  // All remaining running tasks get killed
-  for (size_t i = 3; i < kNumNodes; ++i) {
-    runner.killTask(
-      "job", folly::to<std::string>("node", i),
-      cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_FAILED
-    );
-    ASSERT_EQ(2, status_seqs[i]->size());
-    assertTaskOnNode(i, 1, "failed", [](const TaskStatus& s) {
-      return s.isFailed();
-    });
+  // Kill all tasks.
+  for (size_t i = 0; i < kNumNodes; ++i) {
+    runner.killTask("job", folly::to<std::string>("node", i));
+    assertTaskKilledNoFilter(i);
+    assertTasksRunningFromNode(i + 1);  // Other tasks are unaffected.
   }
-
-  // But a task that wasn't running remains in backoff. Note: Since it may
-  // run again, this is probably not what the user wants.  We should make
-  // this better?
-  assertTaskKilledNoFilter(0);
 }

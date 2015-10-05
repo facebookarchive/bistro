@@ -167,18 +167,3 @@ enum KillMethod {
   SOFT = 1,  // SIGTERM, wait a few seconds, SIGKILL
   HARD = 2,  // SIGKILL
 }
-
-// Killing a task can be done with different intentions about its status.
-enum KilledTaskStatusFilter {
-  // Treat the status as if the task just quit of its own accord.
-  NONE = 1,
-  // Unless the task is "done", coerce its status to "failed". Useful if you
-  // don't want the task to start back up.
-  FORCE_DONE_OR_FAILED = 2,
-  // Unless the task is "done", coerce its status to "incomplete_backoff".
-  // Useful if we're just preempting the task to allow others to run first.
-  FORCE_DONE_OR_INCOMPLETE_BACKOFF = 3,
-  // Unless the task is "done", coerce its status to "incomplete".  Useful
-  // if the task should be eligible to re-run immediately.
-  FORCE_DONE_OR_INCOMPLETE = 4,
-}

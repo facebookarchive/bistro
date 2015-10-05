@@ -76,15 +76,11 @@ LogLines LocalRunner::getJobLogs(
   );
 }
 
-void LocalRunner::killTask(
-    const std::string& job,
-    const std::string& node,
-    cpp2::KilledTaskStatusFilter status_filter) {
+void LocalRunner::killTask(const std::string& job, const std::string& node) {
   taskQueue_.killTask(
     job,
     node,
-    FLAGS_use_soft_kill ? cpp2::KillMethod::SOFT : cpp2::KillMethod::HARD,
-    status_filter
+    FLAGS_use_soft_kill ? cpp2::KillMethod::SOFT : cpp2::KillMethod::HARD
   );
 }
 

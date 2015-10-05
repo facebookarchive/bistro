@@ -68,16 +68,14 @@ public:
 
   /**
    * Soft-kills or hard-kills the task, and invokes its callback with its
-   * status, which defaults to BACKOFF (if e.g. SIGTERM wasn't handled),
-   * subject to the status filter.  Does nothing for tasks that already
-   * finished, were enqueued but not started, or were never even enqueued
-   * via runTask.  Thread-safe.
+   * status, which defaults to BACKOFF (if e.g.  SIGTERM wasn't handled).
+   * Does nothing for tasks that already finished, were enqueued but not
+   * started, or were never even enqueued via runTask.  Thread-safe.
    */
   void killTask(
     const std::string& job,
     const std::string& node,
-    cpp2::KillMethod kill_method,  // soft (TERM-wait-KILL) or hard (KILL)
-    cpp2::KilledTaskStatusFilter status_filter  // Explained in .thrift file
+    cpp2::KillMethod kill_method  // soft (TERM-wait-KILL) or hard (KILL)
   );
 
 private:
@@ -109,8 +107,7 @@ private:
   std::chrono::milliseconds work() noexcept;
   void kill(
     std::shared_ptr<Task> task,
-    cpp2::KillMethod kill_method,  // soft (TERM-wait-KILL) or hard (KILL)
-    cpp2::KilledTaskStatusFilter status_filter  // Explained in .thrift file
+    cpp2::KillMethod kill_method  // soft (TERM-wait-KILL) or hard (KILL)
   );
 
   boost::filesystem::path pipeDir_;

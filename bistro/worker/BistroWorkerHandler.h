@@ -87,7 +87,6 @@ public:
 
   void killTask(
     const cpp2::RunningTask& rt,
-    cpp2::KilledTaskStatusFilter status_filter,
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker
   ) override;

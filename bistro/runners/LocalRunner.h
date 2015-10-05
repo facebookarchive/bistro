@@ -44,11 +44,7 @@ public:
 
   bool canKill() override { return true; }
 
-  void killTask(
-    const std::string& job,
-    const std::string& node,
-    cpp2::KilledTaskStatusFilter status_filter
-  ) override;
+  void killTask(const std::string& job, const std::string& node) override;
 
 protected:
  TaskRunnerResponse runTaskImpl(

@@ -90,6 +90,7 @@ public:
     const std::shared_ptr<const Job>& job,
     const std::shared_ptr<const Node>& node,
     const TaskStatus* prev_status,
+    // Must be thread-safe
     std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
   ) noexcept;
 
@@ -109,10 +110,7 @@ public:
   /**
    * Blocking (many seconds!) call to kill a task. Throws if the kill fails.
    */
-  virtual void killTask(
-      const std::string& job,
-      const std::string& node,
-      cpp2::KilledTaskStatusFilter status_filter) {
+  virtual void killTask(const std::string& job, const std::string& node) {
     throw std::runtime_error("Killing tasks is not supported");
   }
 
@@ -179,6 +177,7 @@ public:
     const std::shared_ptr<const Node>& node,
     cpp2::RunningTask& rt,
     folly::dynamic& job_args,
+    // Must be thread-safe
     std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
   ) noexcept = 0;
 

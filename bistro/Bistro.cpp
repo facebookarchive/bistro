@@ -159,15 +159,7 @@ std::chrono::milliseconds Bistro::scheduleOnce(
         // just-killed task to ensure that we don't try to kill stubborn
         // tasks in *every* scheduling loop.
         try {
-          taskRunner_->killTask(
-            rt.job,
-            rt.node,
-            // If the task chooses to be done, great. If not, don't treat this
-            // preemption as a failure, so as to avoid decreasing the task's
-            // retry counter.  If needed, we can instead introduce a special
-            // status bit for "preempted", or use "error without backoff".
-            cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE
-          );
+          taskRunner_->killTask(rt.job, rt.node);
         } catch (const std::exception& ex) {
           LOG(WARNING) << "Failed to kill orphan task "
             << apache::thrift::debugString(rt) << ": " << ex.what();

@@ -14,6 +14,7 @@
 #include <iostream>
 
 #include <folly/Conv.h>
+#include <folly/Memory.h>
 
 namespace facebook { namespace bistro {
 
@@ -50,17 +51,17 @@ void HTTPServer::accept() {
       return;
     }
     if (!ec) {
-      auto c = make_shared<Connection>(
+      auto c = folly::make_unique<Connection>(
         // TODO(agoder): This move seems dubious, or at least hard-to-follow.
         std::move(socket_),
-        [this](ConnectionPtr p) {
-          connections_.erase(p);
-          p->stop();
+        [this](Connection* p) {
+          CHECK(connections_.erase(p) == 1);
         },
         processCallback_
       );
-      connections_.insert(c);
-      c->start();
+      auto p = connections_.emplace(std::make_pair(c.get(), std::move(c)));
+      CHECK(p.second);
+      p.first->second->start();
     }
     accept();
   });

@@ -11,7 +11,7 @@
 
 #include <boost/asio.hpp>
 #include <memory>
-#include <set>
+#include <unordered_map>
 
 #include "bistro/bistro/server/Connection.h"
 
@@ -37,9 +37,7 @@ private:
   boost::asio::ip::tcp::acceptor acceptor_;
   boost::asio::ip::tcp::socket socket_;
 
-  std::set<ConnectionPtr> connections_;
-
-
+  std::unordered_map<Connection*, std::unique_ptr<Connection>> connections_;
 };
 
 }}

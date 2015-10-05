@@ -27,10 +27,10 @@ namespace {
 
 Connection::Connection(
     boost::asio::ip::tcp::socket socket,
-    function<void(ConnectionPtr)> stop_callback,
+    function<void(Connection*)> destroy_callback,
     RequestProcessor process_callback)
   : socket_(std::move(socket)),
-    stopCallback_(stop_callback),
+    destroyCallback_(destroy_callback),
     processCallback_(process_callback),
     contentLength_(-1) {
 }
@@ -39,10 +39,6 @@ Connection::~Connection() {}
 
 void Connection::start() {
   read();
-}
-
-void Connection::stop() {
-  socket_.close();
 }
 
 bool Connection::parseRequest() {
@@ -98,13 +94,18 @@ void Connection::read() {
         request_.append(buffer_.data(), bytes_transferred);
         if (parseRequest()) {
           response_ = processCallback_(request_);
+          // Calls destroyCallback_ later, so `this` may become invalid
           write();
         } else {
+          // This same read handler will run again, `this` may become invalid
           read();
         }
-      } else if (ec != boost::asio::error::operation_aborted) {
+        // `this` might not exist here any more.
+      } else {
         LOG(ERROR) << "Error reading request: " << ec;
-        stopCallback_(shared_from_this());
+        socket_.close();
+        destroyCallback_(this);
+        // DANGER: `this` has now been destroyed.
       }
     }
   );
@@ -122,12 +123,12 @@ void Connection::write() {
       boost::asio::buffer(response_),
     },
     [this](boost::system::error_code ec, size_t bytes_transferred) {
-      if (!ec) {
-        boost::system::error_code ignored;
-        socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored);
-      } else if (ec != boost::asio::error::operation_aborted) {
-        stopCallback_(shared_from_this());
+      if (ec) {
+        LOG(ERROR) << "Error writing request: " << ec;
       }
+      socket_.close();
+      destroyCallback_(this);
+      // DANGER: `this` has now been destroyed.
     }
   );
 }

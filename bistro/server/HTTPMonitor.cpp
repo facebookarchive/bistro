@@ -150,7 +150,7 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
     return handleJobs(c, getRequestedJobs(c, d));
   }
   if (handler == "sorted_node_names") {
-    return handleNodes(c);
+    return handleSortedNodeNames(c);
   }
   // TODO: deprecate this in favor of running_tasks
   if (handler == "job_node_runtime") {
@@ -184,6 +184,9 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
       }
     }
     return "forgiven";
+  }
+  if (handler == "nodes") {
+    return handleNodes(c, d);
   }
   if (handler == "kill_task") {
     // Ignoring "status_filter", since it is now deprecated.
@@ -303,7 +306,95 @@ dynamic HTTPMonitor::handleJobs(
   return ret;
 }
 
-dynamic HTTPMonitor::handleNodes(const Config& c) {
+/**
+ * Input: {
+ *   "nodes": ["array", "of", "node", "ids"],  // all nodes if empty or missing
+ *   "fields": ["resources", "disabled"],  // all resources if empty or missing
+ * }
+ * Output: {
+ *   "results" : {
+ *     "level_name_0" : {...},
+ *     "level_name_1" : {
+ *       "node1": {
+ *         "resources" : {
+ *           "r1" : {"default": w, "limit": x, "weight": y, "override": z},
+ *           ...
+ *         }
+ *         "disabled" : true
+ *       },
+ *       ...
+ *     },
+ *     ...
+ *   }
+ * }
+ *
+ * "disabled" describes whether the node / worker is healthy or not.
+ * Even when requested, disabled will be omitted if node / worker is healthy to
+ * minimize response size.
+ * Response doesn't include workers at this point (TODO t7757044).
+ */
+
+dynamic HTTPMonitor::handleNodes(const Config& c, const dynamic& request) {
+  dynamic responses = dynamic::object("results", dynamic::object());
+
+  bool no_node_filter = request.getDefault("nodes", dynamic{}).empty();
+  std::unordered_set<folly::fbstring> do_this_node;
+  if (!no_node_filter) {
+    for (auto name : request["nodes"]) {
+      do_this_node.insert(name.asString());
+    }
+  }
+
+  bool field_disabled = true, field_resources = true;
+  if (!request.getDefault("fields", dynamic{}).empty()) {
+    field_disabled = field_resources = false;
+    for (const auto& field : request["fields"]) {
+      const auto& fieldName = field.asString();
+      if (fieldName == "resources") {
+        field_resources = true;
+      } else if (fieldName == "disabled") {
+        field_disabled = true;
+      } else {
+        throw BistroException("Unknown field name: ", fieldName);
+      }
+    }
+  }
+
+  // Iterate over all nodes instead of accessing only those requested.
+  auto& results = responses["results"];
+  for (const auto& node : *(nodesLoader_->getDataOrThrow())) {
+    const auto& node_name = node->name();
+    if (no_node_filter || do_this_node.count(node_name) > 0) {
+      // Add level to response if it isn't there yet.
+      const int level = node->level();
+      auto levelString = c.levels.lookup(level);
+      auto& d_level = results.setDefault(levelString);
+      auto& res = (d_level[node_name] = dynamic::object);
+
+      if (field_resources) {
+        auto& resources = (res["resources"] = dynamic::object);
+        for (auto r_id : c.levelIDToResourceID[level]) {
+          const auto& r_name = c.resourceNames.lookup(r_id);
+          auto& resource = (resources[r_name] = dynamic::object
+            ("default", c.defaultJobResources[r_id])
+            ("limit", c.resourcesByLevel[level][r_id])
+          );
+          const auto weight = c.resourceIDToWeight[r_id];
+          if (weight > 0) {
+            resource["weight"] = weight;
+          }
+        }
+      }
+
+      if (field_disabled && !node->enabled()) {
+        res["disabled"] = true;
+      }
+    }
+  }
+  return responses;
+}
+
+dynamic HTTPMonitor::handleSortedNodeNames(const Config& c) {
   // Returns a dict of level => list of node names
   dynamic ret = dynamic::object;
   auto nodes = nodesLoader_->getDataOrThrow();
@@ -412,6 +503,11 @@ dynamic HTTPMonitor::handleHistograms(
 }
 
 void HTTPMonitor::wait() {
+  serverThread_.join();
+}
+
+void HTTPMonitor::stop() {
+  server_.stop();
   serverThread_.join();
 }
 

@@ -108,3 +108,34 @@ TEST(TestManualFetcher, HandleOneLevel) {
   ++it;
   ASSERT_EQ(it, nodes.end());
 }
+
+TEST(TestManualFetcher, HandleDisabledAndChildren) {
+  Config config(dynamic::object
+    ("resources", dynamic::object)
+    ("nodes", dynamic::object
+      ("levels", {"level1", "level2"})
+      ("node_source", "manual")
+      ("node_source_prefs", dynamic::object
+        ("node1", dynamic::object
+          ("children", {"node11", "node12"})
+          ("disabled", true)
+        )
+        ("node12", dynamic::object("disabled", true))
+      )
+    )
+  );
+  Nodes nodes;
+  NodesLoader::_fetchNodesImpl(config, &nodes);
+
+  auto node1 = getNodeVerySlow(nodes, "node1");
+  ASSERT_FALSE(node1->enabled());
+  ASSERT_EQ(nodes.getInstance(), node1->parent());
+
+  auto node11 = getNodeVerySlow(nodes, "node11");
+  ASSERT_TRUE(node11->enabled());
+  ASSERT_EQ(node1.get(), node11->parent());
+
+  auto node12 = getNodeVerySlow(nodes, "node12");
+  ASSERT_FALSE(node12->enabled());
+  ASSERT_EQ(node1.get(), node12->parent());
+}

@@ -37,6 +37,9 @@ public:
     std::shared_ptr<Monitor> monitor
   );
   void wait();
+  void stop();
+  // Public only for unit tests
+  folly::dynamic handleNodes(const Config& c, const folly::dynamic& request);
 
 private:
   std::string handleRequest(const std::string& request);
@@ -45,7 +48,8 @@ private:
     const Config& c,
     const std::vector<const Job*>& jobs
   );
-  folly::dynamic handleNodes(const Config& c);
+
+  folly::dynamic handleSortedNodeNames(const Config& c);
   folly::dynamic handleTaskRuntime(const folly::dynamic& d);
   folly::dynamic handleRunningTasks(const folly::dynamic& d);
   folly::dynamic handleHistograms(

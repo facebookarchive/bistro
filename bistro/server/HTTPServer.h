@@ -27,6 +27,7 @@ class HTTPServer {
 public:
   HTTPServer(int port, const std::string&, RequestProcessor process_callback);
   void run();
+  void stop();
 
 private:
   void accept();

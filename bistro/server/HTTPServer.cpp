@@ -45,6 +45,12 @@ void HTTPServer::run() {
   ioService_.run();
 }
 
+void HTTPServer::stop() {
+  connections_.clear();
+  acceptor_.close();
+  ioService_.stop();
+}
+
 void HTTPServer::accept() {
   acceptor_.async_accept(socket_, [this](boost::system::error_code ec) {
     if (!acceptor_.is_open()) {

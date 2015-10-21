@@ -52,7 +52,7 @@ public:
   );
   ~SubprocessTaskQueue() override;
 
-  LogWriter* getLogWriter() { return logWriter_.get(); }
+  LogWriter* getLogWriter() const { return logWriter_.get(); }
 
   /**
    * Starts the task.  If the task fails to start, will invoke the callback

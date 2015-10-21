@@ -157,7 +157,7 @@ LogLines RemoteWorkerRunner::getJobLogs(
     const vector<string>& nodes,
     int64_t line_id,
     bool is_ascending,
-    const string& regex_filter) {
+    const string& regex_filter) const {
 
   LogLines res;
   res.nextLineID = LogLine::kNotALineID;

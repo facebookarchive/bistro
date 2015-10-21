@@ -68,7 +68,7 @@ public:
     int64_t line_id,  // min if is_ascending, max otherwise
     bool is_ascending,
     const std::string& regex_filter
-  ) override;
+  ) const override;
 
   bool canKill() override { return true; }
 

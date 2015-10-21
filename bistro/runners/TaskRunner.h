@@ -101,7 +101,7 @@ public:
     int64_t line_id,
     bool is_ascending,
     const std::string& regex_filter
-  ) {
+  ) const {
     return LogLines();
   }
 

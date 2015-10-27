@@ -3,7 +3,6 @@
 add_library(
   lib_bistro_server STATIC
   Connection.cpp
-  HTTPServer.cpp
   HTTPMonitor.cpp
   ThriftMonitor.cpp
 )

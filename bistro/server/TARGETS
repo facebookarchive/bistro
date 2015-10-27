@@ -3,15 +3,15 @@ cpp_library(
     srcs = [
       'Connection.cpp',
       'HTTPMonitor.cpp',
-      'HTTPServer.cpp',
       'ThriftMonitor.cpp',
     ],
     deps = [
-        '@/folly:folly',
-        '@/bistro/bistro/thrift:conversion_lib',
         '@/bistro/bistro/config:config_lib',
         '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/thrift:conversion_lib',
         '@/common/fb303/cpp:fb303',
+        '@/folly:folly',
+        '@/proxygen/httpserver:httpserver',
     ],
     external_deps = [
         ('boost', None),

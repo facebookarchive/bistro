@@ -10,8 +10,11 @@
 #include "bistro/bistro/server/HTTPMonitor.h"
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <folly/experimental/AutoTimer.h>
+#include <folly/json.h>
 #include <glog/logging.h>
-#include <zlib.h>
+#include <proxygen/httpserver/ResponseBuilder.h>
+#include <proxygen/httpserver/HTTPServer.h>
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/ConfigLoader.h"
@@ -24,16 +27,58 @@
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/utils/Exception.h"
-#include <folly/experimental/AutoTimer.h>
-#include <folly/json.h>
 
 DEFINE_int32(http_server_port, 8080, "Port to run HTTP server on");
 DEFINE_string(http_server_address, "::", "Address to bind to");
+DEFINE_int32(http_server_threads, 1, "Number of threads for http server");
 
 namespace facebook { namespace bistro {
 
 using namespace folly;
 using namespace std;
+
+void BistroHTTPHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
+  if (body_) {
+    body_->prependChain(std::move(body));
+  } else {
+    body_ = std::move(body);
+  }
+}
+
+void BistroHTTPHandler::onEOM() noexcept {
+  auto request = body_ ? body_->moveToFbString() : fbstring();
+  fbstring response;
+  try {
+    response = monitor_->handleRequest(request);
+  } catch (const std::exception& e) {
+    response = e.what();
+  }
+  proxygen::ResponseBuilder(downstream_)
+    .status(200, "OK")
+    .body(response)
+    .sendWithEOM();
+}
+
+void BistroHTTPHandler::requestComplete() noexcept {
+  delete this;
+}
+
+void BistroHTTPHandler::onError(proxygen::ProxygenError err) noexcept {
+  LOG(ERROR) << "Error in HTTP Handler: " << proxygen::getErrorString(err);
+  delete this;
+}
+
+namespace {
+proxygen::HTTPServerOptions buildHTTPServerOptions(HTTPMonitor* monitor) {
+  proxygen::HTTPServerOptions options;
+  options.threads = static_cast<size_t>(FLAGS_http_server_threads);
+  options.enableContentCompression = true;
+  options.handlerFactories = proxygen::RequestHandlerChain()
+    .addThen<BistroHTTPHandlerFactory>(monitor)
+    .build();
+  return options;
+}
+}
 
 HTTPMonitor::HTTPMonitor(
     shared_ptr<ConfigLoader> config_loader,
@@ -46,29 +91,31 @@ HTTPMonitor::HTTPMonitor(
     taskStatuses_(task_statuses),
     taskRunner_(task_runner),
     monitor_(monitor),
-    server_(
-      FLAGS_http_server_port,
+    server_(buildHTTPServerOptions(this)) {
+
+  std::vector<proxygen::HTTPServer::IPConfig> IPs = {{
+    SocketAddress(
       FLAGS_http_server_address,
-      bind(&HTTPMonitor::handleRequest, this, placeholders::_1)
+      FLAGS_http_server_port,
+      true
     ),
-    serverThread_([this](){ server_.run(); }) {
+    proxygen::HTTPServer::Protocol::HTTP
+  }};
+  server_.bind(IPs);
+  serverThread_ = std::thread([this](){ server_.start(); });
+
   LOG(INFO) << "Launched HTTP Monitor on port " << FLAGS_http_server_port;
 }
 
-string HTTPMonitor::handleRequest(const string& request) {
+fbstring HTTPMonitor::handleRequest(const fbstring& request) {
   LOG(INFO) << "HTTPMonitor request: " << request;
   folly::AutoTimer<> timer("Handled HTTP monitor request");
   dynamic ret = dynamic::object;
-  bool zlib_compress = false;
   try {
     dynamic d(parseJson(request));
     if (const auto* prefs = d.get_ptr("prefs")) {
-      if (auto* zlib = prefs->get_ptr("zlib_compress")) {
-        zlib_compress = zlib->asBool();
-      }
       d.erase("prefs");  // Don't interpret this key as a handler.
     }
-    // This can throw, so parse out 'zlib_compress' first
     std::shared_ptr<const Config> c = configLoader_->getDataOrThrow();
     for (const auto& pair : d.items()) {
       try {
@@ -80,28 +127,9 @@ string HTTPMonitor::handleRequest(const string& request) {
     }
   } catch (const std::exception& e) {
     LOG(ERROR) << "Error handling monitor request: " << e.what();
-    ret = e.what();  // zlib_compress would be ignored with "return"
+    ret = e.what();
   }
-  auto json(folly::toJson(ret));
-  if (zlib_compress) {
-    string output;
-    // Output buffer must be 0.1% large + 12 bytes?
-    output.resize(json.size() + (json.size() / 1000) + 12);
-    uLongf resultLen = output.size();
-    int res = compress(
-      (Bytef*)&output[0],
-      &resultLen,
-      (const Bytef*)json.data(),
-      json.size()
-    );
-    if (res != Z_OK) {
-      LOG(ERROR) << "Error when compressing: " << res;
-      return "Unable to gzcompress data";
-    }
-    return output;
-  } else {
-    return json.toStdString();
-  }
+  return folly::toJson(ret);
 }
 
 namespace {

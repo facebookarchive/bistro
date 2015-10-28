@@ -18,6 +18,7 @@
 
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
 #include "bistro/bistro/if/gen-cpp2/BistroWorker.h"
+#include "bistro/bistro/if/gen-cpp2/common_constants.h"
 #include "bistro/bistro/server/test/ThriftMonitorTestThread.h"
 #include "bistro/bistro/worker/test/BistroWorkerTestThread.h"
 #include "bistro/bistro/utils/LogLines.h"
@@ -243,15 +244,15 @@ TEST_F(TestWorker, HandleBadProtocolVersion) {
     );
   });
 
-  waitForRegexOnFd(
-    &stderr,
+  waitForRegexOnFd(&stderr, folly::to<std::string>(
     ".*Unable to send heartbeat to scheduler: Worker-scheduler protocol "
-    "version mismatch: 0 is not compatible with -1.*"
-  );
+    "version mismatch: ", cpp2::common_constants::kProtocolVersion(),
+    " is not compatible with -1.*"
+  ).c_str());
 
   const char* kNewSchedulerRegex = ".* Connected to new scheduler .*";
   EXPECT_NO_PCRE_MATCH(kNewSchedulerRegex, stderr.read());
 
-  scheduler->protocolVersion_ = 0;
+  scheduler->protocolVersion_ = cpp2::common_constants::kProtocolVersion();
   waitForRegexOnFd(&stderr, kNewSchedulerRegex);
 }

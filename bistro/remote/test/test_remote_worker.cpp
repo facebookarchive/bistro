@@ -11,6 +11,7 @@
 
 #include <folly/experimental/TestUtil.h>
 
+#include "bistro/bistro/if/gen-cpp2/common_constants.h"
 #include "bistro/bistro/remote/RemoteWorker.h"
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
@@ -37,6 +38,7 @@ RemoteWorker initializeWorker(
     const std::vector<cpp2::RunningTask>& running_tasks) {
 
   cpp2::BistroWorker bw;
+  bw.protocolVersion = cpp2::common_constants::kProtocolVersion();
 
   // RemoteWorkers creates a worker whenever it sees a new shard ID.
   RemoteWorker worker(test_time, bw);
@@ -133,6 +135,7 @@ TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {
   int64_t test_time = 0;
 
   cpp2::BistroWorker bw;
+  bw.protocolVersion = cpp2::common_constants::kProtocolVersion();
   // The worker has been unhealthy long enough that it's about to be lost.
   RemoteWorker worker(test_time - FLAGS_lose_unhealthy_worker_after - 1, bw);
   EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
@@ -487,6 +490,7 @@ TEST(TestRemoteWorker, RecordStatuses) {
   // recordNonRunningTaskStatus throws if the worker is in the NEW state
   {
     cpp2::BistroWorker bw;
+    bw.protocolVersion = cpp2::common_constants::kProtocolVersion();
     RemoteWorker worker(test_time, bw);
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_THROW(

@@ -9,6 +9,8 @@
  */
 #include "bistro/bistro/worker/test/FakeBistroWorkerThread.h"
 
+#include "bistro/bistro/if/gen-cpp2/common_constants.h"
+
 using namespace std;
 
 namespace facebook { namespace bistro {
@@ -43,6 +45,7 @@ cpp2::BistroWorker FakeBistroWorkerThread::getBistroWorker() {
   worker.machineLock.port = port;
   worker.addr.ip_or_host = ssit_.getAddress().getAddressStr();
   worker.addr.port = port;
+  worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
   return worker;
 }
 

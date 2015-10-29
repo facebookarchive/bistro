@@ -1,0 +1,9 @@
+cpp_unittest(
+    name = 'subprocess_stats_test',
+    srcs = [
+        'SubprocessStatsTest.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/stats:subprocess_stats_lib',
+    ],
+)

@@ -1,0 +1,1 @@
+add_gtest(SubprocessStatsTest lib_bistro_stats_test)

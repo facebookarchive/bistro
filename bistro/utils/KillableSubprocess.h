@@ -14,6 +14,7 @@
 #include <memory>
 #include <csignal>
 #include <string>
+#include "bistro/bistro/stats/SubprocessStats.h"
 
 namespace folly {
   class Subprocess;
@@ -107,10 +108,7 @@ public:
     // Used in logging output to help you differentiate subprocesses.  The
     // "debug info" received by the callbacks includes this ID.
     const std::string& debug_id
-  ) : child_(Child(
-        std::move(subprocess), termination_cb, exception_cb, debug_id
-      )),
-      communicateCB_(communicate_cb) {}
+  );
 
   /**
    * Blocks until the process exits, in such a way that it's safe to *Kill()
@@ -160,6 +158,11 @@ public:
    * logging.  Returns true if the signal was sent.
    */
   bool sendSignal(int signum) noexcept { return child_->sendSignal(signum); }
+
+  /**
+   * Returns current usage stats for child subprocess
+   */
+  SubprocessUsage getUsage() noexcept { return stats_.getStats(); }
 
 private:
   /**
@@ -234,6 +237,8 @@ private:
   // This callback is outside of Child since communicate() must be
   // unsynchronized, or we couldn't kill a communicating process.
   const CommunicateCallback communicateCB_;
+  // subprocess stats
+  SubprocessStats stats_;
 };
 
 }}

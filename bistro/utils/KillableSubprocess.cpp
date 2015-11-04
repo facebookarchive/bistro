@@ -18,6 +18,7 @@ namespace facebook { namespace bistro {
 namespace {
   // When waiting for a process to exit, poll this often.
   const int kPollPeriodMs = 20;
+  const int kStatsRefreshIntervalSec = 2;
 }
 
 bool KillableSubprocess::Child::poll(bool* invoked_callback) {
@@ -149,6 +150,20 @@ void KillableSubprocess::Child::logException(
   }
 }
 
+KillableSubprocess::KillableSubprocess(
+  std::unique_ptr<folly::Subprocess>&& subprocess,
+  CommunicateCallback communicate_cb,
+  ExceptionCallback exception_cb,
+  TerminationCallback termination_cb,
+  const std::string& debug_id
+) : child_(Child(
+      std::move(subprocess), termination_cb, exception_cb, debug_id
+    )),
+    communicateCB_(communicate_cb),
+    stats_(SubprocessStatsGetterFactory::get(child_->subprocess_->pid()),
+           kStatsRefreshIntervalSec) {
+}
+
 void KillableSubprocess::communicate() {
   auto subprocess = child_->copySubprocessPtr();
   if (!subprocess) {
@@ -164,7 +179,13 @@ void KillableSubprocess::communicate() {
 
 bool KillableSubprocess::pollAndSleep() {
   bool invoked_termination_callback;
+  auto startTimeSec = time(nullptr);
   while (!child_->poll(&invoked_termination_callback)) {
+    const auto nowSec = time(nullptr);
+    if (nowSec - startTimeSec >= kStatsRefreshIntervalSec) {
+      startTimeSec = nowSec;
+      stats_.refreshStats();
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(kPollPeriodMs));
   }
   return invoked_termination_callback;

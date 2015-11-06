@@ -4,6 +4,7 @@ cpp_library(
         'ThriftConversion.cpp',
     ],
     deps = [
+        '@/bistro/bistro/config:config_lib',
         '@/bistro/bistro/if:if-cpp2',
         '@/folly:folly',
     ],

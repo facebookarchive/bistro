@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include "bistro/bistro/thrift/ThriftConversion.h"
+#include "bistro/bistro/config/Config.h"  // for string constants only
 
 using namespace facebook::bistro;
 using namespace facebook::bistro::cpp2;
@@ -84,6 +85,10 @@ TEST(TestThriftConversion, HandleJob) {
   c.dependsOn = {"jobX", "jobY"};
   c.killOrphanTasksAfterSec = 0.123;
   c.__isset.killOrphanTasksAfterSec = true;
+  // Set some non-default fields, but not all since Job.cpp already tests them
+  c.taskSubprocessOptions.pollMs = 666;
+  c.taskSubprocessOptions.parentDeathSignal = 555;
+  c.killRequest.killWaitMs = 456;
   c.versionID = 987654321;
 
   auto d = toDynamic(c);
@@ -98,6 +103,10 @@ TEST(TestThriftConversion, HandleJob) {
   ASSERT_EQ(dynamic("fakeLevel"), d["level_for_tasks"]);
   ASSERT_EQ(dynamic("fakeLevel2"), d["level_for_host_placement"]);
   ASSERT_EQ(0.123, d["kill_orphan_tasks_after_sec"].asDouble());
+  ASSERT_EQ(666, d[kTaskSubprocess][kPollMs].asInt());
+  ASSERT_EQ(555, d[kTaskSubprocess][kParentDeathSignal].asInt());
+  ASSERT_EQ(kTerm, d[kKillSubprocess][kMethod].asString());
+  ASSERT_EQ(456, d[kKillSubprocess][kKillWaitMs].asInt());
   ASSERT_EQ(987654321, d.at("version_id").asInt());
   ASSERT_EQ(dynamic("fakeHost"), d["host_placement"]);
   ASSERT_EQ(dynamic({"jobX", "jobY"}), d["depends_on"]);
@@ -113,6 +122,8 @@ TEST(TestThriftConversion, HandleJob) {
   ASSERT_EQ(c.levelForTasks, c2.levelForTasks);
   ASSERT_EQ(c.levelForHostPlacement, c2.levelForHostPlacement);
   ASSERT_EQ(c.killOrphanTasksAfterSec, c2.killOrphanTasksAfterSec);
+  ASSERT_EQ(c.taskSubprocessOptions, c2.taskSubprocessOptions);
+  ASSERT_EQ(c.killRequest, c2.killRequest);
   ASSERT_EQ(c.versionID, c2.versionID);
   ASSERT_EQ(c.hostPlacement, c2.hostPlacement);
   ASSERT_EQ(c.dependsOn, c2.dependsOn);

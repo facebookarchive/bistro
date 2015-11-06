@@ -69,6 +69,9 @@ public:
   inline time_t modifyTime() const { return modifyTime_; }
   inline folly::Optional<std::chrono::milliseconds> killOrphanTasksAfter()
     const { return killOrphanTasksAfter_; }
+  inline const cpp2::TaskSubprocessOptions& taskSubprocessOptions()
+    const { return taskSubprocessOptions_; }
+  inline const cpp2::KillRequest& killRequest() const { return killRequest_; }
 
   // ConfigLoaders may notice that a job config was modified and bump the time.
   void setModifyTime(time_t modify_time) { modifyTime_ = modify_time; }
@@ -115,6 +118,8 @@ private:
   time_t createTime_{0};
   time_t modifyTime_{0};
   folly::Optional<std::chrono::milliseconds> killOrphanTasksAfter_;
+  cpp2::TaskSubprocessOptions taskSubprocessOptions_;
+  cpp2::KillRequest killRequest_;
 
   // ConfigLoaders can use this to implement compare-and-swap mutation in
   // saveJob, thereby preventing two racing saveJob() calls from silently

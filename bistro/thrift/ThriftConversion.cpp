@@ -11,6 +11,8 @@
 
 #include <folly/json.h>
 
+#include "bistro/bistro/config/Config.h"
+
 namespace facebook { namespace bistro {
 
 using namespace std;
@@ -89,6 +91,9 @@ dynamic toDynamic(const cpp2::BistroJobConfig& c) {
   } else {
     config["kill_orphan_tasks_after_sec"] = false;
   }
+  config[kTaskSubprocess] =
+    detail::taskSubprocessOptionsToDynamic(c.taskSubprocessOptions);
+  config[kKillSubprocess] = detail::killRequestToDynamic(c.killRequest);
   if (c.versionID != -1) {
     config["version_id"] = c.versionID;
   }
@@ -156,6 +161,8 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
       ));
     }
   }
+  detail::parseTaskSubprocessOptions(d, &config.taskSubprocessOptions);
+  detail::parseKillRequest(d, &config.killRequest);
   if (auto *p = d.get_ptr("version_id")) {
     if (!p->isInt()) {
       throw std::runtime_error("'version_id' must be an integer");

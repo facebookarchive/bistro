@@ -85,6 +85,64 @@ TEST(TestJob, HandleAll) {
     );
   }
 
+  cpp2::TaskSubprocessOptions task_opts;
+  EXPECT_EQ(task_opts, j.taskSubprocessOptions());
+
+  // Check non-default task options via Config
+  cd1[kTaskSubprocess] = folly::dynamic::object
+    (kPollMs, 111)
+    (kMaxLogLinesPerPollInterval, 222)
+    (kParentDeathSignal, 333)
+    (kProcessGroupLeader, true)
+    (kUseCanaryPipe, false);
+  task_opts.pollMs = 111;
+  task_opts.maxLogLinesPerPollInterval = 222;
+  task_opts.parentDeathSignal = 333;
+  task_opts.processGroupLeader = true;
+  task_opts.useCanaryPipe = false;
+  EXPECT_EQ(task_opts, Job(Config(cd1), "j", jd).taskSubprocessOptions());
+
+  // Further override task options via Job
+  jd[kTaskSubprocess] = folly::dynamic::object
+    (kMaxLogLinesPerPollInterval, 444)
+    (kUseCanaryPipe, true);
+  task_opts.maxLogLinesPerPollInterval = 444;
+  task_opts.useCanaryPipe = true;
+  EXPECT_EQ(task_opts, Job(Config(cd1), "j", jd).taskSubprocessOptions());
+
+  // Check task options' toDynamic
+  EXPECT_EQ(
+    folly::dynamic(folly::dynamic::object
+      (kPollMs, 111)
+      (kMaxLogLinesPerPollInterval, 444)
+      (kParentDeathSignal, 333)
+      (kProcessGroupLeader, true)
+      (kUseCanaryPipe, true)),
+    Job(Config(cd1), "j", jd).toDynamic(c).at(kTaskSubprocess)
+  );
+
+  cpp2::KillRequest kill_req;
+  EXPECT_EQ(kill_req, j.killRequest());
+
+  // Non-default kill request via Config
+  cd1[kKillSubprocess] =
+    folly::dynamic::object(kMethod, kKill)(kKillWaitMs, 987);
+  kill_req.method = cpp2::KillMethod::KILL;
+  kill_req.killWaitMs = 987;
+  EXPECT_EQ(kill_req, Job(Config(cd1), "j", jd).killRequest());
+
+  // Further override kill request via Job
+  jd[kKillSubprocess] = folly::dynamic::object(kMethod, kTermWaitKill);
+  kill_req.method = cpp2::KillMethod::TERM_WAIT_KILL;
+  EXPECT_EQ(kill_req, Job(Config(cd1), "j", jd).killRequest());
+
+  // Check kill request's toDynamic
+  EXPECT_EQ(
+    folly::dynamic(folly::dynamic::object
+      (kMethod, kTermWaitKill)(kKillWaitMs, 987)),
+    Job(Config(cd1), "j", jd).toDynamic(c).at(kKillSubprocess)
+  );
+
   // Check default, invalid, and valid level_for_host_placement.
   EXPECT_EQ(StringTable::NotFound, j.levelForHostPlacement());
   {

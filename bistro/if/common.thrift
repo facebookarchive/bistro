@@ -144,6 +144,50 @@ struct BistroWorker {
   6: i16 protocolVersion = 0,  // Default must stay at 0
 }
 
+// If you change the defaults, keep in mind that these must be appropriate
+// for Bistro's health-check tasks.
+struct TaskSubprocessOptions {
+  // Every N milliseconds, check whether a task process had exited. Also
+  // used for log line rate limits, taskMaxLogLinesPerPollInterval_.  It
+  // is a bad idea to make this less than 2ms.
+  1: i32 pollMs = 10  // Wake up 100 times per second
+
+  // Every poll interval, increase each task's log line quota by this
+  // much.  With the defaults of 50 lines every 10ms, 5000 lines per
+  // second can be logged by each task (either to stdout or stderr)
+  // without being throttled.  If you want per-job rate limits, just
+  // introduce a resource to control task concurrency appropriately.
+  // Non-positive values disables the rate limiting entirely.
+  2: i32 maxLogLinesPerPollInterval = 50  // 50*(1000/10) = 5k lines/s
+
+  // (Linux-specific) If Bistro exits, what signal should its child
+  // processes receive?  Use 0 for 'no signal', 15 for SIGTERM, 9 for
+  // SIGKILL.  README.task_termination explains the KILL
+  3: i32 parentDeathSignal = 9
+
+  // When true, makes each task's child process a group leader, and
+  // signals the entire process group to kill the task.  See
+  // README.task_termination for the details.
+  //
+  // Defaults to `false` so that Ctrl-Z and Ctrl-C work when running
+  // Bistro interactively in a terminal.
+  4: bool processGroupLeader = 0
+
+  // This is a hack to allow more reliable waiting for descendants of the
+  // task's descendant processes.  Specifically, waitpid(-pgid) does not
+  // work in POSIX (though Linux does provide PR_SET_CHILD_SUBREAPER),
+  // since as soon as our child exits, its orphaned descendants get
+  // reparented to `init` and can no longer be waited for.  To provide
+  // *some* way of waiting for orphaned descendants, we open a pipe to the
+  // child, and pray that neither it nor its descendants will choose to
+  // close random FDs they do not know about.  As long as the canary pipe
+  // is open, we know that some descendant is still running, and the task
+  // will not be considered complete.  Most child processes won't close
+  // the status pipe either, so this hack is entirely optional -- if
+  // you're short on FDs, turning it off is harmless.
+  5: bool useCanaryPipe = 1
+}
+
 struct SchedulerHeartbeatResponse {
   // Workers associate themselves with a scheduler, and only accept commands
   // from that scheduler. The ID also helps them detect scheduler restarts.

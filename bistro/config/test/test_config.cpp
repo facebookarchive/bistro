@@ -86,6 +86,35 @@ TEST(TestConfig, HandleConstruction) {
 
   EXPECT_FALSE(c.killOrphanTasksAfter.hasValue());
 
+  cpp2::TaskSubprocessOptions task_opts;
+  EXPECT_EQ(task_opts, c.taskSubprocessOptions);
+
+  // Check non-default task options
+  d[kTaskSubprocess] = folly::dynamic::object
+    (kPollMs, 111)
+    (kMaxLogLinesPerPollInterval, 222)
+    (kParentDeathSignal, 333)
+    (kProcessGroupLeader, true)
+    (kUseCanaryPipe, false);
+  task_opts.pollMs = 111;
+  task_opts.maxLogLinesPerPollInterval = 222;
+  task_opts.parentDeathSignal = 333;
+  task_opts.processGroupLeader = true;
+  task_opts.useCanaryPipe = false;
+  EXPECT_EQ(task_opts, Config(d).taskSubprocessOptions);
+
+  cpp2::KillRequest kill_req;
+  EXPECT_EQ(kill_req, c.killRequest);
+  // Does the Thrift enum have a sane default?
+  EXPECT_EQ(cpp2::KillMethod::TERM, c.killRequest.method);
+
+  // Non-default kill request
+  d[kKillSubprocess] =
+    folly::dynamic::object(kMethod, kKill)(kKillWaitMs, 987);
+  kill_req.method = cpp2::KillMethod::KILL;
+  kill_req.killWaitMs = 987;
+  EXPECT_EQ(kill_req, Config(d).killRequest);
+
   // levelForTasks defaults to the bottom (non-worker) level
   EXPECT_EQ(2, c.levelForTasks);
   d["level_for_tasks"] = "level2";

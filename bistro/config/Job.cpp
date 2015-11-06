@@ -33,7 +33,9 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
     filters_(config.levels.size()),
     levelForHostPlacement_(StringTable::NotFound),
     backoffSettings_(config.defaultBackoffSettings),
-    killOrphanTasksAfter_(config.killOrphanTasksAfter) {
+    killOrphanTasksAfter_(config.killOrphanTasksAfter),
+    taskSubprocessOptions_(config.taskSubprocessOptions),
+    killRequest_(config.killRequest) {
 
   try {
     if (owner_.empty()) {
@@ -100,6 +102,10 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
     }
 
     detail::parseKillOrphanTasksAfter(d, &killOrphanTasksAfter_);
+
+    detail::parseTaskSubprocessOptions(d, &taskSubprocessOptions_);
+
+    detail::parseKillRequest(d, &killRequest_);
 
     if (auto* ptr = d.get_ptr("version_id")) {
       if (!ptr->isInt()) {
@@ -211,6 +217,10 @@ dynamic Job::toDynamic(const Config& parent_config) const {
   } else {
     config["kill_orphan_tasks_after_sec"] = false;
   }
+  // Always output all options to avoid Config / default ambiguity.
+  config[kTaskSubprocess] =
+    detail::taskSubprocessOptionsToDynamic(taskSubprocessOptions_);
+  config[kKillSubprocess] = detail::killRequestToDynamic(killRequest_);
   if (versionID_ >= 0) {
     config["version_id"] = versionID_;
   }

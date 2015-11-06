@@ -92,17 +92,48 @@ public:
   std::vector<std::vector<int>> levelIDToResourceID;
   StringTable resourceNames;
   JobBackoffSettings defaultBackoffSettings;
+  cpp2::TaskSubprocessOptions taskSubprocessOptions;
+  cpp2::KillRequest killRequest;
 
   // Optional override for worker resources, to indicate that some workers have
   // more resources available.
   std::unordered_map<std::string, ResourceVector> workerResourcesOverride;
 };
 
+// Helper functions used by Config & Job
 namespace detail {
-void parseKillOrphanTasksAfter(  // Used by Config & Job
+void parseKillOrphanTasksAfter(
   const folly::dynamic& d,
   folly::Optional<std::chrono::milliseconds>* maybe_kill_orphans
 );
+folly::dynamic taskSubprocessOptionsToDynamic(
+  const cpp2::TaskSubprocessOptions& opts
+);
+void parseTaskSubprocessOptions(
+  const folly::dynamic& d,
+  cpp2::TaskSubprocessOptions* opts
+);
+folly::dynamic killRequestToDynamic(const cpp2::KillRequest& req);
+void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req);
+}  // namespace detail
+
+// Field names: better duplicated string constants than typo-prone literals.
+namespace {
+// Task subprocess
+const folly::dynamic kTaskSubprocess = "task_subprocess";
+const folly::dynamic kPollMs = "poll_ms";
+const folly::dynamic kMaxLogLinesPerPollInterval
+  = "max_log_lines_per_poll_interval";
+const folly::dynamic kParentDeathSignal = "parent_death_signal";
+const folly::dynamic kProcessGroupLeader = "process_group_leader";
+const folly::dynamic kUseCanaryPipe = "use_canary_pipe";
+// Kill request
+const folly::dynamic kKillSubprocess = "kill_subprocess";
+const folly::dynamic kMethod = "method";
+const folly::dynamic kTermWaitKill = "term_wait_kill";
+const folly::dynamic kTerm = "term";
+const folly::dynamic kKill = "kill";
+const folly::dynamic kKillWaitMs = "kill_wait_ms";
 }
 
 }}  // namespace facebook::bistro

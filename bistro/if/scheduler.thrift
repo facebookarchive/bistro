@@ -53,6 +53,8 @@ struct BistroJobConfig {
   15: list<string> dependsOn,
   16: string hostPlacement,
   17: optional double killOrphanTasksAfterSec,
+  19: common.TaskSubprocessOptions taskSubprocessOptions,
+  20: common.KillRequest killRequest,
   // ConfigLoaders can use this to implement compare-and-swap for saveJob(),
   // preventing two concurrent calls from silently clobbering one another.
   18: i64 versionID,

@@ -54,6 +54,105 @@ void parseKillOrphanTasksAfter(
     }
   }
 }
+
+folly::dynamic taskSubprocessOptionsToDynamic(
+    const cpp2::TaskSubprocessOptions& opts) {
+  return folly::dynamic::object
+    (kPollMs, opts.pollMs)
+    (kMaxLogLinesPerPollInterval, opts.maxLogLinesPerPollInterval)
+    (kParentDeathSignal, opts.parentDeathSignal)
+    (kProcessGroupLeader, opts.processGroupLeader)
+    (kUseCanaryPipe, opts.useCanaryPipe);
+}
+
+void parseTaskSubprocessOptions(
+    const folly::dynamic& d,
+    cpp2::TaskSubprocessOptions* opts) {
+  if (const auto* tso = d.get_ptr(kTaskSubprocess)) {
+    if (!tso->isObject()) {
+      throw BistroException("task_subprocess must be an object");
+    }
+    if (const auto* p = tso->get_ptr(kPollMs)) {
+      if (!p->isInt()) {
+        throw BistroException("poll_ms must be an integer");
+      }
+      opts->pollMs = p->asInt();
+    }
+    if (const auto* p = tso->get_ptr(kMaxLogLinesPerPollInterval)) {
+      if (!p->isInt()) {
+        throw BistroException(
+          "max_log_lines_per_poll_interval must be an integer"
+        );
+      }
+      opts->maxLogLinesPerPollInterval = p->asInt();
+    }
+    if (const auto* p = tso->get_ptr(kParentDeathSignal)) {
+      if (!p->isInt()) {
+        throw BistroException("parent_death_signal must be an integer");
+      }
+      opts->parentDeathSignal = p->asInt();
+    }
+    if (const auto* p = tso->get_ptr(kProcessGroupLeader)) {
+      if (!p->isBool()) {
+        throw BistroException("process_group_leader must be an boolean");
+      }
+      opts->processGroupLeader = p->asBool();
+    }
+    if (const auto* p = tso->get_ptr(kUseCanaryPipe)) {
+      if (!p->isBool()) {
+        throw BistroException("use_canary_pipe must be an boolean");
+      }
+      opts->useCanaryPipe = p->asBool();
+    }
+  }
+}
+
+folly::dynamic killRequestToDynamic(const cpp2::KillRequest& req) {
+  return folly::dynamic::object
+    (kMethod, [&](){
+        switch (req.method) {
+          case cpp2::KillMethod::TERM_WAIT_KILL:
+            return kTermWaitKill;
+          case cpp2::KillMethod::TERM:
+            return kTerm;
+          case cpp2::KillMethod::KILL:
+            return kKill;
+          default:
+            throw BistroException(
+              "Unknown KillMethod ", static_cast<int>(req.method)
+            );
+        }
+      }())
+    (kKillWaitMs, req.killWaitMs);
+}
+
+void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req) {
+  if (const auto* kr = d.get_ptr(kKillSubprocess)) {
+    if (!kr->isObject()) {
+      throw BistroException("kill_subprocess must be an object");
+    }
+    if (const auto* p = kr->get_ptr(kMethod)) {
+      if (!p->isString()) {
+        throw BistroException("method must be an string");
+      }
+      if (*p == kTermWaitKill) {
+        req->method = cpp2::KillMethod::TERM_WAIT_KILL;
+      } else if (*p == kTerm) {
+        req->method = cpp2::KillMethod::TERM;
+      } else if (*p == kKill) {
+        req->method = cpp2::KillMethod::KILL;
+      } else {
+        throw BistroException("Unknown KillMethod ", p->asString());
+      }
+    }
+    if (const auto* p = kr->get_ptr(kKillWaitMs)) {
+      if (!p->isInt()) {
+        throw BistroException("kill_wait_ms must be an integer");
+      }
+      req->killWaitMs = p->asInt();
+    }
+  }
+}
 }  // namespace detail
 
 using namespace folly;
@@ -119,6 +218,10 @@ Config::Config(const dynamic& d)
     killOrphanTasksAfter = std::chrono::milliseconds(0);
   }
   detail::parseKillOrphanTasksAfter(d, &killOrphanTasksAfter);
+
+  detail::parseTaskSubprocessOptions(d, &taskSubprocessOptions);
+
+  detail::parseKillRequest(d, &killRequest);
 
   // What is the node level that jobs will use to create tasks by default?
   // You probably don't want to specify "worker" because there are no nodes.

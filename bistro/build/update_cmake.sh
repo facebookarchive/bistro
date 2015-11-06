@@ -19,7 +19,8 @@ _UPDATE_CMAKE_EXIT_CODE=0
 function add_test_to_cmake() {
   l=$(grep '^add_gtest(' "$2" | tail -n 1)
   if [[ "$l" == "" ]]; then
-    echo " - Please manually add 'add_gtest($1 bistro_some_lib)' to $2" 1>&2
+    echo " - Please manually add 'add_gtest($1 lib_bistro_something)' to $2" \
+      1>&2
     export _UPDATE_CMAKE_EXIT_CODE=1
   else
     echo "$l" | \
@@ -34,11 +35,11 @@ function add_source_to_cmake() {
  - Please manually add this to $2:
 
 add_library(
-  bistro_some_lib STATIC
+  lib_bistro_something STATIC
   $1
 )
 bistro_link_libraries(
-  bistro_some_lib
+  lib_bistro_something
 )
 
    NOTE: You may need other changes, like add_subdirectory(...) in the 

@@ -9,6 +9,7 @@ add_subdirectory(flags)
 add_subdirectory(if)
 add_subdirectory(monitor)
 add_subdirectory(nodes)
+add_subdirectory(processes)
 add_subdirectory(remote)
 add_subdirectory(runners)
 add_subdirectory(scheduler)
@@ -30,6 +31,7 @@ bistro_link_libraries(
   lib_bistro_if
   lib_bistro_monitor
   lib_bistro_nodes
+  lib_bistro_processes
   lib_bistro_runners
   lib_bistro_scheduler
   lib_bistro_server

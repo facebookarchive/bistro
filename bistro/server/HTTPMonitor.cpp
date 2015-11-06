@@ -13,8 +13,6 @@
 #include <folly/experimental/AutoTimer.h>
 #include <folly/json.h>
 #include <glog/logging.h>
-#include <proxygen/httpserver/ResponseBuilder.h>
-#include <proxygen/httpserver/HTTPServer.h>
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/ConfigLoader.h"
@@ -28,57 +26,10 @@
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/utils/Exception.h"
 
-DEFINE_int32(http_server_port, 8080, "Port to run HTTP server on");
-DEFINE_string(http_server_address, "::", "Address to bind to");
-DEFINE_int32(http_server_threads, 1, "Number of threads for http server");
-
 namespace facebook { namespace bistro {
 
 using namespace folly;
 using namespace std;
-
-void BistroHTTPHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
-  if (body_) {
-    body_->prependChain(std::move(body));
-  } else {
-    body_ = std::move(body);
-  }
-}
-
-void BistroHTTPHandler::onEOM() noexcept {
-  auto request = body_ ? body_->moveToFbString() : fbstring();
-  fbstring response;
-  try {
-    response = monitor_->handleRequest(request);
-  } catch (const std::exception& e) {
-    response = e.what();
-  }
-  proxygen::ResponseBuilder(downstream_)
-    .status(200, "OK")
-    .body(response)
-    .sendWithEOM();
-}
-
-void BistroHTTPHandler::requestComplete() noexcept {
-  delete this;
-}
-
-void BistroHTTPHandler::onError(proxygen::ProxygenError err) noexcept {
-  LOG(ERROR) << "Error in HTTP Handler: " << proxygen::getErrorString(err);
-  delete this;
-}
-
-namespace {
-proxygen::HTTPServerOptions buildHTTPServerOptions(HTTPMonitor* monitor) {
-  proxygen::HTTPServerOptions options;
-  options.threads = static_cast<size_t>(FLAGS_http_server_threads);
-  options.enableContentCompression = true;
-  options.handlerFactories = proxygen::RequestHandlerChain()
-    .addThen<BistroHTTPHandlerFactory>(monitor)
-    .build();
-  return options;
-}
-}
 
 HTTPMonitor::HTTPMonitor(
     shared_ptr<ConfigLoader> config_loader,
@@ -90,21 +41,7 @@ HTTPMonitor::HTTPMonitor(
     nodesLoader_(nodes_loader),
     taskStatuses_(task_statuses),
     taskRunner_(task_runner),
-    monitor_(monitor),
-    server_(buildHTTPServerOptions(this)) {
-
-  std::vector<proxygen::HTTPServer::IPConfig> IPs = {{
-    SocketAddress(
-      FLAGS_http_server_address,
-      FLAGS_http_server_port,
-      true
-    ),
-    proxygen::HTTPServer::Protocol::HTTP
-  }};
-  server_.bind(IPs);
-  serverThread_ = std::thread([this](){ server_.start(); });
-
-  LOG(INFO) << "Launched HTTP Monitor on port " << FLAGS_http_server_port;
+    monitor_(monitor) {
 }
 
 fbstring HTTPMonitor::handleRequest(const fbstring& request) {
@@ -528,15 +465,6 @@ dynamic HTTPMonitor::handleHistograms(
     ret["samples"] = samples;
   }
   return ret;
-}
-
-void HTTPMonitor::wait() {
-  serverThread_.join();
-}
-
-void HTTPMonitor::stop() {
-  server_.stop();
-  serverThread_.join();
 }
 
 }}

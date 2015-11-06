@@ -10,8 +10,6 @@
 #pragma once
 
 #include <folly/dynamic.h>
-#include <proxygen/httpserver/RequestHandlerFactory.h>
-#include <proxygen/httpserver/HTTPServer.h>
 #include <string>
 #include <thread>
 
@@ -42,8 +40,6 @@ public:
   HTTPMonitor& operator=(const HTTPMonitor&) = delete;
   HTTPMonitor& operator=(HTTPMonitor&&) = delete;
 
-  void wait();
-  void stop();
   // Public only for unit tests
   folly::dynamic handleNodes(const Config& c, const folly::dynamic& request);
 
@@ -73,53 +69,6 @@ private:
   std::shared_ptr<TaskStatuses> taskStatuses_;
   std::shared_ptr<TaskRunner> taskRunner_;
   std::shared_ptr<Monitor> monitor_;
-
-  proxygen::HTTPServer server_;
-  std::thread serverThread_;
-
-};
-
-class BistroHTTPHandler : public proxygen::RequestHandler {
-public:
-  explicit BistroHTTPHandler(HTTPMonitor* monitor)
-    : monitor_(monitor) {}
-
-  void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers)
-    noexcept override {}
-
-  void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
-
-  void onEOM() noexcept override;
-
-  // We don't support upgrading the connection.
-  void onUpgrade(proxygen::UpgradeProtocol proto) noexcept override {}
-
-  void requestComplete() noexcept override;
-
-  void onError(proxygen::ProxygenError err) noexcept override;
-
-private:
-  HTTPMonitor* monitor_;
-  std::unique_ptr<folly::IOBuf> body_;
-};
-
-class BistroHTTPHandlerFactory : public proxygen::RequestHandlerFactory {
-public:
-  explicit BistroHTTPHandlerFactory(HTTPMonitor* monitor)
-    : monitor_(monitor) {}
-
-  void onServerStart() noexcept override {}
-  void onServerStop() noexcept override {}
-
-  proxygen::RequestHandler* onRequest(
-    proxygen::RequestHandler*,
-    proxygen::HTTPMessage*
-  ) noexcept override {
-    return new BistroHTTPHandler(monitor_);
-  }
-
-private:
-  HTTPMonitor* monitor_;
 };
 
 }}

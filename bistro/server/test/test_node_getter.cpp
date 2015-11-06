@@ -76,10 +76,6 @@ class GetterTest : public ::testing::Test {
     );
   }
 
-  void TearDown() override {
-    monitor_->stop();
-  }
-
   std::shared_ptr<HTTPMonitor> monitor_;
   std::shared_ptr<Config> config_;
   std::shared_ptr<InMemoryConfigLoader> configLoader_;

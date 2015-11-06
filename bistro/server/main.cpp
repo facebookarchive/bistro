@@ -19,7 +19,7 @@
 #include "bistro/bistro/runners/BenchmarkRunner.h"
 #include "bistro/bistro/runners/LocalRunner.h"
 #include "bistro/bistro/runners/RemoteWorkerRunner.h"
-#include "bistro/bistro/server/HTTPMonitor.h"
+#include "bistro/bistro/server/HTTPMonitorServer.h"
 #include "bistro/bistro/server/ThriftMonitor.h"
 #include "bistro/bistro/statuses/SQLiteTaskStore.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
@@ -107,13 +107,15 @@ int main(int argc, char* argv[]) {
   bistro_thread.add(bind(&Bistro::scheduleOnceSystemTime, &bistro));
   SCOPE_EXIT { bistro_thread.stop(); };
 
-  HTTPMonitor http_monitor(
+  auto http_monitor = make_shared<HTTPMonitor>(
     config_loader,
     nodes_loader,
     task_statuses,
     task_runner,
     monitor
   );
+
+  HTTPMonitorServer http_monitor_server(http_monitor);
 
   // Initialize the thrift monitor
   auto handler = folly::make_unique<ThriftMonitor>(

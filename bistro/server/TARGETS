@@ -3,6 +3,7 @@ cpp_library(
     srcs = [
       'Connection.cpp',
       'HTTPMonitor.cpp',
+      'HTTPMonitorServer.cpp',
       'ThriftMonitor.cpp',
     ],
     deps = [

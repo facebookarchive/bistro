@@ -227,9 +227,6 @@ const TaskStatus& TaskStatus::update(
 
 dynamic TaskStatus::toDynamicNoTime() const {
   // DO: Consider making this human-readable when a simple label exists?
-  // DO: Right now, we log to LogTable::STATUSES with JSON blobs manually
-  // constructed to resemble this format.  If this is made human-readable,
-  // use toDynamicNoTime() there instead.
   dynamic d = dynamic::object(
     "result_bits",
     static_cast<std::underlying_type<TaskStatusBits>::type>(bits_)
@@ -243,6 +240,9 @@ dynamic TaskStatus::toDynamicNoTime() const {
 dynamic TaskStatus::toDynamic() const {
   auto d = toDynamicNoTime();
   d["time"] = timestamp_;
+  if (usesBackoff() && backoffDuration_ != 0) {
+    d["backoff_duration"] = backoffDuration_;
+  }
   return d;
 }
 

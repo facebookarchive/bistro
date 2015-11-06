@@ -1,5 +1,8 @@
 cpp_library(
     name = 'processes',
+    srcs = [
+        'AsyncReadPipeRateLimiter.cpp',
+    ],
     deps = [
         '@/folly:subprocess',
         '@/wangle:wangle',

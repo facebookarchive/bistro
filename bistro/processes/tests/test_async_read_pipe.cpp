@@ -17,23 +17,9 @@
 #include <folly/Random.h>
 
 #include "bistro/bistro/processes/AsyncReadPipe.h"
+#include "bistro/bistro/processes/tests/utils.h"
 
 using namespace facebook::bistro;
-
-void wrapOrCloseFd(folly::File* file, int fd) {
-  if (file) {
-    *file = folly::File(fd, /*owns_fd=*/ true);
-  } else {
-    folly::checkUnixError(::close(fd));
-  }
-}
-
-void makePipe(folly::File* read_pipe, folly::File* write_pipe) {
-  int pipe_fds[2];
-  folly::checkUnixError(pipe(pipe_fds), "pipe");
-  wrapOrCloseFd(write_pipe, pipe_fds[1]);
-  wrapOrCloseFd(read_pipe, pipe_fds[0]);
-}
 
 /**
  * Reads lines from a pipe via asyncReadPipe() and readPipeLinesCallback().

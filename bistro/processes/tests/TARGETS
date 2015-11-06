@@ -5,6 +5,12 @@ cpp_unittest(
 )
 
 cpp_unittest(
+    name = 'test_async_read_pipe_rate_limiter',
+    srcs = ['test_async_read_pipe_rate_limiter.cpp'],
+    deps = ['@/bistro/bistro/processes:processes'],
+)
+
+cpp_unittest(
     name = 'test_async_subprocess',
     srcs = ['test_async_subprocess.cpp'],
     deps = ['@/bistro/bistro/processes:processes'],

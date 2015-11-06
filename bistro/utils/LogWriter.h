@@ -17,7 +17,9 @@
 
 #include "bistro/bistro/utils/BackgroundThreadMixin.h"
 #include "bistro/bistro/utils/EnumHash.h"
+#include "bistro/bistro/utils/LogLines.h"
 #include "bistro/bistro/utils/ProcessRunner.h"  // for enum class LogTable
+
 #include <folly/Range.h>
 #include <folly/Synchronized.h>
 
@@ -28,10 +30,31 @@ namespace sqlite {
   class Statement;
 }
 
-class LogLines;
+class BaseLogWriter {
+public:
+  virtual ~BaseLogWriter() {}
+  virtual void write(
+    LogTable table,
+    const std::string& job,
+    const std::string& node,
+    folly::StringPiece line
+  ) = 0;
 
-class LogWriter : BackgroundThreadMixin {
+  virtual LogLines getJobLogs(
+    const std::string& logtype,
+    const std::vector<std::string>& jobs,
+    const std::vector<std::string>& nodes,
+    int64_t line_id,
+    bool is_ascending,
+    int limit,
+    const std::string& regex_filter
+  ) const {
+    throw std::logic_error("Not implemented");
+  }
+};
 
+// You must NOT inherit from this, since it contains a BackgroundThreads.
+class LogWriter final : public BaseLogWriter {
 public:
   explicit LogWriter(const boost::filesystem::path& db_file);
   ~LogWriter() override;
@@ -41,7 +64,7 @@ public:
     const std::string& job,
     const std::string& node,
     folly::StringPiece line
-  );
+  ) override;
 
   LogLines getJobLogs(
     const std::string& logtype,
@@ -51,7 +74,7 @@ public:
     bool is_ascending,
     int limit,
     const std::string& regex_filter
-  );
+  ) const override;
 
   void prune() noexcept;
 
@@ -70,6 +93,7 @@ private:
 
   std::atomic<uint32_t> counter_;
 
+  BackgroundThreads threads_;  // Declared last as per BackgroundThreads doc.
 };
 
 }}

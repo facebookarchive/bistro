@@ -79,15 +79,15 @@ LogWriter::LogWriter(const boost::filesystem::path& db_file) : counter_(0) {
     LOG(INFO) << "Created table " << name;
   }
   if (FLAGS_log_prune_frequency > 0) {
-    runInBackgroundLoop([this](){
+    threads_.add([this]() {
       prune();
       return chrono::seconds(FLAGS_log_prune_frequency);
-    });
+    }, std::chrono::milliseconds(0));
   }
 }
 
 LogWriter::~LogWriter() {
-  stopBackgroundThreads();
+  threads_.stop();
 }
 
 void LogWriter::write(
@@ -126,7 +126,7 @@ LogLines LogWriter::getJobLogs(
     int64_t line_id,
     bool is_ascending,
     int limit,
-    const std::string& regex_filter) {
+    const std::string& regex_filter) const {
 
   if (logtype != "stderr" && logtype != "stdout" && logtype != "statuses") {
     throw BistroException("Unknown table for logs: ", logtype);

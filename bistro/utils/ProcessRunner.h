@@ -28,7 +28,7 @@ namespace facebook { namespace bistro {
 enum class LogTable : unsigned char {
   STDERR = 0,
   STDOUT = 1,
-  STATUSES = 2,
+  STATUSES = 2,  // Future: rename to EVENTS
 };
 
 /**

@@ -1,0 +1,7 @@
+cpp_library(
+    name = 'processes',
+    deps = [
+        '@/folly:subprocess',
+        '@/wangle:wangle',
+    ],
+)

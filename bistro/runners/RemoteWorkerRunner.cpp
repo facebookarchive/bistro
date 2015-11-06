@@ -452,8 +452,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   // get marked unhealthy or even lost, since workers_ is now unlocked, but
   // we just have to try our luck.
   eventBase_->runInEventBaseThread([
-      cb, this, rt, job_args, worker, did_not_run_sequence_num]() noexcept {
-
+      cb, this, job, rt, job_args, worker, did_not_run_sequence_num
+    ]() noexcept {
     try {
       shared_ptr<cpp2::BistroWorkerAsyncClient>
         client{getWorkerClient(worker)};
@@ -498,7 +498,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         worker.id,
         // The real sequence number may have been incremented after we found
         // the worker, but this is okay, the worker simply rejects the task.
-        did_not_run_sequence_num
+        did_not_run_sequence_num,
+        job->taskSubprocessOptions()
       );
     } catch (const exception& e) {
       // We can get here if client creation failed (e.g. TAsyncSocket could
@@ -632,7 +633,9 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
         },
         schedulerID_,
         w.id,
-        0  // healtchecks don't use "notifyIfTasksNotRunning"
+        0,  // healtchecks don't use "notifyIfTasksNotRunning"
+        // Don't let the user's custom subprocess options mess us up
+        cpp2::TaskSubprocessOptions()
       );
     } catch (const exception& e) {
       LOG(ERROR) << "Error sending health-check to " << debugString(w)
@@ -847,27 +850,19 @@ void RemoteWorkerRunner::fetchRunningTasksForNewWorkers(
 }
 
 void RemoteWorkerRunner::killTask(
-    const std::string& job,
-    const std::string& node) {
-
-  // Look up the running task
-  const Job::ID job_id(Job::JobNameTable.asConst()->lookup(job));
-  const Node::ID node_id(Node::NodeNameTable.asConst()->lookup(node));
-  auto maybe_rt = taskStatuses_->copyRunningTask(job_id, node_id);
-  if (!maybe_rt.hasValue()) {
-    throw BistroException("Unknown running task ", job, ", ", node);
-  }
+    const cpp2::RunningTask& rt,
+    const cpp2::KillRequest& req) {
 
   // Look up the worker for the task
   folly::Optional<cpp2::BistroWorker> maybe_worker;
   SYNCHRONIZED(workers_) {
-    auto* worker_ptr = workers_.getWorker(maybe_rt->workerShard);
+    auto* worker_ptr = workers_.getWorker(rt.workerShard);
     if (worker_ptr != nullptr) {
       maybe_worker = worker_ptr->getBistroWorker();
     }
   }
   if (!maybe_worker.hasValue()) {
-    throw BistroException("Could not get worker for ", debugString(*maybe_rt));
+    throw BistroException("Could not get worker for ", debugString(rt));
   }
 
   // Make a synchronous kill request so that the client knows when the kill
@@ -875,11 +870,8 @@ void RemoteWorkerRunner::killTask(
   folly::EventBase evb;
   getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(
     &evb,
-    maybe_worker->addr,
-    0,  // default connect timeout
-    0,  // default send timeout
-    300000  // 5 minute receive timeout
-  )->sync_killTask(*maybe_rt, schedulerID_, maybe_worker->id);
+    maybe_worker->addr
+  )->sync_killTask(rt, schedulerID_, maybe_worker->id, req);
 }
 
 }}

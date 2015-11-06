@@ -24,7 +24,7 @@ class TaskStatus;
 
 // We use this special task id for 'healthcheck' tasks, that are sent
 // regularly to test whether each remote worker is functioning well.
-// Hack: Duplicated in SubprocessTaskQueue.
+// Hack: Duplicated in TaskSubprocessQueue.
 const std::string kHealthcheckTaskJob = "__BISTRO_HEALTH_CHECK__";
 // This special node ID for healthcheck tasks signals that the worker is new.
 const std::string kHealthcheckTaskNewWorkerNode = "__NEW_WORKER__";

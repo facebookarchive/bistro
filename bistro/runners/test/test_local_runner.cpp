@@ -33,6 +33,8 @@ const Config kConfig(dynamic::object
     ("node_source_prefs", dynamic::object)
   )
   ("resources", dynamic::object)
+  // Need to make leaders for the signal to reach the `sleep` child process.
+  ("task_subprocess", dynamic::object("process_group_leader", true))
 );
 const dynamic kJob = dynamic::object
   ("enabled", true)
@@ -71,7 +73,8 @@ TEST(TestLocalRunner, HandleAll) {
   ASSERT_TRUE(status->isRunning());
 
   while (status->isRunning()) {
-    this_thread::sleep_for(chrono::milliseconds(100));
+    /* sleep override */
+    this_thread::sleep_for(chrono::milliseconds(10));
   }
   ASSERT_TRUE(status->isDone());
 
@@ -89,18 +92,27 @@ TEST(TestLocalRunner, HandleAll) {
       ASSERT_EQ(1, log.lines.size());
       ASSERT_EQ("this is my " + logtype, log.lines.back().line);
     } else {
-      ASSERT_EQ(3, log.lines.size());
+      ASSERT_EQ(4, log.lines.size());
       ASSERT_LE(start_time, log.lines[0].time);
       ASSERT_EQ(job->name(), log.lines[0].jobID);
       ASSERT_EQ(node->name(), log.lines[0].nodeID);
-      EXPECT_EQ(
-        dynamic(dynamic::object
-          ("result", "running")
-          ("data", dynamic::object("worker_host", getLocalHostName()))),
-        parseJson(log.lines[0].line)
+      EXPECT_EQ("running", parseJson(log.lines[0].line)["event"].asString());
+      int proc_exit_idx = 2;
+      if (folly::parseJson(log.lines[1].line)["event"]
+          != "task_pipes_closed") {
+        proc_exit_idx = 1;
+        ASSERT_EQ(
+          "task_pipes_closed",
+          folly::parseJson(log.lines[2].line)["event"].asString()
+        );
+      }
+      ASSERT_EQ(
+        "process_exited",
+        folly::parseJson(log.lines[proc_exit_idx].line)["event"].asString()
       );
-      ASSERT_EQ("exited", log.lines[1].line);
-      ASSERT_EQ("done", log.lines[2].line);
+      auto j = folly::parseJson(log.lines[3].line);
+      ASSERT_EQ("got_status", j["event"].asString());
+      ASSERT_EQ("done", j["raw_status"].asString());
     }
     ASSERT_LE(start_time, log.lines.back().time);
     ASSERT_EQ(job->name(), log.lines.back().jobID);
@@ -116,7 +128,7 @@ TEST(TestLocalRunner, HandleKill) {
   TemporaryFile cmdFile(tmp_dir.createFile());
   cmdFile.writeString(
     "#!/bin/sh\n"
-    "sleep 100\n"
+    "sleep 10000\n"
     "echo \"done\" >$2"
   );
   PCHECK(chmod(cmdFile.getFilename().c_str(), 0700) == 0);
@@ -125,6 +137,7 @@ TEST(TestLocalRunner, HandleKill) {
   auto job = make_shared<Job>(kConfig, "job", kJob);
   const size_t kNumNodes = 5;
   Synchronized<std::vector<TaskStatus>> status_seqs[kNumNodes];
+  folly::Synchronized<cpp2::RunningTask> rts[kNumNodes];
 
   auto assertTaskOnNode = [&](
       int node_num,
@@ -153,7 +166,10 @@ TEST(TestLocalRunner, HandleKill) {
       job,
       node,
       nullptr,  // no previous status
-      [&status_seqs, i](const cpp2::RunningTask& rt, TaskStatus&& st) {
+      [&status_seqs, i, &rts](const cpp2::RunningTask& rt, TaskStatus&& st) {
+        SYNCHRONIZED(last_rt, rts[i]) {
+          last_rt = rt;
+        }
         SYNCHRONIZED(status_seq, status_seqs[i]) {
           if (!status_seq.empty()) {
             // Copy and update lets us examine the whole status sequence.
@@ -180,20 +196,26 @@ TEST(TestLocalRunner, HandleKill) {
     | TaskStatusBits::UsesBackoff
     | TaskStatusBits::DoesNotAdvanceBackoff;
 
-  const auto assertTaskKilledNoFilter = [&](int n) {
-    ASSERT_EQ(2, status_seqs[n]->size());
-    assertTaskOnNode(n, 1, "incomplete_backoff", [](const TaskStatus& status) {
+  // Kill all tasks.
+  for (size_t i = 0; i < kNumNodes; ++i) {
+    cpp2::RunningTask rt;
+    SYNCHRONIZED(last_rt, rts[i]) {
+      ASSERT_EQ("job", last_rt.job);  // Was it even set?
+      rt = last_rt;
+    }
+    runner.killTask(rt, cpp2::KillRequest());
+    // Wait for the task to die
+    while (status_seqs[i]->size() < 2) {
+      /* sleep override */
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    ASSERT_EQ(2, status_seqs[i]->size());
+    assertTaskOnNode(i, 1, "incomplete_backoff", [](const TaskStatus& status) {
       return status.bits() == kIncompleteBackoffBits
         && status.backoffDuration().seconds == 60 // See JobBackoffSettings.cpp
         && status.data()
         && status.data()->at("exception") == "Task killed, no status returned";
     });
-  };
-
-  // Kill all tasks.
-  for (size_t i = 0; i < kNumNodes; ++i) {
-    runner.killTask("job", folly::to<std::string>("node", i));
-    assertTaskKilledNoFilter(i);
     assertTasksRunningFromNode(i + 1);  // Other tasks are unaffected.
   }
 }

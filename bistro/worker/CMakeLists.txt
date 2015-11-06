@@ -6,6 +6,7 @@ add_library(
 bistro_link_libraries(
   lib_bistro_worker
   lib_bistro_if
+  lib_bistro_processes
   lib_bistro_statuses
   lib_bistro_utils
 )

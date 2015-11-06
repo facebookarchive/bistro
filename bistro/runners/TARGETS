@@ -11,6 +11,7 @@ cpp_library(
         '@/bistro/bistro/config:config_lib',
         '@/bistro/bistro/remote:remote_lib',
         '@/bistro/bistro/nodes:nodes_lib',
+        '@/bistro/bistro/processes:processes',
         '@/bistro/bistro/statuses:statuses_lib',
         '@/bistro/bistro/utils:utils_lib',
         '@/bistro/bistro/if:if-cpp2',

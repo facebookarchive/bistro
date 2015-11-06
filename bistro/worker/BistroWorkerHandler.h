@@ -12,10 +12,10 @@
 #include "bistro/bistro/if/gen-cpp2/BistroWorker.h"
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
+#include "bistro/bistro/processes/TaskSubprocessQueue.h"
 #include "bistro/bistro/remote/RemoteWorkerState.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/BackgroundThreadMixin.h"
-#include "bistro/bistro/utils/SubprocessTaskQueue.h"
 #include "common/fb303/cpp/FacebookBase2.h"
 #include <folly/MPMCQueue.h>
 #include <folly/Synchronized.h>
@@ -70,7 +70,8 @@ public:
     const std::vector<std::string>& command,
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker,
-    int64_t notify_if_tasks_not_running_sequence_num
+    int64_t notify_if_tasks_not_running_sequence_num,
+    const cpp2::TaskSubprocessOptions& opts
   ) override;
 
   void notifyIfTasksNotRunning(
@@ -88,7 +89,8 @@ public:
   void killTask(
     const cpp2::RunningTask& rt,
     const cpp2::BistroInstanceID& scheduler,
-    const cpp2::BistroInstanceID& worker
+    const cpp2::BistroInstanceID& worker,
+    const cpp2::KillRequest&
   ) override;
 
   void getJobLogsByID(
@@ -153,7 +155,7 @@ private:
   std::chrono::seconds heartbeat() noexcept;
   std::chrono::seconds healthcheck() noexcept;
 
-  SubprocessTaskQueue taskQueue_;
+  TaskSubprocessQueue taskQueue_;
   folly::MPMCQueue<std::unique_ptr<NotifyData>> notifyFinishedQueue_;
   folly::MPMCQueue<cpp2::RunningTask> notifyNotRunningQueue_;
 

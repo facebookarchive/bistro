@@ -146,6 +146,7 @@ service BistroWorker extends fb303.FacebookService {
     // response to a runTask transport failure, this should be rare enough
     // not to affect throughput.
     6: i64 notify_if_tasks_not_running_sequence_num,
+    7: common.TaskSubprocessOptions opts,
   ) throws (1: BistroWorkerException ex);
 
   /**
@@ -297,6 +298,7 @@ service BistroWorker extends fb303.FacebookService {
     // sensible thing to do if Bistro gets speculative execution.
     3: common.BistroInstanceID scheduler,
     4: common.BistroInstanceID worker,
+    5: common.KillRequest req,
   ) throws (1: BistroWorkerException ex);
 
   /**

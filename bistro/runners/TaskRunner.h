@@ -108,9 +108,10 @@ public:
   virtual bool canKill() { return false; }
 
   /**
-   * Blocking (many seconds!) call to kill a task. Throws if the kill fails.
+   * Kill a task -- blocks until the first signal is sent, does not wait for
+   * the kill to succeed.  Throws if the signal cannot be sent.
    */
-  virtual void killTask(const std::string& job, const std::string& node) {
+  virtual void killTask(const cpp2::RunningTask&, const cpp2::KillRequest&) {
     throw std::runtime_error("Killing tasks is not supported");
   }
 

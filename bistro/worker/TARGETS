@@ -6,6 +6,7 @@ cpp_library(
     deps = [
         '@/bistro/bistro/if:if-cpp2',
         '@/bistro/bistro/if:worker_if-cpp2',
+        '@/bistro/bistro/processes:processes',
         # for enforceWorkerSchedulerProtocolVersion()
         '@/bistro/bistro/remote:remote_lib',
         '@/bistro/bistro/statuses:statuses_lib',

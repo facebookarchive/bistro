@@ -9,15 +9,11 @@
  */
 #include "bistro/bistro/runners/LocalRunner.h"
 
+#include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/hostname.h"
 #include "bistro/bistro/utils/LogWriter.h"
-
-DEFINE_bool(
-  use_soft_kill, true,
-  "To kill, send a task SIGTERM, wait, and only then SIGKILL"
-);
 
 namespace facebook { namespace bistro {
 
@@ -27,7 +23,7 @@ LocalRunner::LocalRunner(
     const boost::filesystem::path& cmd,
     const boost::filesystem::path& dir)
   // The default log filename matches BistroRemoteWorkerHandler
-  : taskQueue_(dir / "/task_logs.sql3", dir / "/pipes"),
+  : taskQueue_(folly::make_unique<LogWriter>(dir / "/task_logs.sql3")),
     cmd_(cmd),
     jobsDir_(dir / "/jobs") {
 }
@@ -52,7 +48,8 @@ TaskRunnerResponse LocalRunner::runTaskImpl(
     {cmd_.native()},
     folly::toJson(job_args).toStdString(),  // Job config argument
     jobsDir_ / running_task.job,  // Working directory for the task
-    cb
+    cb,
+    job->taskSubprocessOptions()
   );
   return RanTask;
 }
@@ -76,13 +73,10 @@ LogLines LocalRunner::getJobLogs(
   );
 }
 
-void LocalRunner::killTask(const std::string& job, const std::string& node) {
-  taskQueue_.killTask(
-    job,
-    node,
-    FLAGS_use_soft_kill
-      ? cpp2::KillMethod::TERM_WAIT_KILL : cpp2::KillMethod::KILL
-  );
+void LocalRunner::killTask(
+    const cpp2::RunningTask& rt,
+    const cpp2::KillRequest& req) {
+  taskQueue_.kill(rt, req);
 }
 
 }}

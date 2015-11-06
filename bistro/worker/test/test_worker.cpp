@@ -25,7 +25,6 @@
 #include "bistro/bistro/utils/hostname.h"
 
 DECLARE_int32(heartbeat_period_sec);
-DECLARE_int32(worker_threads);
 DECLARE_int32(incremental_sleep_ms);
 
 using namespace facebook::bistro;
@@ -43,16 +42,18 @@ const auto kNormalCmd = vector<string>{
 const auto kSleepCmd = vector<string>{
     "/bin/sh",
     "-c",
-    // need exec here because kill does not work with subprocesses currently
-    "exec sleep 100"
+    // I don't want to add this to ThriftMonitorTestThread.cpp
+    //   ("task_subprocess", dynamic::object("process_group_leader", true))
+    // since that could make debugging the test slightly more annoying.
+    // Instead, just `exec` so that the killTask() terminates the whole
+    // process tree of the task.
+    "exec sleep 10000"
 };
 
 struct TestWorker : public ::testing::Test {
   TestWorker() {
     // Faster heartbeat arrival => tests finish faster
     FLAGS_heartbeat_period_sec = 0;
-    // Don't waste time spinning up and tearing down 100 threads.
-    FLAGS_worker_threads = 2;
     // Make BackgroundThreads exit a lot faster.
     FLAGS_incremental_sleep_ms = 10;
   }
@@ -139,18 +140,16 @@ TEST_F(TestWorker, HandleNormal) {
       ASSERT_EQ(1, log.lines.size());
       ASSERT_EQ("my_" + logtype + "\n", log.lines.back().line);
     } else {
-      ASSERT_EQ(3, log.lines.size());
+      ASSERT_EQ(4, log.lines.size());
       ASSERT_LE(start_time, log.lines[0].time);
       ASSERT_EQ("test_job", log.lines[0].jobID);
       ASSERT_EQ("test_node", log.lines[0].nodeID);
-      EXPECT_EQ(
-        dynamic(dynamic::object
-          ("result", "running")
-          ("data", dynamic::object("worker_host", getLocalHostName()))),
-        parseJson(log.lines[0].line)
-      );
-      ASSERT_EQ("exited", log.lines[1].line);
-      ASSERT_EQ("done", log.lines[2].line);
+      EXPECT_EQ("running", parseJson(log.lines[0].line)["event"].asString());
+      // Not bothering to verify 1 & 2 since test_task_subprocess_queue
+      // and test_local_runner cover these well.
+      auto j = parseJson(log.lines[3].line);
+      ASSERT_EQ("got_status", j["event"].asString());
+      ASSERT_EQ("done", j["raw_status"].asString());
     }
     ASSERT_LE(start_time, log.lines.back().time);
     ASSERT_EQ("test_job", log.lines.back().jobID);
@@ -167,56 +166,63 @@ TEST_F(TestWorker, HandleKillTask) {
   ));
   waitForWorkerHealthy(worker, &stderr);
 
-  cpp2::RunningTask rt[2];
-  for (int i=0; i<2; i++) {
+  const size_t kNumTasks = 2;
+  cpp2::RunningTask rt[kNumTasks];
+  for (int i = 0; i < kNumTasks; i++) {
     rt[i] = worker.runTask("test_job", to<string>("node", i), kSleepCmd);
   }
 
   vector<cpp2::RunningTask> rts;
   worker.getClient()->sync_getRunningTasks(rts, worker.getWorker().id);
-  ASSERT_EQ(2, rts.size());
+  ASSERT_EQ(kNumTasks, rts.size());
 
-  worker.getClient()->sync_killTask(
-    rt[0],
-    worker.getSchedulerID(),
-    worker.getWorker().id
-  );
-  for (int i=0; i<2; i++) {
-    cpp2::LogLines log;
-    worker.getClient()->sync_getJobLogsByID(
-      log,
-      "statuses",
-      vector<string>({"test_job"}),
-      vector<string>({rt[i].node}),
-      0,
-      true,
-      10,
-        ""
+  // Kill one task at a time.
+  for (int task_to_kill = 0; task_to_kill < kNumTasks; ++task_to_kill) {
+    worker.getClient()->sync_killTask(
+      rt[task_to_kill],
+      worker.getSchedulerID(),
+      worker.getWorker().id,
+      cpp2::KillRequest()
     );
-    EXPECT_EQ(
-      dynamic(dynamic::object
-        ("result", "running")
-        ("data", dynamic::object("worker_host", getLocalHostName()))),
-      parseJson(log.lines[0].line)
-    );
-    if (i == 0) {
-      ASSERT_EQ(3, log.lines.size());
-      ASSERT_EQ("soft-killed", log.lines[1].line);
-    } else {
-      ASSERT_EQ(1, log.lines.size());
+    for (int i = 0; i < kNumTasks; i++) {
+      cpp2::LogLines log;
+      do {  // Wait for the kill to work
+        /* sleep override */
+        this_thread::sleep_for(chrono::milliseconds(10));
+        worker.getClient()->sync_getJobLogsByID(
+          log,
+          "statuses",
+          vector<string>({"test_job"}),
+          vector<string>({rt[i].node}),
+          0,
+          true,
+          10,
+          ""
+        );
+      } while (i == task_to_kill && log.lines.size() < 4);
+      ASSERT_LE(1, log.lines.size());
+      EXPECT_EQ("running", parseJson(log.lines[0].line)["event"].asString());
+      if (i <= task_to_kill) {
+        ASSERT_EQ(4, log.lines.size());
+        auto j = folly::parseJson(log.lines[3].line);
+        EXPECT_EQ("got_status", j["event"].asString());
+        EXPECT_EQ(
+          "Task killed, no status returned",
+          j["status"]["data"]["exception"].asString()
+        );
+      } else {
+        EXPECT_EQ(1, log.lines.size());
+      }
     }
+    // Once this event fires, the worker no longer considers the task running.
+    auto re = folly::to<std::string>(
+      ".* worker task state change: acknowledged_by_scheduler - "
+      "test_job / node", task_to_kill, "\n.*"
+    );
+    waitForRegexOnFd(&stderr, re.c_str());
+    worker.getClient()->sync_getRunningTasks(rts, worker.getWorker().id);
+    EXPECT_EQ(kNumTasks - task_to_kill - 1, rts.size());
   }
-
-  // Once this event fires, the worker's no longer considers the task running.
-  waitForRegexOnFd(
-    &stderr,
-    ".* worker task state change: acknowledged_by_scheduler - "
-    "test_job / node0\n.*"
-  );
-  stderr.release();
-
-  worker.getClient()->sync_getRunningTasks(rts, worker.getWorker().id);
-  ASSERT_EQ(1, rts.size());
 }
 
 struct FakeBistroScheduler : public virtual cpp2::BistroSchedulerSvIf {

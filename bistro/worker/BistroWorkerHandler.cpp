@@ -48,10 +48,6 @@ DEFINE_string(
   "Note that storing log DBs on a networked FS is guaranteed to reduce "
   "your overall system reliability."
 );
-DEFINE_bool(
-  use_soft_kill, true,
-  "To kill, send a task SIGTERM, wait, and only then SIGKILL"
-);
 
 namespace facebook { namespace bistro {
 
@@ -111,7 +107,9 @@ BistroWorkerHandler::BistroWorkerHandler(
     logStateTransitionFn_(log_state_transition_fn),
     schedulerClientFn_(scheduler_client_fn),
     workerCommand_(worker_command),
-    taskQueue_(data_dir / FLAGS_log_db_file_name, data_dir / "pipes"),
+    taskQueue_(folly::make_unique<LogWriter>(
+      data_dir / FLAGS_log_db_file_name
+    )),
     notifyFinishedQueue_(100000),
     notifyNotRunningQueue_(10000),
     jobsDir_(data_dir / "jobs"),
@@ -176,7 +174,8 @@ void BistroWorkerHandler::runTask(
     const vector<string>& cmd,
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker,
-    int64_t notify_if_tasks_not_running_sequence_num) {
+    int64_t notify_if_tasks_not_running_sequence_num,
+    const cpp2::TaskSubprocessOptions& opts) {
 
   AutoTimer<> timer("runTask was slow");
   timer.setMinTimeToLog(0.1); // 100 ms per log => 10 tasks/sec
@@ -274,7 +273,8 @@ void BistroWorkerHandler::runTask(
         TaskID{rt.job, rt.node}, std::move(status)
       ));
       logStateTransitionFn_("completed_task", worker_, &rt);
-    }
+    },
+    opts
   );
   logStateTransitionFn_("queued_task", worker_, &rt);
 }
@@ -346,37 +346,15 @@ void BistroWorkerHandler::requestSuicide(
 void BistroWorkerHandler::killTask(
     const cpp2::RunningTask& rt,
     const cpp2::BistroInstanceID& scheduler,
-    const cpp2::BistroInstanceID& worker) {
+    const cpp2::BistroInstanceID& worker,
+    const cpp2::KillRequest& req) {
 
   throwOnInstanceIDMismatch("killTask", scheduler, worker);
   logStateTransitionFn_("kill_task_request", worker_, &rt);
-  SYNCHRONIZED(runningTasks_) {
-    auto it = runningTasks_.find(TaskID{rt.job, rt.node});
-    if (it == runningTasks_.end()) {
-      return;  // no such task, do nothing
-    }
-    if (it->second.invocationID != rt.invocationID) {
-      throw BistroWorkerException(
-        "Tried to kill one task invocation: ", debugString(rt),
-        ", but a different one was running: ", debugString(it->second)
-      );
-    }
-    // Don't erase rt from runningTasks_ here, which may cause races.
-    // Let notifyFinished() clean it up in the background
-  }
-
-  // The kill can take a while, so don't hold any locks while we do it.
-  // Runs the notification callback when it's done, just like normal exit.
-  //
-  // Crucially, this call does *not* touch runningTasks_ or state_, which
-  // means that there are no interesting races with any of the other calls.
-  taskQueue_.killTask(
-    rt.job,
-    rt.node,
-    FLAGS_use_soft_kill
-      ? cpp2::KillMethod::TERM_WAIT_KILL : cpp2::KillMethod::KILL
-  );
-  logStateTransitionFn_("killed_task", worker_, &rt);
+  // Only sends the signal, does not wait -- if the task dies,
+  // notifyFinished() will clean up.
+  taskQueue_.kill(rt, req);
+  logStateTransitionFn_("kill_task_sent_signal", worker_, &rt);
 }
 
 void BistroWorkerHandler::suicide() {

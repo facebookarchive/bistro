@@ -152,14 +152,15 @@ std::chrono::milliseconds Bistro::scheduleOnce(
       if (kill_time > time_since_epoch) {  // Kill later
         new_id_to_kill_time[std::move(id)] = kill_time;
       } else {  // Kill now
-        // Future: once killTask is non-blocking, making the kills here,
-        // synchronously, won't be so bad.  Future: use rt with its
-        // invocation ID to make sure we are killing the right instance of
-        // the task.  Future: Consider setting a delayed "kill time" for the
+        // Future: Consider setting a delayed "kill time" for the
         // just-killed task to ensure that we don't try to kill stubborn
         // tasks in *every* scheduling loop.
         try {
-          taskRunner_->killTask(rt.job, rt.node);
+          taskRunner_->killTask(
+            rt,
+            jit != config->jobs.end()  // Fall back to the global kill request
+              ? jit->second->killRequest() : config->killRequest
+          );
         } catch (const std::exception& ex) {
           LOG(WARNING) << "Failed to kill orphan task "
             << apache::thrift::debugString(rt) << ": " << ex.what();

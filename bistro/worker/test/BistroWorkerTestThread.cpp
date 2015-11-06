@@ -76,7 +76,8 @@ cpp2::RunningTask BistroWorkerTestThread::runTask(
     cmd,
     getSchedulerID(),
     getWorker().id,
-    0
+    0,
+    cpp2::TaskSubprocessOptions()
   );
   return rt;
 }

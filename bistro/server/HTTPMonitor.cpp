@@ -154,12 +154,23 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
     return handleNodes(c, d);
   }
   if (handler == "kill_task") {
-    // Ignoring "status_filter", since it is now deprecated.
-    taskRunner_->killTask(  // Throws on failure
-      d["job_id"].asString().toStdString(),
-      d["node_id"].asString().toStdString()
-    );
-    return "killed";
+    // Ignore d["status_filter"], since that option is now deprecated.
+    auto job = d["job_id"].asString().toStdString();
+    auto node = d["node_id"].asString().toStdString();
+    // Look up the job
+    auto jit = c.jobs.find(job);
+    if (jit == c.jobs.end()) {
+      throw BistroException("Unknown job ", job);
+    }
+    // Look up the running task
+    const Job::ID job_id(Job::JobNameTable.asConst()->lookup(job));
+    const Node::ID node_id(Node::NodeNameTable.asConst()->lookup(node));
+    auto maybe_rt = taskStatuses_->copyRunningTask(job_id, node_id);
+    if (!maybe_rt.hasValue()) {
+      throw BistroException("Unknown running task ", job, ", ", node);
+    }
+    taskRunner_->killTask(*maybe_rt, jit->second->killRequest());
+    return "signaled";
   }
   throw BistroException("Unknown handler: ", handler);
 }

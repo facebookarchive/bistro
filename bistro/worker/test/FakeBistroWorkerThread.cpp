@@ -22,7 +22,8 @@ void FakeBistroWorker::async_tm_runTask(
   const std::vector<std::string>& command,
   const cpp2::BistroInstanceID& scheduler,
   const cpp2::BistroInstanceID& worker,
-  int64_t notify_if_tasks_not_running_sequence_num) {
+  int64_t notify_if_tasks_not_running_sequence_num,
+  const cpp2::TaskSubprocessOptions&) {
 
   cb->done();
 }

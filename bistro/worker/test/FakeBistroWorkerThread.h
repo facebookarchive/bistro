@@ -27,7 +27,8 @@ public:
      const std::vector<std::string>& command,
      const cpp2::BistroInstanceID& scheduler,
      const cpp2::BistroInstanceID& worker,
-     int64_t notify_if_tasks_not_running_sequence_num) override;
+     int64_t notify_if_tasks_not_running_sequence_num,
+     const cpp2::TaskSubprocessOptions&) override;
 
  void async_tm_getRunningTasks(
      std::unique_ptr<

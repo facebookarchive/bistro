@@ -11,6 +11,7 @@ bistro_link_libraries(
   lib_bistro_config
   lib_bistro_if
   lib_bistro_nodes
+  lib_bistro_processes
   lib_bistro_remote
   lib_bistro_statuses
   lib_bistro_utils

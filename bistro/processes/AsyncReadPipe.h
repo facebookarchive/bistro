@@ -18,23 +18,79 @@
 
 namespace facebook { namespace bistro {
 
+namespace detail { template <typename Callback> class AsyncReadPipeImpl; }
 /**
- * Construct via readFileLinesCallback() to get template deduction.
+ * You don't make one of these directly, instead use asyncReadPipe().  Once
+ * the pipe handler is constructed, you can use these public APIs.
+ */
+class AsyncReadPipe : public folly::EventHandler {
+public:
+  // Insofar as I can tell, folly::Promise intends for this to be
+  // thread-safe, meaning that you can call asyncReadPipe()->pipeClosed()
+  // from outside the EventBase thread.
+  folly::Future<folly::Unit> pipeClosed() { return closedPromise_.getFuture(); }
+
+  ///
+  /// None of the following are thread-safe, so you may only use them from
+  /// this handler's EventBase thread -- most often, from the callback.
+  ///
+
+  bool isPaused() const { return isPaused_; }
+
+  // The callback can use pipe().close() to stop reading early.
+  folly::File& pipe() { return pipe_; }
+
+  void pause() {
+    if (!isPaused_) {
+      isPaused_ = true;
+      unregisterHandler();
+    }
+  }
+
+  // Caveat: Once the pipe is paused, the pipe won't invoke the callback, so
+  // you cannot use it to resume reading.  Instead, use the shared_ptr
+  // returned by asyncReadPipe() to resume() via *another* call on the
+  // EventBase thread.  Since the EventHandler is paused, you can probably
+  // even get away with calling resume() from another thread, but I would
+  // avoid it, since it's easy to get the synchronization wrong.
+  void resume() {
+    if (isPaused_) {
+      isPaused_ = false;
+      // If we don't check `pipe_`, a well-intentioned resume would abort if
+      // the pipe had already been closed (e.g. due to an exception in the
+      // read callback).
+      if (pipe_) {
+        // This CHECK will abort on regular files.
+        CHECK(registerHandler(EventHandler::READ | EventHandler::PERSIST));
+      }
+    }
+  }
+
+protected:
+  template <typename Callback> friend class AsyncReadPipeImpl;
+  explicit AsyncReadPipe(folly::File pipe) : pipe_(std::move(pipe)) {}
+
+  folly::Promise<folly::Unit> closedPromise_;
+  folly::File pipe_;
+  bool isPaused_{true};
+};
+
+/**
+ * Construct via readPipeLinesCallback() to get template deduction.
  *
  * A callback that helps you read lines (or other character-delimited
- * pieces) from a pipe/file.  Your callback gets chunks with the delimiter
- * still attached, unless this is the final piece in the stream.  If the
- * last character is a delimiter, your callback will get an empty last
- * piece, so an EOF signal is guaranteed.
+ * pieces) from an AsyncReadPipe.  Your callback gets chunks with the
+ * delimiter still attached, unless this is the final piece in the stream.
+ * If the last character is a delimiter, your callback will get an empty
+ * last piece, so an EOF signal is guaranteed.
  *
  * A schematic example (see the unit test's checkPipeRead() for a full one):
  *
  *   asyncReadPipe(
  *     event_base_ptr,
  *     folly::File(pipe_fd, true),  // owns_fd
- *     readFileLinesCallback([fd](folly::StringPiece line) {
- *       std::cout << "read line from fd " << fd << ": " << line;
- *       return true;  // Keep reading
+ *     readPipeLinesCallback([fd](AsyncReadPipe* p, folly::StringPiece line) {
+ *       std::cout << "read line from fd " << p->pipe.fd() << ": " << line;
  *     })
  *   ).get();
  *
@@ -43,100 +99,135 @@ namespace facebook { namespace bistro {
  * chunk of a line is delimiter-terminated iff the delimiter was present in
  * the input.  In particular, the last line always lacks a delimiter -- so
  * if the stream ends on a delimiter, the final line is empty.
+ *
+ * WARNING: If your PipeLineCallback calls pause(), it must still consume
+ * any lines that are already in the StreamSplitter's internal buffer.  So,
+ * do NOT rely on "pause()" working instantly here.
  */
-template <typename LineCallback> class ReadFileLinesCallback;
-template <typename LineCallback>
-ReadFileLinesCallback<LineCallback> readFileLinesCallback(
-    LineCallback line_cob,
+template <typename PipeLineCallback> class ReadPipeLinesCallback;
+template <typename PipeLineCallback>
+ReadPipeLinesCallback<PipeLineCallback> readPipeLinesCallback(
+    PipeLineCallback pipe_line_cob,
     uint64_t max_line_length = 0,  // No line length limit by default
     char delimiter = '\n',
     uint64_t buf_size = 1024) {
-  return ReadFileLinesCallback<LineCallback>(
-    std::move(line_cob), max_line_length, delimiter, buf_size
+  return ReadPipeLinesCallback<PipeLineCallback>(
+    std::move(pipe_line_cob), max_line_length, delimiter, buf_size
   );
 }
-template <typename LineCallback>
-class ReadFileLinesCallback {
+template <typename PipeLineCallback>
+class ReadPipeLinesCallback {
+  // This `bind`-like wrapper lets us pass the AsyncReadPipe* through the
+  // StreamSplitter to the PipeLineCallback.  Decidedly not thread-safe.
+  struct BindPipePtr {
+    BindPipePtr(PipeLineCallback cob, AsyncReadPipe** pipe_ptr)
+      : cob_(std::move(cob)), pipePtr_(pipe_ptr) {}
+    bool operator()(folly::StringPiece s) {
+      cob_(*pipePtr_, s);
+      // Continue splitting even if the pipe is paused, since a
+      // StreamSplitter cannot be paused.
+      return true;
+    }
+    PipeLineCallback cob_;
+    AsyncReadPipe** pipePtr_;
+  };
+
 public:
-  explicit ReadFileLinesCallback(
-    LineCallback line_cob,
+  explicit ReadPipeLinesCallback(
+    PipeLineCallback line_cob,
     uint64_t max_line_length = 0,  // No line length limit by default
     char delimiter = '\n',
     uint64_t buf_size = 1024
-  ) : bufSize_(buf_size),
-      splitter_(delimiter, std::move(line_cob), max_line_length) {}
+  ) : pipePtr_(new (AsyncReadPipe*)),
+      bufSize_(buf_size),
+      splitter_(
+        delimiter,
+        BindPipePtr(std::move(line_cob), pipePtr_.get()),
+        max_line_length
+      ) {}
 
-  bool operator()(const folly::File& file) {
+  void operator()(AsyncReadPipe* pipe) {
+    // This kludge passes `pipe` into the inner callback through the
+    // StreamSplitter.  It seems better than threading templated varargs
+    // through the entire StreamSplitter implementation.
+    *pipePtr_ = pipe;
     char buf[bufSize_];
-    while (true) {  // Read until EAGAIN or EOF or callback stop request
-      ssize_t ret = folly::readNoInt(file.fd(), buf, bufSize_);
+    // Read until EAGAIN or EOF, or the callback closes the FD or pauses the
+    // pipe.  It's crucial to check isPaused here -- otherwise we might read
+    // indefinitely even after the client requests a pause.
+    while (pipe->pipe() && !pipe->isPaused()) {
+      ssize_t ret = folly::readNoInt(pipe->pipe().fd(), buf, bufSize_);
       if (ret == -1 && errno == EAGAIN) {  // No more data for now
-        return true;
+        break;
       }
       folly::checkUnixError(ret, "read");
       if (ret == 0) {  // Reached end-of-file
-        splitter_.flush();  // Ignore return since the file is over anyway
-        return false;
+        splitter_.flush();  // Split whatever remained in the buffer
+        pipe->pipe().close();
+        break;
       }
-      if (!splitter_(folly::StringPiece(buf, ret))) {
-        return false;  // The callback told us to stop
-      }
+      splitter_(folly::StringPiece(buf, ret));
     }
   }
 
 private:
+  std::unique_ptr<AsyncReadPipe*> pipePtr_;  // unique_ptr for a fixed address
   const uint64_t bufSize_;
-  folly::gen::StreamSplitter<LineCallback> splitter_;
+  folly::gen::StreamSplitter<BindPipePtr> splitter_;
 };
 
 /**
  * Read from a pipe via an EventBase (regular files are not supported).
  * asyncReadPipe() need not be run from the EventBase thread.
  *
- * The resulting future is ready when the pipe is closed.  It yields an
- * exception if your callback throws (in which case the pipe is also closed,
- * ignoring and logging secondary exceptions), or if closing the pipe
- * throws.
+ * AsyncReadPipe::pipeClosed() becomes ready when the pipe is closed.  It
+ * yields an exception if your callback throws (in which case the pipe is
+ * also closed, ignoring and logging secondary exceptions).
  *
  * Your read callback runs in the thread of the specified EventBase:
  *
- *   bool (const folly::File&)
+ *   void (const AsyncReadPipe* p)
  *
- * Return true for "keep reading" or false for "close FD and stop reading",
- * which may cause the other end to get a SIGPIPE.
+ * It may call p->pause() to temporarily cease being called, or even
+ * p->pipe().close(), which might cause the other end to get a SIGPIPE.
+ *
+ * The reason this exposes a shared_ptr is that we cannot resume() from
+ * inside the callback -- it won't be called, and whatever code path is
+ * responsible for resuming had better share ownership of this handler.
+ * Note that you should generally only resume() from the EventBase thread.
  */
-namespace detail { template <typename Callback> class AsyncReadPipeHandler; }
 template <typename Callback>
-folly::Future<folly::Unit> asyncReadPipe(
+std::shared_ptr<AsyncReadPipe> asyncReadPipe(
     folly::EventBase* evb, folly::File pipe, Callback cob) {
-  folly::Future<folly::Unit> f;
+  std::shared_ptr<AsyncReadPipe> p;
   // I'm not leaking the object; it's self-owned, and self-destructs on
-  // close.  It would be *unsafe* to inspect the returned pointer, since it
-  // might already have been deleted.  This arrangement makes sense for a
+  // close.  It would be *unsafe* to use the returned pointer, since it
+  // already belongs to a shared_ptr.  This arrangement makes sense for a
   // few reasons:
   //  - The handler must have a stable address to be used with EventBase.
-  //  - External ownership makes it possible for the object to be destroyed
+  //  - Purely external ownership would allow the object to be destroyed
   //    right before libevent invokes its callback (use-after-free).
-  new detail::AsyncReadPipeHandler<Callback>(
-    evb, std::move(pipe), std::move(cob), &f
+  new detail::AsyncReadPipeImpl<Callback>(
+    evb, std::move(pipe), std::move(cob), &p
   );
-  return f;
+  return p;
 }
+
 namespace detail {
 template <typename Callback>
-class AsyncReadPipeHandler : public folly::EventHandler {
+class AsyncReadPipeImpl : public AsyncReadPipe {
 protected:
-  friend folly::Future<folly::Unit> asyncReadPipe<>(
+  friend std::shared_ptr<AsyncReadPipe> asyncReadPipe<>(
     folly::EventBase*, folly::File, Callback
   );
 
-  AsyncReadPipeHandler(
+  AsyncReadPipeImpl(
     folly::EventBase* evb,
     folly::File pipe,
     Callback cob,
-    folly::Future<folly::Unit>* pipe_closed
-  ) : pipe_(std::move(pipe)), callback_(std::move(cob)) {
-    *pipe_closed = closedPromise_.getFuture();
+    std::shared_ptr<AsyncReadPipe>* handler
+  ) : AsyncReadPipe(std::move(pipe)), self_(this), callback_(std::move(cob)) {
+    *handler = self_;
     // Enable nonblocking IO
     int fd = pipe_.fd();
     int flags = ::fcntl(fd, F_GETFL);
@@ -145,33 +236,31 @@ protected:
     folly::checkUnixError(r, "fcntl");
     // Initialize the parent class
     initHandler(evb, fd);
-    // This CHECK will abort on regular files.
-    CHECK(registerHandler(EventHandler::READ | EventHandler::PERSIST));
+    resume();
     // CAREFUL: we're not in the EventBase thread here, but handlerReady may
     // already be running, and this object may already be destroyed (!!!)
   }
 
   // Implementation detail -- invoke the "read" callback.
-  // Final: it's unsafe to extend AsyncReadPipeHandler, see CAREFUL above.
+  // Final: it's unsafe to extend AsyncReadPipe, see CAREFUL above.
   void handlerReady(uint16_t events) noexcept override final {
     // These must be the FIRST lines in the scope, so that they run last.
     bool handler_should_die = false;
     auto suicide_guard = folly::makeGuard([&]() {
       if (handler_should_die) {
         unregisterHandler();
-        delete this;
+        // No longer self-owning. Will be destroyed here, or later, by
+        // another owning thread.
+        self_.reset();
       }
     });
     CHECK(events & EventHandler::READ);  // No WRITE support
     try {
-      // Ensure that the callback cannot close the pipe.
-      const folly::File& const_pipe = pipe_;
-      if (callback_(const_pipe)) {  // Keep reading?
-        return;
+      callback_(this);
+      if (!pipe_) {  // The callback closed the pipe.
+        handler_should_die = true;
+        closedPromise_.setValue();
       }
-      // The callback requested the pipe to be closed.
-      handler_should_die = true;
-      closedPromise_.setWith([this]() { pipe_.close(); });
     } catch (const std::exception& ex) {
       handler_should_die = true;
       folly::exception_wrapper ew{std::current_exception(), ex};
@@ -187,9 +276,10 @@ protected:
   }
 
 private:
-  folly::File pipe_;
+  // This object is self-owned, keeping it alive until we are sure none of
+  // its code will run on the EventBase any more.
+  std::shared_ptr<detail::AsyncReadPipeImpl<Callback>> self_;
   Callback callback_;
-  folly::Promise<folly::Unit> closedPromise_;
 };
 }  // namespace detail
 

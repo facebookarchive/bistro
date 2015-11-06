@@ -20,8 +20,23 @@
 
 using namespace facebook::bistro;
 
+void wrapOrCloseFd(folly::File* file, int fd) {
+  if (file) {
+    *file = folly::File(fd, /*owns_fd=*/ true);
+  } else {
+    folly::checkUnixError(::close(fd));
+  }
+}
+
+void makePipe(folly::File* read_pipe, folly::File* write_pipe) {
+  int pipe_fds[2];
+  folly::checkUnixError(pipe(pipe_fds), "pipe");
+  wrapOrCloseFd(write_pipe, pipe_fds[1]);
+  wrapOrCloseFd(read_pipe, pipe_fds[0]);
+}
+
 /**
- * Reads lines from a pipe via asyncReadPipe() and readFileLinesCallback().
+ * Reads lines from a pipe via asyncReadPipe() and readPipeLinesCallback().
  *
  * Writes message to a pipe in randomly sized chunks. Randomly alternates
  * between reading and writing (so that "read read write", and "write write
@@ -34,10 +49,8 @@ using namespace facebook::bistro;
  * Checks that the concatenation of the lines reconstructs the message.
  */
 void checkPipeRead(const std::string& message) {
-  int pipe_fds[2];
-  folly::checkUnixError(pipe(pipe_fds), "pipe");
-  folly::File write_pipe(pipe_fds[1], /*owns_fd=*/ true);
-  folly::File read_pipe(pipe_fds[0], /*owns_fd=*/ true);
+  folly::File read_pipe, write_pipe;
+  makePipe(&read_pipe, &write_pipe);
 
   size_t cursor = 0;
   auto write_chunk_fn = [&]() {
@@ -63,7 +76,7 @@ void checkPipeRead(const std::string& message) {
   auto closed = asyncReadPipe(
     &evb,
     std::move(read_pipe),
-    readFileLinesCallback([&](folly::StringPiece s) {
+    readPipeLinesCallback([&](AsyncReadPipe*, folly::StringPiece s) {
       EXPECT_FALSE(saw_eof);  // Saw EOF at most once
       read_message.append(s.begin(), s.end());
       if (!s.empty()) {
@@ -76,9 +89,8 @@ void checkPipeRead(const std::string& message) {
       } else {
         EXPECT_EQ(s.size() - 1, folly::qfind(s, '\n'));  // EOL only at the end
       }
-      return true;  // Keep reading
     })
-  );
+  )->pipeClosed();
 
   while (!closed.isReady()) {
     if (folly::Random::oneIn(2)) {
@@ -104,18 +116,86 @@ TEST(TestAsyncReadPipe, SimpleRead) {
 namespace { class TestError : public std::exception {}; }
 
 TEST(TestAsyncReadPipe, CallbackException) {
-  // Make a pipe and immediately close the write end, we won't need it.
-  int pipe_fds[2];
-  folly::checkUnixError(pipe(pipe_fds), "pipe");
-  folly::File read_pipe(pipe_fds[0], /*owns_fd=*/ true);
-  folly::checkUnixError(close(pipe_fds[1]));
+  folly::File read_pipe;
+  makePipe(&read_pipe, nullptr);
 
   folly::EventBase evb;
   auto closed = asyncReadPipe(
     &evb,
     std::move(read_pipe),
-    [&](const folly::File& f) -> bool { throw TestError(); }
-  );
+    [&](AsyncReadPipe*) -> bool { throw TestError(); }
+  )->pipeClosed();
   while (!closed.isReady()) { evb.loop(); }
   EXPECT_THROW(closed.get(), TestError);
+}
+
+TEST(TestAsyncReadPipe, PauseResume) {
+  folly::File read_pipe, write_pipe;
+  makePipe(&read_pipe, &write_pipe);
+
+  size_t lines_before_pause = 3;
+  folly::EventBase evb;
+  auto pipe = asyncReadPipe(
+    &evb,
+    std::move(read_pipe),
+    readPipeLinesCallback([&](AsyncReadPipe* pipe, folly::StringPiece s) {
+      if (!s.empty()) {
+        LOG(INFO) << "Read: '" << s << "'";
+        --lines_before_pause;
+        if (lines_before_pause == 0) {
+          pipe->pause();
+        }
+      }
+    }, 0, '\n', 1)  // 1-char buffer to ensure that pause is "instant"
+  );
+  auto closed = pipe->pipeClosed();
+
+  auto write_fn = [&](const char* msg) {
+    // Will deadlock if the pipe buffer fills up, but I'll take my chances.
+    folly::writeFull(write_pipe.fd(), msg, strlen(msg));
+  };
+
+  evb.loopOnce(EVLOOP_NONBLOCK);  // No data, no action
+  EXPECT_EQ(3, lines_before_pause);
+
+  // The first 3 are consumed, and then we pause.
+  for (int i = 0; i < 6; ++i) {
+    write_fn("a\n");
+    evb.loopOnce(EVLOOP_NONBLOCK);
+    EXPECT_EQ((i < 3) ? (2 - i) : 0, lines_before_pause);
+  }
+
+  // Consume all the lines, and check that no more events fire.
+  lines_before_pause = 5;
+  pipe->resume();
+  EXPECT_EQ(5, lines_before_pause);  // Doesn't fire without the EventBase
+  evb.loopOnce(EVLOOP_NONBLOCK);
+  EXPECT_EQ(2, lines_before_pause);  // All 3 blocked lines get consumed
+  evb.loopOnce(EVLOOP_NONBLOCK);  // Nothing more to read yet.
+  write_fn("b\nc\nd\nf\ng\n");
+  EXPECT_EQ(2, lines_before_pause);
+  evb.loopOnce(EVLOOP_NONBLOCK);
+  EXPECT_EQ(0, lines_before_pause);  // 2 consumed, 3 to go
+
+  lines_before_pause = 1;
+  pipe->resume();
+  EXPECT_EQ(1, lines_before_pause);
+  evb.loopOnce(EVLOOP_NONBLOCK);
+  EXPECT_EQ(0, lines_before_pause);  // 1 consumed, 2 to go
+
+  lines_before_pause = 2;
+  pipe->resume();
+  EXPECT_EQ(2, lines_before_pause);
+  evb.loopOnce(EVLOOP_NONBLOCK);
+  EXPECT_EQ(0, lines_before_pause);  // All consumed
+
+  EXPECT_FALSE(closed.isReady());
+  write_pipe.close();
+  EXPECT_FALSE(closed.isReady());  // The EventBase didn't run yet
+  evb.loopOnce(EVLOOP_NONBLOCK);
+  EXPECT_FALSE(closed.isReady());  // The pipe is paused, so we didn't know
+  pipe->resume();
+  evb.loopOnce(EVLOOP_NONBLOCK);
+  EXPECT_TRUE(closed.isReady());  // Now we know
+  EXPECT_EQ(0, lines_before_pause);  // No more lines were seen
 }

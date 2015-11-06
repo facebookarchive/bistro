@@ -80,7 +80,8 @@ void LocalRunner::killTask(const std::string& job, const std::string& node) {
   taskQueue_.killTask(
     job,
     node,
-    FLAGS_use_soft_kill ? cpp2::KillMethod::SOFT : cpp2::KillMethod::HARD
+    FLAGS_use_soft_kill
+      ? cpp2::KillMethod::TERM_WAIT_KILL : cpp2::KillMethod::KILL
   );
 }
 

@@ -164,6 +164,14 @@ struct SchedulerHeartbeatResponse {
 }
 
 enum KillMethod {
-  SOFT = 1,  // SIGTERM, wait a few seconds, SIGKILL
-  HARD = 2,  // SIGKILL
+  TERM_WAIT_KILL = 1,  // SIGTERM, wait, SIGKILL -- formerly 'SOFT'
+  KILL = 2,  // SIGKILL -- formerly 'HARD'
+  TERM = 3,
+}
+
+struct KillRequest {
+  1: KillMethod method = KillMethod.TERM,
+  // For TERM_WAIT_KILL, how many ms to wait for a child to exit between
+  // SIGTERM and SIGKILL.  Non-positive values send SIGKILL immediately.
+  2: i32 killWaitMs,
 }

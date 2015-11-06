@@ -373,7 +373,8 @@ void BistroWorkerHandler::killTask(
   taskQueue_.killTask(
     rt.job,
     rt.node,
-    FLAGS_use_soft_kill ? cpp2::KillMethod::SOFT : cpp2::KillMethod::HARD
+    FLAGS_use_soft_kill
+      ? cpp2::KillMethod::TERM_WAIT_KILL : cpp2::KillMethod::KILL
   );
   logStateTransitionFn_("killed_task", worker_, &rt);
 }

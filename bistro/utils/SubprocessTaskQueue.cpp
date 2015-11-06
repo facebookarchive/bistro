@@ -117,9 +117,9 @@ SubprocessTaskQueue::Task::Task(
 namespace {  // Helper for kill() & work()
 Optional<string> killViaMethod(ProcessRunner& runner, cpp2::KillMethod m) {
   switch (m) {
-    case cpp2::KillMethod::SOFT:
+    case cpp2::KillMethod::TERM_WAIT_KILL:
       return runner.softKill();
-    case cpp2::KillMethod::HARD:
+    case cpp2::KillMethod::KILL:
       return runner.hardKill();
     default:
       LOG(ERROR) << "Ignoring invalid kill method: " << static_cast<int>(m);

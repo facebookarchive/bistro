@@ -1,0 +1,473 @@
+/*
+ *  Copyright (c) 2015, Facebook, Inc.
+ *  All rights reserved.
+ *
+ *  This source code is licensed under the BSD-style license found in the
+ *  LICENSE file in the root directory of this source tree. An additional grant
+ *  of patent rights can be found in the PATENTS file in the same directory.
+ *
+ */
+#include "bistro/bistro/processes/TaskSubprocessQueue.h"
+
+#include <boost/filesystem.hpp>
+#include <folly/json.h>
+#include <folly/Subprocess.h>
+#include <thrift/lib/cpp2/protocol/DebugProtocol.h>
+
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
+#include "bistro/bistro/processes/AsyncSubprocess.h"
+#include "bistro/bistro/statuses/TaskStatus.h"
+#include "bistro/bistro/utils/Exception.h"
+#include "bistro/bistro/utils/hostname.h"
+#include "bistro/bistro/utils/LogWriter.h"
+#include "bistro/bistro/utils/shell.h"
+
+DEFINE_int32(
+  task_thread_pool_size, 10,
+  "How many threads to start to monitor task subprocesses. A high value "
+  "wastes RAM and CPU, while a low value increases the latency with which "
+  "Bistro processes task subprocess events."
+);
+
+namespace facebook { namespace bistro {
+
+namespace {
+
+// DO: Avoid duplication of this constant with RemoteWorker.h
+const std::string kHealthcheckTaskJob = "__BISTRO_HEALTH_CHECK__";
+
+// Reserve an FD so that we can safely use the same one for opening a
+// pipe to a child.  This FD below is never used, it's always clobbered.
+int makePlaceholderFd() {
+  int pipes[2];
+  folly::checkUnixError(pipe(pipes));
+  folly::checkUnixError(close(pipes[1]));
+  return pipes[0];
+}
+
+TaskStatus parseStatus(const detail::TaskSubprocessState* state) {
+  if (state->rawStatus_.empty()) {
+    if (state->wasKilled()) {
+      // Task backs off, but its backoff counter is not advanced. Good
+      // for preempting or restarting running tasks.
+      return TaskStatus::incompleteBackoff(folly::make_unique<folly::dynamic>(
+        folly::dynamic::object
+          ("exception", "Task killed, no status returned")
+      ));
+    } else {
+      return TaskStatus::errorBackoff("Failed to read a status");
+    }
+  } else {
+    return TaskStatus::fromString(state->rawStatus_);
+  }
+}
+
+}  // anonymous namespace
+
+void TaskSubprocessQueue::logEvent(
+    int glog_level,
+    const cpp2::RunningTask& rt,
+    const detail::TaskSubprocessState* state,
+    const std::string& event,
+    folly::dynamic&& obj = folly::dynamic::object()) noexcept {
+
+  obj["event"] = event;
+  // Adding fields can only fail in case of programmer error, so add them
+  // outside the try-catch.
+  CHECK(state) << "state cannot be null";
+  if (!state->rawStatus_.empty()) {
+    // In theory, this can change -- StatusCob only gets the last line.
+    obj["raw_status"] = state->rawStatus_;
+  }
+  // Distinguish different invocations of the same task.
+  obj["invocation_start_time"] = rt.invocationID.startTime;
+  obj["invocation_rand"] = rt.invocationID.rand;
+  // The worker host need not be the same as the scheduler host, so
+  // it's important to log it.
+  obj["worker_host"] = getLocalHostName();
+  // DO: If useful, also log rt.workerShard, or rt.nextBackoffDuration, or
+  // even rt.nodeResources.
+
+  // Contract: We always write a JSON message (serialization shouldn't fail).
+  std::string msg = folly::toJson(obj).toStdString();
+
+  try {
+    // Suppress INFO messages about healthchecks to keep the logs cleaner
+    if (glog_level != google::INFO || rt.job != kHealthcheckTaskJob) {
+      google::LogMessage(__FILE__, __LINE__, glog_level).stream()
+        << "Task " << rt.job << ", " << rt.node << " message: " << msg;
+    }
+    logWriter_->write(LogTable::STATUSES, rt.job, rt.node, msg);
+  } catch (const std::exception& e) {  // Not much to do with this...
+    LOG(ERROR) << "Error logging task subprocess message '" << msg
+      << "' for task " << apache::thrift::debugString(rt) << ": " << e.what();
+  }
+}
+
+// Set up EventBased handlers to interact with the subprocess and its pipes.
+// Once the process exits, and the pipes close, the final callback removes
+// `state` from `tasks_`.
+void TaskSubprocessQueue::waitForSubprocessAndPipes(
+    const cpp2::RunningTask& rt,
+    // Mutated: we add a per-task log line rate-limiter
+    std::shared_ptr<detail::TaskSubprocessState> state,
+    folly::Subprocess&& proc,
+    TaskSubprocessQueue::StatusCob status_cob) noexcept {
+    // Below, the `noexcept` guarantees that we don't delete from tasks_ twice
+
+  // The pipe & subprocess handlers must run in the same EventBase thread,
+  // since they mutate the same state.  Also, the rate-limiter
+  // initialization below depends on `evb` running the present function.
+  auto evb = folly::EventBaseManager::get()->getExistingEventBase();
+  CHECK(evb);  // The thread pool should have made the EventBase.
+
+  // Take ownership of proc's pipes, and set up their log processing on the
+  // EventBase.  Produce 'pipe closed' futures.
+  //
+  // Technically, this block could be outside of the `noexcept`, but it
+  // should not throw anyhow, so leave it in the same function.
+  std::vector<folly::Future<folly::Unit>> pipe_closed_futures;
+  std::vector<std::shared_ptr<AsyncReadPipe>> pipes;  // For the rate-limiter
+  for (auto&& p : proc.takeOwnershipOfPipes()) {
+    int child_fd = p.childFd;
+    auto job = rt.job;
+    auto node = rt.node;
+    pipes.emplace_back(asyncReadPipe(
+      evb,
+      std::move(p.pipe),
+      readPipeLinesCallback([
+        this, job, node, child_fd, state
+      ](AsyncReadPipe*, folly::StringPiece s) {
+        if (s.empty()) {
+          // Skip the empty line at the end of \n-terminated files
+          return true;
+        }
+
+        // Enforce log line rate limits per task, rather than per job, since
+        // it's cleaner.  For hacky per-job limits, treat log throughput as
+        // a statically-allocated job resource.
+        auto* rate_lim = state->pipeRateLimiter_.get();
+        // This cannot fire, since these AsyncReadPipes are being created
+        // from the same EventBase that will run them, and therefore
+        // state->pipeRateLimiter_ will be set first, below.
+        CHECK(rate_lim);
+        if (child_fd == STDERR_FILENO) {
+          logWriter_->write(LogTable::STDERR, job, node, s);
+          rate_lim->reduceQuotaBy(1);
+        } else if (child_fd == STDOUT_FILENO) {
+          logWriter_->write(LogTable::STDOUT, job, node, s);
+          rate_lim->reduceQuotaBy(1);
+        } else if (child_fd == childStatusPipePlaceholder_.fd()) {
+          // Discard delimiter since status parsing assumes it's gone.
+          s.removeSuffix("\n");
+          // Only use the last status line, no disk IO -- no line quota
+          state->rawStatus_.assign(s.data(), s.size());
+        }
+        // Else: we don't care about other FDs -- in fact, the only other FD
+        // it could reasonably be is the canary pipe, and we won't indulge
+        // the children by paying attention to the junk they write there.
+        return true;  // Keep reading
+      },
+      65000)  // Limit line length to protect the log DB
+    ));
+    pipe_closed_futures.emplace_back(pipes.back()->pipeClosed());
+  }
+  // Gets to run before any line callbacks, since the current scope was
+  // running on the callbacks' EventBase before the callbacks even existed.
+  state->pipeRateLimiter_.reset(new AsyncReadPipeRateLimiter(
+    evb,
+    std::max(1, state->opts().pollMs),  // Poll at the Subprocess's rate
+    state->opts().maxLogLinesPerPollInterval,
+    std::move(pipes)
+  ));
+
+  // Add callbacks to wait for the subprocess and pipes on the same EventBase.
+  collectAll(
+    asyncSubprocess(  // Never yields an exception
+      evb,
+      std::move(proc),
+      // Unlike std::bind, explicitly keeps the state alive.
+      [state](folly::Subprocess& p) { state->asyncSubprocessCallback(p); },
+      std::max(1, state->opts().pollMs)
+    ).then([this, rt, state](folly::ProcessReturnCode&& rc) noexcept {
+      logEvent(
+        google::INFO, rt, state.get(), "process_exited",
+        folly::dynamic::object("message", rc.str())
+      );  // noexcept
+    }),
+    collectAll(pipe_closed_futures).then([this, rt, state](
+      std::vector<folly::Try<folly::Unit>>&& all_closed
+    ) {
+      for (auto& try_pipe_closed : all_closed) {
+        try {
+          // DO: Use folly::exception_wrapper once wangle supports it.
+          try_pipe_closed.throwIfFailed();
+        } catch (const std::exception& e) {
+          // Carry on, the pipe is known to be closed. Logging is noexcept.
+          logEvent(
+            google::ERROR, rt, state.get(), "task_pipe_error",
+            folly::dynamic::object("message", e.what())
+          );  // noexcept
+        }
+      }
+      logEvent(google::INFO, rt, state.get(), "task_pipes_closed"); // noexcept
+    })
+  ).then([this, rt, status_cob, state](
+    // Safe to ignore exceptions, since the above callbacks are noexcept.
+    std::tuple<folly::Try<folly::Unit>, folly::Try<folly::Unit>>&&
+    // `noexcept` since this is the final handler -- nothing inspects
+    // its result.
+  ) noexcept {
+    // Parse the task's status string, if it produced one. Note that in
+    // the absence of a status, our behavior is actually racy.  The task
+    // might have spontaneously exited just before Bistro tried to kill
+    // it.  In that case, wasKilled() would be true, and we would
+    // "incorrectly" report incompleteBackoff().  This is an acceptable
+    // tradeoff, since we *need* both sides of the wasKilled() branch:
+    //  - We must decrement the retry counter on spontaneous exits
+    //    with no status (e.g. C++ program segfaults).
+    //  - We must *not* decrement the retry counter for killed tasks that
+    //    do not output a status (i.e. no SIGTERM handler), since
+    //    preemption should be maximally transparent.
+    auto status = parseStatus(state.get());
+    // Log and report the status
+    logEvent(
+      google::INFO, rt, state.get(), "got_status",
+      // The NoTime variety omits "backoff_duration", but we lack it anyway,
+      // since only TaskStatusSnapshot calls TaskStatus::update().
+      folly::dynamic::object("status", status.toDynamicNoTime())
+    );
+    status_cob(rt, std::move(status));  // noexcept
+    // logEvent ignores healthcheck messages; print a short note instead.
+    if (rt.job == kHealthcheckTaskJob) {
+      LOG(INFO) << "Healthcheck started at " << rt.invocationID.startTime
+        << " quit with status '" << status.toJson() << "'";
+    }
+    SYNCHRONIZED(tasks_) {  // Remove the completed task's state from the map.
+      if (tasks_.erase(makeInvocationID(rt)) == 0) {
+        LOG(FATAL) << "Missing task: " << apache::thrift::debugString(rt);
+      }
+    }
+  });
+}
+
+TaskSubprocessQueue::TaskSubprocessQueue(
+  std::unique_ptr<BaseLogWriter> log_writer
+) : logWriter_(std::move(log_writer)),
+    childStatusPipePlaceholder_(makePlaceholderFd(), /*owns_fd=*/ true),
+    childCanaryPipePlaceholder_(makePlaceholderFd(), /*owns_fd=*/ true),
+    // See the header for the reasons this should be the *last* thing this
+    // constructor does.
+    threadPool_(FLAGS_task_thread_pool_size) {}
+
+TaskSubprocessQueue::~TaskSubprocessQueue() {
+  // Blithely wait for all tasks to exit.
+  while (true) {
+    auto num_tasks = tasks_->size();
+    if (num_tasks == 0) {
+      break;
+    }
+    FB_LOG_EVERY_MS(INFO, 5000) << "Waiting for " << num_tasks << " tasks";
+    /* sleep override */
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+}
+
+void TaskSubprocessQueue::runTask(
+    const cpp2::RunningTask& rt,
+    const std::vector<std::string>& cmd,
+    const std::string& job_arg,
+    const boost::filesystem::path& working_dir,
+    StatusCob status_cob,
+    cpp2::TaskSubprocessOptions opts) {
+
+  // Set up the task's map entry up-front, because it is a usage error to
+  // start two tasks with the same invocation ID.  It also must be done
+  // before setting up the callbacks, since those expect tasks_ to be ready,
+  // and *may* run immediately.  Also, the destructor relies on tasks_ being
+  // added to synchronously.
+  auto state = std::make_shared<detail::TaskSubprocessState>(std::move(opts));
+  SYNCHRONIZED(tasks_) {
+    if (!tasks_.emplace(makeInvocationID(rt), state).second) {
+      throw BistroException(
+        "Task already running: ", apache::thrift::debugString(rt)
+      );
+    }
+  }
+
+  // Passing 'this' is not too scary, since the EventBase threads are the
+  // first to be stopped / destroyed on this object.
+  threadPool_.add([this, rt, cmd, job_arg, working_dir, status_cob, state]() {
+    std::string debug_cmd{"unknown"};
+    try {
+      // Populate `debug_cmd` first, since this shouldn't throw, and it's
+      // required for nice exception logging.
+      auto pipe_filename =  // Unlike /proc, /dev/fd works on Linux and OS X
+        folly::to<std::string>("/dev/fd/", childStatusPipePlaceholder_.fd());
+      std::vector<std::string> args{rt.node, pipe_filename, job_arg};
+      debug_cmd = folly::to<std::string>(
+        '[', escapeShellArgsInsecure(cmd), "] + [",
+        escapeShellArgsInsecure(args), ']'
+      );
+
+      boost::system::error_code ec;
+      boost::filesystem::create_directories(working_dir, ec);
+      if (ec) {
+        throw BistroException(
+          "Failed to make working directory: ", ec.message()
+        );
+      }
+
+      CHECK(cmd.size() >= 1);
+      std::vector<std::string> full_cmd{cmd};
+      full_cmd.insert(full_cmd.end(), args.begin(), args.end());
+      logEvent(google::INFO, rt, state.get(), "running", folly::dynamic::object
+        ("command", folly::dynamic(full_cmd.begin(), full_cmd.end()))
+      );
+
+      auto opts = folly::Subprocess::pipeStdout().pipeStderr()
+        .chdir(working_dir.native())
+        .fd(childStatusPipePlaceholder_.fd(), folly::Subprocess::PIPE_OUT);
+      if (state->opts().useCanaryPipe) {
+        // It's much easier for us to get the read end of the pipe, since we
+        // can just use AsyncReadPipe to track its closing.
+        opts.fd(childCanaryPipePlaceholder_.fd(), folly::Subprocess::PIPE_OUT);
+      }
+      if (state->opts().parentDeathSignal != 0) {
+        opts.parentDeathSignal(state->opts().parentDeathSignal);
+      }
+      if (state->opts().processGroupLeader) {
+        opts.processGroupLeader();
+      }
+      // Can throw, and that's ok. Not inline to guarantee that `state` is
+      // safe to use in the `catch` below.
+      folly::Subprocess proc(full_cmd, opts);
+      // IMPORTANT: This call must be last in the block and `noexcept` to
+      // ensure that the below "remove from tasks_" cannot race the "remove
+      // from tasks_" in the "subprocess exited and pipes closed" callback.
+      waitForSubprocessAndPipes(
+        rt, std::move(state), std::move(proc), std::move(status_cob)
+      );
+    } catch (const std::exception& e) {
+      SYNCHRONIZED(tasks_) {  // Remove the task -- its callback won't run.
+        if (tasks_.erase(makeInvocationID(rt)) == 0) {
+          LOG(FATAL) << "Missing task: " << apache::thrift::debugString(rt);
+        }
+      }
+      auto msg = folly::to<std::string>(
+        "Failed to start task ", apache::thrift::debugString(rt), " / ",
+        debug_cmd, ": ", e.what()
+      );
+      auto status = TaskStatus::errorBackoff(msg);
+      // Although `state` is moved above, this is ok, since our move
+      // constructors and waitForSubprocessAndPipes must be noexcept.
+      logEvent(
+        google::ERROR, rt, state.get(), "task_failed_to_start",
+        folly::dynamic::object("status", status.toDynamicNoTime())
+      );  // noexcept
+      // Advances the backoff/retry counter, so we eventually give up.
+      status_cob(rt, std::move(status));  // noexcept
+    }
+  });
+}
+
+void TaskSubprocessQueue::kill(
+    const cpp2::RunningTask& rt,
+    cpp2::KillRequest req) {
+  SYNCHRONIZED(tasks_) {
+    auto it = tasks_.find(makeInvocationID(rt));
+    if (it == tasks_.end()) {
+      // We don't attempt to kill tasks that have not started yet. Doing
+      // that requires state, and the best place for this state is
+      // Bistro's scheduler (see the "kill orphan tasks" code).
+      throw BistroException(
+        "Cannot kill task with ID ", rt.job, " / ", rt.node, " / ",
+        rt.invocationID.startTime, " / ", rt.invocationID.rand,
+        " since no such task is running."
+      );
+    }
+    it->second->kill(std::move(req));
+  }
+}
+
+namespace detail {
+
+// Hardcoded constant: 10 signals per ~10ms seems plenty.
+TaskSubprocessState::TaskSubprocessState(cpp2::TaskSubprocessOptions opts)
+  : opts_(std::move(opts)), queue_(10) {}
+
+void TaskSubprocessState::asyncSubprocessCallback(
+    folly::Subprocess& proc) noexcept {
+  int signal = 0;  // No signal
+  // Is it time to send a previously scheduled KILL?
+  if (killAfterTicks_ > 0) {
+    --killAfterTicks_;
+    if (killAfterTicks_ == 0) {
+      signal = SIGKILL;
+    }
+  }
+  cpp2::KillRequest kill_req;
+  while (queue_.read(kill_req)) {
+    switch (kill_req.method) {
+      case cpp2::KillMethod::KILL:
+        signal = SIGKILL;  // KILL takes precedence over an outstanding TERM
+        killAfterTicks_ = 0;  // No point in sending already-scheduled kills
+        break;
+      case cpp2::KillMethod::TERM_WAIT_KILL:
+        if (signal == 0) {  // TERM does not replace an outstanding KILL
+          signal = SIGTERM;
+        }
+        // Pick the earlier kill time of the two -- only one SIGKILL will fire.
+        {
+          uint32_t ticks =
+            std::max(0, kill_req.killWaitMs / opts_.pollMs);
+          killAfterTicks_ =
+            (killAfterTicks_ == 0) ? ticks : std::min(ticks, killAfterTicks_);
+        }
+        break;
+      case cpp2::KillMethod::TERM:
+        if (signal == 0) {  // TERM does not replace an outstanding KILL
+          signal = SIGTERM;
+        }
+        break;
+      default:  // Not reached, checked in TaskSubprocessState::kill()
+        LOG(FATAL) << "Unknown kill method: "
+          << static_cast<int>(kill_req.method);
+    }
+  }
+  // AsyncSubprocess guarantees that the process had not yet been wait()ed
+  // for when this callback runs, so sendSignal() is not racy, and is
+  // guaranteed to go to the right process / pgid.
+  if (signal != 0) {
+    CHECK(proc.returnCode().running());
+    auto pid = proc.pid();
+    CHECK(pid > 1);
+    if (opts_.processGroupLeader) {
+      pid = -pid;
+      CHECK(pid < -1);
+    }
+    // FATAL since none of the POSIX error conditions can occur, unless we
+    // have a serious bug like signaling the wrong PID.
+    PLOG_IF(FATAL, ::kill(pid, signal) == -1)
+      << "Failed to kill " << pid << " with " << signal;
+    wasKilled_ = true;  // Alters "no status" handling, see above.
+  }
+}
+
+void TaskSubprocessState::kill(cpp2::KillRequest req) {
+  switch (req.method) {
+    case cpp2::KillMethod::TERM_WAIT_KILL:
+    case cpp2::KillMethod::KILL:
+    case cpp2::KillMethod::TERM:
+      queue_.blockingWrite(std::move(req));
+      break;
+    default:
+      throw BistroException(
+        "Unknown kill method: ", static_cast<int>(req.method)
+      );
+  }
+}
+
+} // namespace detail
+
+}}  // namespace facebook::bistro

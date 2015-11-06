@@ -15,3 +15,12 @@ cpp_unittest(
     srcs = ['test_async_subprocess.cpp'],
     deps = ['@/bistro/bistro/processes:processes'],
 )
+
+cpp_unittest(
+    name = 'test_task_subprocess_queue',
+    srcs = ['test_task_subprocess_queue.cpp'],
+    deps = [
+        '@/bistro/bistro/processes:processes',
+        '@/folly/experimental:test_util',
+    ],
+)

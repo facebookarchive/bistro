@@ -2,8 +2,12 @@ cpp_library(
     name = 'processes',
     srcs = [
         'AsyncReadPipeRateLimiter.cpp',
+        'TaskSubprocessQueue.cpp',
     ],
     deps = [
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/utils:utils_lib',
         '@/folly:subprocess',
         '@/wangle:wangle',
     ],

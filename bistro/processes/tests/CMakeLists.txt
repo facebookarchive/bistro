@@ -1,3 +1,4 @@
 add_gtest(test_async_read_pipe lib_bistro_processes)
 add_gtest(test_async_read_pipe_rate_limiter lib_bistro_processes)
 add_gtest(test_async_subprocess lib_bistro_processes)
+add_gtest(test_task_subprocess_queue lib_bistro_processes)

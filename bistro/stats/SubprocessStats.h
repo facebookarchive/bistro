@@ -12,20 +12,22 @@
 #include <boost/noncopyable.hpp>
 #include <atomic>
 #include <memory>
+#include "bistro/bistro/if/gen-cpp2/common_types.h"
 
 namespace facebook { namespace bistro {
 
+struct SubprocessSystem {
+  // cpu
+  uint64_t numberCpuCores{0};
+  // memory
+  uint64_t rssMBytes{0};
+};
+
 struct SubprocessUsage {
   // cpu
-  uint64_t userCpu;
-  uint64_t sysCpu;
-  uint64_t totalCpu;
+  double numberCpuCores{0.};
   // memory
-  uint64_t rssBytes;
-  uint64_t totalBytes;
-  // network
-  uint64_t rxBytesPerSec;
-  uint64_t txBytesPerSec;
+  double rssMBytes{0.};
 };
 
 /**
@@ -38,7 +40,7 @@ class SubprocessStatsGetter {
    virtual ~SubprocessStatsGetter() {}
    // first call, should be done before getUsage
    // returns linux system err or 0 on success
-   virtual int initialize() = 0;
+   virtual int getSystem(SubprocessSystem* available) = 0;
    // returns linux system err or 0 on success
    virtual int getUsage(SubprocessUsage* usage) = 0;
 };
@@ -59,11 +61,19 @@ class SubprocessStatsGetterFactory {
 class SubprocessStats : boost::noncopyable {
  public:
   explicit SubprocessStats(std::unique_ptr<SubprocessStatsGetter> getter,
-                           uint32_t updateIntervalSec = 2);
+                           uint32_t updateIntervalSec = 1);
   // explicitly update stats
   int refreshStats();
   // if stats are fresh returns cache, otherwise atomically updates new values
-  SubprocessUsage getStats();
+  SubprocessUsage getUsage();
+  SubprocessSystem getSystem();
+
+  // convert SubprocessUsage to thrift map<PhysicalResources, double>
+  static
+  std::map<cpp2::PhysicalResources, double> convert(const SubprocessUsage&);
+  // convert SubprocessSystem to thrift map<PhysicalResources, int64>
+  static
+  std::map<cpp2::PhysicalResources, double> convert(const SubprocessSystem&);
  private:
   std::unique_ptr<SubprocessStatsGetter> getter_; // getter
   // two storages, one is active and stores the latest stats data

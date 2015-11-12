@@ -21,6 +21,7 @@
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/processes/AsyncReadPipeRateLimiter.h"
+#include "bistro/bistro/stats/SubprocessStats.h"
 
 namespace folly { class dynamic; }
 
@@ -51,6 +52,8 @@ private:
 public:
   using StatusCob =
     std::function<void(const cpp2::RunningTask&, TaskStatus&&)>;
+  using ResourceCob =
+    std::function<void(const cpp2::RunningTask&, SubprocessUsage&&)>;
 
 
   explicit TaskSubprocessQueue(std::unique_ptr<BaseLogWriter>);
@@ -75,6 +78,7 @@ public:
     const boost::filesystem::path& working_dir,  // Start the task here
     // MUST be noexcept and thread-safe; called from some EventBase thread.
     StatusCob status_cob,
+    ResourceCob resource_cob,
     cpp2::TaskSubprocessOptions opts
   );
 
@@ -140,14 +144,17 @@ public:
   // only be used from the EventBase thread of the AsyncSubprocess.
   //
 
-  explicit TaskSubprocessState(cpp2::TaskSubprocessOptions opts);
-  void asyncSubprocessCallback(folly::Subprocess& proc) noexcept;
+  TaskSubprocessState(cpp2::TaskSubprocessOptions opts,
+                      TaskSubprocessQueue::ResourceCob&& resource_cb);
+  void asyncSubprocessCallback(const cpp2::RunningTask& rt,
+                               folly::Subprocess& proc) noexcept;
 
   // Returns true after the signal was actually sent.
   bool wasKilled() const { return wasKilled_; }
 
   // These are used only by TaskSubprocessQueue, stored here for convenience.
   std::unique_ptr<AsyncReadPipeRateLimiter> pipeRateLimiter_;  // Created late
+  std::unique_ptr<SubprocessStats> stats_; // Create late, need subprocess pid
   std::string rawStatus_;
 
   /**
@@ -166,10 +173,28 @@ public:
   const cpp2::TaskSubprocessOptions& opts() const { return opts_; }
 
 private:
+  int64_t getNumPolls() const {
+    // For resource callback invocation asyncSubprocessCallback callback
+    // in event base thread will be used, which got called every opts_.pollMs.
+    // To calculate the number of asyncSubprocessCallback invocations per one
+    // resource callback invocation, we round up the ratio of time intervals,
+    // i.e opts_.refreshResourcesSec and opts_.pollMs.
+    // Protect intervals from zero values, just in case
+
+    // Convert resource callback invocation interval to milliseconds
+    const double resInterval = std::max(1, opts_.refreshResourcesSec) * 1000.;
+    const double pollInterval = std::max(1, opts_.pollMs);
+    // Round up ratio to make sure resource callback invocation happens no
+    // frequently then requested
+    return std::ceil(resInterval / pollInterval);
+  }
+private:
   const cpp2::TaskSubprocessOptions opts_;
   folly::MPMCQueue<cpp2::KillRequest> queue_;
   uint32_t killAfterTicks_{0};  // 0 says 'do not kill'; timer for operator()
   bool wasKilled_{false};
+  TaskSubprocessQueue::ResourceCob resourceCallback_;
+  int64_t numPolls_{0};
 };
 }  // namespace detail
 

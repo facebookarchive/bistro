@@ -8,25 +8,22 @@
  *
  */
 #include <gtest/gtest.h>
-#include "bistro/bistro/stats/SubprocessStats.h"
+#include "bistro/bistro/stats/test/utils.h"
 #include <thread>
 
 using namespace facebook::bistro;
 
 namespace {
 
-void checkUsage(const SubprocessUsage& usage) {
-  EXPECT_GE(usage.rssBytes, 0);
-  EXPECT_LE(usage.rssBytes, 4*1024*1024*1024ULL);
-  EXPECT_GE(usage.totalBytes, 0);
-  EXPECT_LE(usage.totalBytes, 256*1024*1024*1024ULL);
+SubprocessStatsChecker statsChecker;
 
-  EXPECT_GE(usage.userCpu, 0);
-  EXPECT_LE(usage.userCpu, 32);
-  EXPECT_GE(usage.sysCpu, 0);
-  EXPECT_LE(usage.sysCpu, 32);
-  EXPECT_GE(usage.totalCpu, 0);
-  EXPECT_LE(usage.totalCpu, 32);
+void checkUsage(const SubprocessUsage& usage, bool logging) {
+  statsChecker.checkLimits(usage);
+  if (logging) {
+    LOG(INFO) << "Current usage"
+              << ", numberCpuCores: " << usage.numberCpuCores
+              << ", rssMBytes: " << usage.rssMBytes;
+  }
 }
 
 void threadFunction(int rounds,
@@ -36,7 +33,7 @@ void threadFunction(int rounds,
     std::this_thread::yield();
   }
   while (rounds-- > 0) {
-    checkUsage(processor.getStats());
+    checkUsage(processor.getUsage(), false);
     std::this_thread::yield();
   }
 }
@@ -47,13 +44,23 @@ TEST(TestSubprocessStats, HandleNew) {
   auto getter = SubprocessStatsGetterFactory::get();
   EXPECT_NE(getter.get(), nullptr);
   SubprocessStats processor(std::move(getter));
-  checkUsage(processor.getStats());
+  const int kRounds = 2;
+  for (auto idx = 0; idx < kRounds; ++idx ) {
+    // consume cpu cycles for 1 second
+    const auto until = time(nullptr) + 1;
+    double sum = 0.0;
+    while (time(nullptr) < until) {
+      sum += std::exp(std::log(time(nullptr)));
+    }
+    CHECK(sum > 0.0);
+    checkUsage(processor.getUsage(), true);
+  }
 }
 
 TEST(MutiThreadTestSubprocessStats, HandleNew) {
   auto getter = SubprocessStatsGetterFactory::get();
   SubprocessStats processor(std::move(getter));
-  const int kRounds = 4*1024*1024;
+  const int kRounds = 4*1024;
   std::atomic<bool> started(false);
   // hold threads
   std::thread tOne([&]() {

@@ -89,6 +89,13 @@ cpp2::BistroWorker makeWorker(
   worker.id.rand = folly::Random::rand64(folly::ThreadLocalPRNG());
   worker.heartbeatPeriodSec = FLAGS_heartbeat_period_sec;
   worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
+
+  // get machine resources
+  auto getter = SubprocessStatsGetterFactory::get();
+  CHECK(getter.get());
+  SubprocessStats stats(std::move(getter));
+  worker.totalResources = SubprocessStats::convert(stats.getSystem());
+
   LOG(INFO) << "Worker is ready: " << debugString(worker);
   log_state_transition_fn("initializing", worker, nullptr);
   return worker;
@@ -273,6 +280,15 @@ void BistroWorkerHandler::runTask(
         TaskID{rt.job, rt.node}, std::move(status)
       ));
       logStateTransitionFn_("completed_task", worker_, &rt);
+    },
+    [this](const cpp2::RunningTask& rt, SubprocessUsage&& usage) {
+      SYNCHRONIZED(runningTasks_) {
+        auto it = runningTasks_.find({rt.job, rt.node});
+        CHECK (it != runningTasks_.end()) << "Not found running task"
+                                          << ", job: " << rt.job
+                                          << ", node: " << rt.node;
+        it->second.physicalResources = SubprocessStats::convert(usage);
+      }
     },
     opts
   );

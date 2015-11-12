@@ -8,6 +8,7 @@ cpp_library(
         '@/bistro/bistro/if:if-cpp2',
         '@/bistro/bistro/statuses:statuses_lib',
         '@/bistro/bistro/utils:utils_lib',
+        '@/bistro/bistro/stats:subprocess_stats_lib',
         '@/folly:subprocess',
         '@/wangle:wangle',
     ],

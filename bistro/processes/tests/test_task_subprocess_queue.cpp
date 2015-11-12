@@ -13,6 +13,7 @@
 #include <folly/json.h>
 
 #include "bistro/bistro/processes/TaskSubprocessQueue.h"
+#include "bistro/bistro/stats/test/utils.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/LogWriter.h"
 
@@ -60,11 +61,22 @@ DECLARE_int32(task_thread_pool_size);
 using namespace facebook::bistro;
 using Clock = std::chrono::high_resolution_clock;
 using TimePoint = std::chrono::time_point<Clock>;
+
+namespace { // anonymous
+
+SubprocessStatsChecker statsChecker;
+
+void checkUsageLimits(const SubprocessUsage& usage) {
+  statsChecker.checkLimits(usage);
+}
+
 double timeDiff(TimePoint a, TimePoint b) {
   return
     std::chrono::duration_cast<std::chrono::duration<double>>(a - b).count();
 }
 double timeSince(TimePoint t) { return timeDiff(Clock::now(), t); }
+
+}
 
 struct TestLogWriter : public BaseLogWriter {
   struct TaskLogs {
@@ -175,6 +187,11 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
             (*status.data()).at("exception").asString()
           );
         },
+        [](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+          EXPECT_EQ("job", rt.job);
+          EXPECT_EQ("node", rt.node);
+          checkUsageLimits(usage);
+        },
         opts
       );
     };
@@ -226,6 +243,11 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
         EXPECT_EQ("job", rt.job);
         EXPECT_EQ("node", rt.node);
         EXPECT_TRUE(status.isDone());
+      },
+      [](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+        EXPECT_EQ("job", rt.job);
+        EXPECT_EQ("node", rt.node);
+        checkUsageLimits(usage);
       },
       opts
     );
@@ -307,6 +329,11 @@ TEST_F(TestTaskSubprocessQueue, NormalRun) {
         EXPECT_EQ("node", rt.node);
         EXPECT_TRUE(status.isDone());
       },
+      [](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+        EXPECT_EQ("job", rt.job);
+        EXPECT_EQ("node", rt.node);
+        checkUsageLimits(usage);
+      },
       cpp2::TaskSubprocessOptions()  // defaults should be ok
     );
     pipe_fd = tsq.statusPipeFdForTest();
@@ -352,6 +379,11 @@ TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
           EXPECT_EQ("job", rt.job);
           EXPECT_EQ(node, rt.node);
           EXPECT_TRUE(status.isDone());
+        },
+        [node](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+          EXPECT_EQ("job", rt.job);
+          EXPECT_EQ(node, rt.node);
+          checkUsageLimits(usage);
         },
         cpp2::TaskSubprocessOptions()  // defaults should be ok
       );
@@ -399,6 +431,11 @@ TEST_F(TestTaskSubprocessQueue, NoStatus) {
           "Failed to read a status",
           (*status.data()).at("exception").asString()
         );
+      },
+      [](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+        EXPECT_EQ("job", rt.job);
+        EXPECT_EQ("node", rt.node);
+        checkUsageLimits(usage);
       },
       cpp2::TaskSubprocessOptions()  // defaults should be ok
     );
@@ -451,6 +488,9 @@ TEST_F(TestTaskSubprocessQueue, FailsToStart) {
           ".* failed to execute /should/not/work/: No such file or directory",
           (*status.data()).at("exception").asString()
         );
+      },
+      [](const cpp2::RunningTask&, SubprocessUsage&& usage){
+        checkUsageLimits(usage);
       },
       cpp2::TaskSubprocessOptions()  // defaults should be ok
     );
@@ -562,6 +602,11 @@ TEST_F(TestTaskSubprocessQueue, RateLimitLog) {
         EXPECT_EQ("job", rt.job);
         EXPECT_EQ("node", rt.node);
         EXPECT_TRUE(status.isDone());
+      },
+      [](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+        EXPECT_EQ("job", rt.job);
+        EXPECT_EQ("node", rt.node);
+        checkUsageLimits(usage);
       },
       opts
     );

@@ -16,10 +16,11 @@ namespace facebook { namespace bistro {
 
 ///////////////////// - SubprocessStatsGetterFactory
 std::unique_ptr<SubprocessStatsGetter>
-SubprocessStatsGetterFactory::get(pid_t pid, int type, bool init) {
-  std::unique_ptr<SubprocessStatsGetter> getter =
-      folly::make_unique<SubprocessStatsSigarGetter>(pid);
-  if (init && getter->initialize() != SIGAR_OK) {
+SubprocessStatsGetterFactory::get(pid_t pid, int, bool init) {
+  SubprocessStatsSigarGetter* obj = new SubprocessStatsSigarGetter(pid);
+  std::unique_ptr<SubprocessStatsGetter> getter(obj);
+  if (init && !obj->initialize()) {
+    LOG(ERROR) << "Cannot initialize SubprocessStatsSigarGetter, pid: " << pid;
     getter.reset();
   }
   return getter;
@@ -34,13 +35,12 @@ SubprocessStats::SubprocessStats(std::unique_ptr<SubprocessStatsGetter> getter,
  , lastUpdateTimeSec_(0)
  , storageIdx_(0)
  , locked_(false) {
-  memset(storage_, 0, sizeof(storage_));
 }
 
 int SubprocessStats::refreshStats() {
   // try to lock
   bool locked = false;
-  if (!locked_.compare_exchange_strong(locked, true)) {
+  if (!(locked = locked_.compare_exchange_strong(locked, true))) {
     LOG(WARNING) << "Cannot get the lock, another thread owns it";
     return 1; // failed to get the lock
   }
@@ -61,11 +61,11 @@ int SubprocessStats::refreshStats() {
     LOG(ERROR) << "Cannot get resources, error code: " << res;
   }
   // release the lock
-  locked_.compare_exchange_strong(locked, false);
+  CHECK(locked_.compare_exchange_strong(locked, false));
   return res;
 }
 
-SubprocessUsage SubprocessStats::getStats() {
+SubprocessUsage SubprocessStats::getUsage() {
   const auto now = time(nullptr);
   const auto lastUpdate = lastUpdateTimeSec_.load();
   // check cache expiration
@@ -74,6 +74,29 @@ SubprocessUsage SubprocessStats::getStats() {
   }
   // return active storage
   return storage_[storageIdx_.load()];
+}
+
+SubprocessSystem SubprocessStats::getSystem() {
+  // getter would cache system resources
+  SubprocessSystem resources;
+  getter_->getSystem(&resources);
+  return resources;
+}
+
+/* static */ std::map<cpp2::PhysicalResources, double>
+SubprocessStats::convert(const SubprocessUsage& usage) {
+  std::map<cpp2::PhysicalResources, double> res;
+  res[cpp2::PhysicalResources::RAM_MBYTES] = usage.rssMBytes;
+  res[cpp2::PhysicalResources::CPU_CORES] = usage.numberCpuCores;
+  return res;
+}
+
+/* static */ std::map<cpp2::PhysicalResources, double>
+SubprocessStats::convert(const SubprocessSystem& resources) {
+  std::map<cpp2::PhysicalResources, double> res;
+  res[cpp2::PhysicalResources::RAM_MBYTES] = resources.rssMBytes;
+  res[cpp2::PhysicalResources::CPU_CORES] = resources.numberCpuCores;
+  return res;
 }
 
 }}

@@ -75,7 +75,7 @@ public:
   explicit BistroHTTPHandlerFactory(HTTPMonitor* monitor)
     : monitor_(monitor) {}
 
-  void onServerStart() noexcept override {}
+  void onServerStart(folly::EventBase*) noexcept override {}
   void onServerStop() noexcept override {}
 
   proxygen::RequestHandler* onRequest(

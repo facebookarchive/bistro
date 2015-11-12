@@ -17,6 +17,12 @@ const i64 kNotALineID = -1;
 // The current protocol version, by default we reject connections from others.
 const i16 kProtocolVersion = 0;
 
+// Physical resources names - enum
+enum PhysicalResources {
+  RAM_MBYTES = 1,
+  CPU_CORES = 2,
+}
+
 // Both members are required because we keep hundreds of millions of these
 // in memory, and therefore don't want to waste bits on the __isset field.
 struct BackoffDuration {
@@ -79,6 +85,7 @@ struct RunningTask {
   // Disinguish different invocations of the same task.
   5: BistroInstanceID invocationID,
   6: BackoffDuration nextBackoffDuration,  // How long to back off on error
+  7: map<PhysicalResources, double> physicalResources,
 }
 
 // This structure isn't for incoming connections, use ServiceAddress for
@@ -142,6 +149,7 @@ struct BistroWorker {
   // Make it unnecessary to manually set this config for the scheduler.
   5: i32 heartbeatPeriodSec,  // The scheduler adds a grace period
   6: i16 protocolVersion = 0,  // Default must stay at 0
+  7: map<PhysicalResources, double> totalResources, // machine resources
 }
 
 // If you change the defaults, keep in mind that these must be appropriate
@@ -186,6 +194,9 @@ struct TaskSubprocessOptions {
   // the status pipe either, so this hack is entirely optional -- if
   // you're short on FDs, turning it off is harmless.
   5: bool useCanaryPipe = 1
+
+  // Refresh the real resources usage in seconds
+  6: i32 refreshResourcesSec = 2
 }
 
 struct SchedulerHeartbeatResponse {

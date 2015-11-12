@@ -181,13 +181,20 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
     std::move(pipes)
   ));
 
+  // Sets subprocess stats monitoring
+  state->stats_.reset(
+      new SubprocessStats(SubprocessStatsGetterFactory::get(proc.pid()),
+                          state->opts().refreshResourcesSec)
+  );
   // Add callbacks to wait for the subprocess and pipes on the same EventBase.
   collectAll(
     asyncSubprocess(  // Never yields an exception
       evb,
       std::move(proc),
       // Unlike std::bind, explicitly keeps the state alive.
-      [state](folly::Subprocess& p) { state->asyncSubprocessCallback(p); },
+      [rt, state](folly::Subprocess& p) {
+        state->asyncSubprocessCallback(rt, p);
+      },
       std::max(1, state->opts().pollMs)
     ).then([this, rt, state](folly::ProcessReturnCode&& rc) noexcept {
       logEvent(
@@ -279,6 +286,7 @@ void TaskSubprocessQueue::runTask(
     const std::string& job_arg,
     const boost::filesystem::path& working_dir,
     StatusCob status_cob,
+    ResourceCob resource_cob,
     cpp2::TaskSubprocessOptions opts) {
 
   // Set up the task's map entry up-front, because it is a usage error to
@@ -286,7 +294,8 @@ void TaskSubprocessQueue::runTask(
   // before setting up the callbacks, since those expect tasks_ to be ready,
   // and *may* run immediately.  Also, the destructor relies on tasks_ being
   // added to synchronously.
-  auto state = std::make_shared<detail::TaskSubprocessState>(std::move(opts));
+  auto state = std::make_shared<detail::TaskSubprocessState>(std::move(opts),
+      std::move(resource_cob));
   SYNCHRONIZED(tasks_) {
     if (!tasks_.emplace(makeInvocationID(rt), state).second) {
       throw BistroException(
@@ -393,10 +402,15 @@ void TaskSubprocessQueue::kill(
 namespace detail {
 
 // Hardcoded constant: 10 signals per ~10ms seems plenty.
-TaskSubprocessState::TaskSubprocessState(cpp2::TaskSubprocessOptions opts)
-  : opts_(std::move(opts)), queue_(10) {}
+TaskSubprocessState::TaskSubprocessState(cpp2::TaskSubprocessOptions opts,
+  TaskSubprocessQueue::ResourceCob&& resource_cb)
+  : opts_(std::move(opts)),
+    queue_(10),
+    resourceCallback_(std::move(resource_cb)) {
+}
 
 void TaskSubprocessState::asyncSubprocessCallback(
+    const cpp2::RunningTask& rt,
     folly::Subprocess& proc) noexcept {
   int signal = 0;  // No signal
   // Is it time to send a previously scheduled KILL?
@@ -451,6 +465,9 @@ void TaskSubprocessState::asyncSubprocessCallback(
     PLOG_IF(FATAL, ::kill(pid, signal) == -1)
       << "Failed to kill " << pid << " with " << signal;
     wasKilled_ = true;  // Alters "no status" handling, see above.
+  } else if (--numPolls_ <= 0) {
+    numPolls_ = getNumPolls(); // reset number rounds
+    resourceCallback_(rt, std::move(stats_->getUsage()));
   }
 }
 

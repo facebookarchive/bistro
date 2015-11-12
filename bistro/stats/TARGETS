@@ -5,6 +5,7 @@ cpp_library(
     ],
     deps = [
         '@/folly:folly',
+        '@/bistro/bistro/if:common-cpp2',
     ],
     external_deps=[
         ('sigar', 'any'),

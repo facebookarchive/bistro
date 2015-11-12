@@ -162,7 +162,7 @@ public:
   /**
    * Returns current usage stats for child subprocess
    */
-  SubprocessUsage getUsage() noexcept { return stats_.getStats(); }
+  SubprocessUsage getUsage() noexcept { return stats_.getUsage(); }
 
 private:
   /**

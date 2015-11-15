@@ -62,6 +62,9 @@ struct RemoteWorkerState {
       // Avoid MUST_DIE for --lose_unhealthy_worker_after seconds
       timeBecameUnhealthy_(cur_time),
       timeLastGoodHealthcheckSent_(INT64_MIN),  // Unhealthy
+      // Must be updated on every heartbeat, so update{New,Current}Worker do
+      // that.  Cannot set it to `cur_time` here since BistroWorkerHandler
+      // makes a RemoteWorkerState before having sent any heartbeat.
       timeLastHeartbeatReceived_(INT64_MIN),
       notifyIfTasksNotRunningSequenceNum_(0) {
   }

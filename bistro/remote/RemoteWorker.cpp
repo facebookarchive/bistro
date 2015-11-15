@@ -352,6 +352,7 @@ void RemoteWorker::updateNewWorker(
   // of the same running tasks, this logs "lost" followed by "running").
   loseRunningTasks(update);
   *this = RemoteWorker(update->curTime(), w_new);
+  state_.timeLastHeartbeatReceived_ = update->curTime();
   updateState(update);
 }
 

@@ -13,6 +13,7 @@
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/config/Config.h"
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/statuses/TaskStore.h"
 #include "bistro/bistro/utils/Exception.h"
 #include <folly/experimental/AutoTimer.h>

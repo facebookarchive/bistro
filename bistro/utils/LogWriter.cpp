@@ -33,7 +33,7 @@ namespace {
 map<LogTable, const char*> tables = {
   { LogTable::STDERR, "stderr" },
   { LogTable::STDOUT, "stdout" },
-  { LogTable::STATUSES, "statuses" },
+  { LogTable::EVENTS, "statuses" },
 };
 
 }

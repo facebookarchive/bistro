@@ -9,10 +9,11 @@
  */
 #include <gtest/gtest.h>
 
-#include "bistro/bistro/utils/LogLines.h"
-#include "bistro/bistro/utils/LogWriter.h"
 #include "bistro/bistro/sqlite/Database.h"
 #include "bistro/bistro/sqlite/Statement.h"
+#include "bistro/bistro/utils/LogLines.h"
+#include "bistro/bistro/utils/LogWriter.h"
+#include "bistro/bistro/utils/TemporaryFile.h"
 
 using namespace facebook;
 using namespace facebook::bistro;
@@ -25,7 +26,7 @@ DECLARE_int32(log_prune_frequency);
 map<LogTable, string> tables = {
   { LogTable::STDERR, "stderr" },
   { LogTable::STDOUT, "stdout" },
-  { LogTable::STATUSES, "statuses" },
+  { LogTable::EVENTS, "statuses" },
 };
 
 TEST(TestLogWriter, HandleAll) {
@@ -37,7 +38,7 @@ TEST(TestLogWriter, HandleAll) {
     make_tuple(
       LogTable::STDERR, "job2", "node2", vector<string>{"line3", "line4"}),
     make_tuple(
-      LogTable::STATUSES, "job3", "node3", vector<string>{"line5", "line6"}),
+      LogTable::EVENTS, "job3", "node3", vector<string>{"line5", "line6"}),
   };
 
   TemporaryFile db_file;

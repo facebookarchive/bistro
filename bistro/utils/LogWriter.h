@@ -18,7 +18,6 @@
 #include "bistro/bistro/utils/BackgroundThreadMixin.h"
 #include "bistro/bistro/utils/EnumHash.h"
 #include "bistro/bistro/utils/LogLines.h"
-#include "bistro/bistro/utils/ProcessRunner.h"  // for enum class LogTable
 
 #include <folly/Range.h>
 #include <folly/Synchronized.h>
@@ -29,6 +28,12 @@ namespace sqlite {
   class Database;
   class Statement;
 }
+
+enum class LogTable : unsigned char {
+  STDERR = 0,
+  STDOUT = 1,
+  EVENTS = 2,
+};
 
 class BaseLogWriter {
 public:

@@ -118,7 +118,7 @@ struct TestLogWriter : public BaseLogWriter {
           logs->stderr_.push_back(line.str());
         }
         break;
-      case LogTable::STATUSES:
+      case LogTable::EVENTS:
         {
           // Always parse, since it's good to verify we always get valid JSON.
           auto d = folly::parseJson(line);

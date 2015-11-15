@@ -18,6 +18,7 @@
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/flags/Flags.h"
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/monitor/Monitor.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/scheduler/SchedulerPolicy.h"

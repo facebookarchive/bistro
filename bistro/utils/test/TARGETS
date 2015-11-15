@@ -1,14 +1,4 @@
 cpp_unittest(
-    name = 'test_parallel_processor',
-    srcs = [
-        'test_parallel_processor.cpp',
-    ],
-    deps = [
-        '@/common/init:init',
-    ],
-)
-
-cpp_unittest(
     name = 'test_symbol_table',
     srcs = [
         'test_symbol_table.cpp',
@@ -49,29 +39,9 @@ cpp_unittest(
 )
 
 cpp_unittest(
-    name = 'test_process_runner',
-    srcs = [
-        'test_process_runner.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/utils:utils_lib',
-    ],
-)
-
-cpp_unittest(
     name = 'test_log_writer',
     srcs = [
         'test_log_writer.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/utils:utils_lib',
-    ],
-)
-
-cpp_unittest(
-    name = 'test_killable_subprocess',
-    srcs = [
-        'test_killable_subprocess.cpp',
     ],
     deps = [
         '@/bistro/bistro/utils:utils_lib',
@@ -85,5 +55,6 @@ cpp_unittest(
     ],
     deps = [
         '@/bistro/bistro/utils:utils_lib',
+        '@/folly:subprocess',
     ],
 )

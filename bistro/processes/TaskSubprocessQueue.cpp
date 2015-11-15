@@ -97,7 +97,7 @@ void TaskSubprocessQueue::logEvent(
       google::LogMessage(__FILE__, __LINE__, glog_level).stream()
         << "Task " << rt.job << ", " << rt.node << " message: " << msg;
     }
-    logWriter_->write(LogTable::STATUSES, rt.job, rt.node, msg);
+    logWriter_->write(LogTable::EVENTS, rt.job, rt.node, msg);
   } catch (const std::exception& e) {  // Not much to do with this...
     LOG(ERROR) << "Error logging task subprocess message '" << msg
       << "' for task " << apache::thrift::debugString(rt) << ": " << e.what();

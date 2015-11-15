@@ -91,6 +91,12 @@ public:
     return schedulerID_;
   }
 
+  std::unordered_map<std::string, ResourceVector> copyResourcesForUnitTest() {
+    return workerResources_.copy();
+  }
+
+  bool inInitialWaitForUnitTest() { return inInitialWait_.load(); }
+
 // TODO: Make this private once we don't have an FB-specific class
 // inheriting from this.
 protected:

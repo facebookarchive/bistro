@@ -87,14 +87,19 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
     // RemoteWorkerRunner::runTaskImpl() gets to mark the task running in
     // the scheduler *BEFORE* the next updateWorkerResources().  So, there
     // would be no savings by releasing the lock before we are done here.
-    for (const auto& wconn : workers_) {
+    for (const auto& wconn : workers_.workerPool()) {
       const auto& w = wconn.second->getBistroWorker();
-      // Try for hostport, and fallback to hostname
+      // Try for hostport, and fallback to hostname, then shard name
       auto it = config->workerResourcesOverride.find(
         folly::to<string>(w.machineLock.hostname, ':', w.machineLock.port)
       );
       if (it == config->workerResourcesOverride.end()) {
         it = config->workerResourcesOverride.find(w.machineLock.hostname);
+      }
+      if (it == config->workerResourcesOverride.end()) {
+        // I added the shard-name lookup for TestBusiestSelector, but it
+        // seems like a reasonable idea in general.
+        it = config->workerResourcesOverride.find(w.shard);
       }
       if (it == config->workerResourcesOverride.end()) {
         workerResources_[w.shard] = resources;
@@ -172,7 +177,7 @@ LogLines RemoteWorkerRunner::getJobLogs(
   std::vector<std::string> unhealthy_workers;
   std::vector<std::string> lost_workers;
   SYNCHRONIZED_CONST(workers_) {
-    for (const auto& wconn : workers_) {
+    for (const auto& wconn : workers_.workerPool()) {
       const auto& w = wconn.second->getBistroWorker();
       // Instead of trying to fetch logs from unhealthy workers, which can
       // be slow, and degrade the user experience, display a "transient"
@@ -397,6 +402,7 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         // workerResources_.
         config_->remoteWorkerSelectorType
       )->findWorker(
+        config_.get(),
         *job,
         *node,
         workerLevel_,  // Needed for checking worker-level job filters.
@@ -467,7 +473,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
             try {
               client->recv_runTask(state);
             } catch (const cpp2::BistroWorkerException& e) {
-              LOG(ERROR) << "Worker never started task: " << e.message;
+              LOG(ERROR) << "Worker never started task "
+                << debugString(rt) << ": " << e.message;
               // Okay to mark the task "not running" since we know for sure
               // that the worker received & processed our request, and
               // decided not to run it.
@@ -482,8 +489,9 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
               // The task may or may not be running, so do NOT invoke the
               // callback, or the scheduler might schedule duplicate tasks,
               // exceed resource limits, etc.
-              LOG(ERROR) << "The runTask request hit an error, will have to "
-                "poll to find if the task is running: " << e.what();
+              LOG(ERROR) << "The runTask request hit an error on "
+                << debugString(rt) << ", will have to poll to find if the "
+                "task is running: " << e.what();
               SYNCHRONIZED(workers_) {
                 workers_.mutableWorkerOrAbort(worker.shard)
                   ->addUnsureIfRunningTask(rt);

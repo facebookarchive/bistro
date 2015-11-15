@@ -49,11 +49,11 @@ private:
      * Robust iterator: if nextShard_ isn't in the pool, use a random element.
      * If the pool is empty, returns nullptr.
      */
-    const RemoteWorker* getNextWorker() const;
+    const RemoteWorker* getNextWorker();
 
   private:
     const std::string name_;  // for log messages
-    mutable std::string nextShard_;
+    std::string nextShard_;
   };
 
 public:
@@ -63,14 +63,6 @@ public:
   RemoteWorkers(RemoteWorkers&&) = delete;
   RemoteWorkers& operator=(const RemoteWorkers&) = delete;
   RemoteWorkers& operator=(RemoteWorkers&&) = delete;
-
-  RoundRobinWorkerPool::const_iterator begin() const {
-    return workerPool_.begin();
-  }
-
-  RoundRobinWorkerPool::const_iterator end() const {
-    return workerPool_.end();
-  }
 
   folly::Optional<cpp2::SchedulerHeartbeatResponse> processHeartbeat(
     RemoteWorkerUpdate* update,
@@ -99,14 +91,21 @@ public:
   }
 
   // Returns nullptr if no worker is available
-  const RemoteWorker* getNextWorker() const {
+  const RemoteWorker* getNextWorker() {
     return workerPool_.getNextWorker();
   }
 
   // Returns nullptr if no worker is available on that host
   const RemoteWorker* getNextWorkerByHost(
     const std::string &hostname
-  ) { return getHostWorkerPool(hostname).getNextWorker(); }
+  ) { return mutableHostWorkerPool(hostname).getNextWorker(); }
+
+  // The worker pool accessors deliberately cannot use 'getNextWorker', they
+  // are meant only for iterating over the entire pool.
+  const RoundRobinWorkerPool& workerPool() const { return workerPool_; }
+  const RoundRobinWorkerPool& hostWorkerPool(const std::string& hostname) {
+    return mutableHostWorkerPool(hostname);
+  }
 
 private:
   RemoteWorker* getNonConstWorker(const std::string& shard) {
@@ -120,7 +119,7 @@ private:
   /**
    * If hostname isn't found, makes an empty worker pool for more concise code.
    */
-  RoundRobinWorkerPool& getHostWorkerPool(const std::string& hostname);
+  RoundRobinWorkerPool& mutableHostWorkerPool(const std::string& hostname);
 
   RoundRobinWorkerPool workerPool_;
   // Per-host round-robin, with the pointers shared with workerPool_

@@ -1,10 +1,12 @@
 cpp_library(
     name = 'remote_lib',
     srcs = [
+        'BusiestRemoteWorkerSelector.cpp',
         'RemoteWorker.cpp',
         'RemoteWorkers.cpp',
         'RemoteWorkerState.cpp',
         'RemoteWorkerSelector.cpp',
+        'RoundRobinRemoteWorkerSelector.cpp',
     ],
     deps = [
         '@/bistro/bistro/if:if-cpp2',

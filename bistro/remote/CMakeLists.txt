@@ -1,9 +1,11 @@
 add_library(
   lib_bistro_remote STATIC
+  BusiestRemoteWorkerSelector.cpp
   RemoteWorkers.cpp
   RemoteWorker.cpp
   RemoteWorkerState.cpp
   RemoteWorkerSelector.cpp
+  RoundRobinRemoteWorkerSelector.cpp
 )
 bistro_link_libraries(
   lib_bistro_remote

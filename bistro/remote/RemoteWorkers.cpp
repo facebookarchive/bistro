@@ -43,7 +43,7 @@ RemoteWorkers::processHeartbeat(
       std::make_shared<RemoteWorker>(update->curTime(), worker)
     );
     // Add the same pointer to the right host worker pool
-    CHECK(getHostWorkerPool(worker.machineLock.hostname).emplace(
+    CHECK(mutableHostWorkerPool(worker.machineLock.hostname).emplace(
       shard, res.first->second
     ).second) << "Worker pool for hostname " << worker.machineLock.hostname
       << " already had " << " shard " << shard;
@@ -56,10 +56,10 @@ RemoteWorkers::processHeartbeat(
   if (new_hostname != old_hostname) {
     // This might "invalidate" the nextShard_ iterator, but it's okay
     // since the getNextWorker() implementation is robust.
-    CHECK(1 == getHostWorkerPool(old_hostname).erase(shard))
+    CHECK(1 == mutableHostWorkerPool(old_hostname).erase(shard))
       << "Inconsistency: did not find shard " << shard
       << " in the worker pool for its hostname " << old_hostname;
-    CHECK(getHostWorkerPool(new_hostname).emplace(
+    CHECK(mutableHostWorkerPool(new_hostname).emplace(
       shard, worker_it->second
     ).second)
       << "Changing hostname " << old_hostname << " to " << new_hostname
@@ -83,7 +83,7 @@ void RemoteWorkers::updateState(RemoteWorkerUpdate* update) {
 }
 
 const RemoteWorker*
-RemoteWorkers::RoundRobinWorkerPool::getNextWorker() const {
+RemoteWorkers::RoundRobinWorkerPool::getNextWorker() {
 
   if (this->empty()) {
     LOG(WARNING) << "No workers in the '" << name_ << "' pool";
@@ -99,7 +99,7 @@ RemoteWorkers::RoundRobinWorkerPool::getNextWorker() const {
 }
 
 RemoteWorkers::RoundRobinWorkerPool&
-    RemoteWorkers::getHostWorkerPool(const string& host) {
+    RemoteWorkers::mutableHostWorkerPool(const string& host) {
 
   auto host_worker_it = hostToWorkerPool_.find(host);
   if (host_worker_it == hostToWorkerPool_.end()) {

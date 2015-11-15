@@ -41,14 +41,14 @@ TEST(TestRemoteWorkers, ProtocolMismatch) {
   // Mismatched version
   worker.protocolVersion = -1;
   EXPECT_THROW(r.processHeartbeat(&update, worker), std::runtime_error);
-  EXPECT_TRUE(r.begin() == r.end());
+  EXPECT_TRUE(r.workerPool().begin() == r.workerPool().end());
 
   // Matched version
   worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
   auto res = r.processHeartbeat(&update, worker);
   EXPECT_TRUE(res.hasValue());
-  EXPECT_FALSE(r.begin() == r.end());
-  EXPECT_TRUE(++r.begin() == r.end());
+  EXPECT_FALSE(r.workerPool().begin() == r.workerPool().end());
+  EXPECT_TRUE(++r.workerPool().begin() == r.workerPool().end());
   EXPECT_NE(nullptr, r.getWorker(worker.shard));
 }
 
@@ -121,7 +121,7 @@ TEST(TestRemoteWorkers, WorkerPools) {
 
     // iterator
     IDSet iter_ids;
-    for (const auto& rw : r) {
+    for (const auto& rw : r.workerPool()) {
       iter_ids.emplace(rw.second->getBistroWorker().id);
     }
     EXPECT_EQ(expected_ids, iter_ids);

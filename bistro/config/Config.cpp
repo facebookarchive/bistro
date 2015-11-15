@@ -290,6 +290,9 @@ Config::Config(const dynamic& d)
       // when using the "busiest" worker selection strategy.
       resourceIDToWeight.resize(resource_id + 1, 0);
       if (auto* weight_ptr = pair.second.get_ptr("weight")) {
+        if (!weight_ptr->isInt() || weight_ptr->asInt() < 0) {
+          throw BistroException("Resource weight must be an integer >= 0");
+        }
         resourceIDToWeight[resource_id] = weight_ptr->asInt();
       }
       auto& r = resourcesByLevel[level_id];

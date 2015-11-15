@@ -34,7 +34,8 @@ public:
 
   virtual ~RemoteWorkerSelector();
 
-  TaskRunnerResponse findWorker(
+  virtual TaskRunnerResponse findWorker(
+    const Config* config,
     const Job& job,
     const Node& node,
     int worker_level,
@@ -42,20 +43,15 @@ public:
     WorkerResources* worker_resources,
     RemoteWorkers* workers,
     cpp2::BistroWorker* found_worker,
+    // getNotifyIfTasksNotRunningSequenceNum() from the chosen worker.
     int64_t* did_not_run_sequence_num
-  ) noexcept;
+  ) noexcept = 0;
 
-//  virtual XXX = 0;
-
-protected:
-  // Tries to run the given job on the given worker, subject to available
-  // worker resource.  If it's possible, returns true and updates the
-  // passed-in worker resources.
-  bool tryToRun(
+  // Check whether the job's filters prevent it from running on this worker.
+  static bool jobCanRunOnWorker(
     const Job& job,
     const cpp2::BistroWorker& worker,
-    int worker_level,
-    WorkerResources* worker_resources
+    int worker_level
   ) noexcept;
 };
 

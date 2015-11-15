@@ -90,7 +90,7 @@ struct TestLogWriter : public BaseLogWriter {
   using TaskLogMap = std::map<std::pair<std::string, std::string>, TaskLogs>;
 
   explicit TestLogWriter(
-    TaskLogMap* tlm = nullptr, bool print_logs = true
+    folly::Synchronized<TaskLogMap>* tlm = nullptr, bool print_logs = true
   ) : taskToLogs_(tlm), printLogs_(print_logs) {}
 
   void write(
@@ -99,24 +99,29 @@ struct TestLogWriter : public BaseLogWriter {
     const std::string& node,
     folly::StringPiece line
   ) override {
-    auto* logs =
-      taskToLogs_ ? &((*taskToLogs_)[std::make_pair(job, node)]) : nullptr;
+    auto record_logs_fn = [&](std::function<void(TaskLogs*)> cob) {
+      if (taskToLogs_) {
+        SYNCHRONIZED(task_to_logs, *taskToLogs_) {
+          cob(&(task_to_logs[std::make_pair(job, node)]));
+        }
+      }
+    };
     switch (table) {
       case LogTable::STDOUT:
         if (printLogs_) {
           LOG(INFO) << "stdout: " << job << " / " << node << ": " << line;
         }
-        if (logs) {
+        record_logs_fn([line](TaskLogs* logs) {
           logs->stdout_.push_back(line.str());
-        }
+        });
         break;
       case LogTable::STDERR:
         if (printLogs_) {
           LOG(INFO) << "stderr: " << job << " / " << node << ": " << line;
         }
-        if (logs) {
+        record_logs_fn([line](TaskLogs* logs) {
           logs->stderr_.push_back(line.str());
-        }
+        });
         break;
       case LogTable::EVENTS:
         {
@@ -142,10 +147,10 @@ struct TestLogWriter : public BaseLogWriter {
           }
 
           // Don't log since TaskSubprocessQueue::logEvent already does.
-          if (logs) {
+          record_logs_fn([&d](TaskLogs* logs) {
             logs->events_.push_back(std::move(d));
             logs->eventTimes_.push_back(Clock::now());
-          }
+          });
         }
         break;
       default:
@@ -153,8 +158,9 @@ struct TestLogWriter : public BaseLogWriter {
     }
   }
 
-  TaskLogMap* taskToLogs_;
-  bool printLogs_;
+  // write() is required to be thread-safe
+  folly::Synchronized<TaskLogMap>* taskToLogs_;
+  const bool printLogs_;
 };
 
 struct TestTaskSubprocessQueue : public ::testing::Test {
@@ -218,7 +224,7 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
       cpp2::KillRequest kill_req,
       int initial_sleep,
       int post_kill_sleep,
-      TestLogWriter::TaskLogMap* task_to_logs = nullptr) {
+      folly::Synchronized<TestLogWriter::TaskLogMap>* task_to_logs = nullptr) {
     cpp2::RunningTask rt;
     rt.job = "job";
     rt.node = "node";
@@ -314,7 +320,7 @@ TEST_F(TestTaskSubprocessQueue, NormalRun) {
     "/bin/sh", "-c",
     "sleep 1; echo stdout; echo stderr 1>&2; echo done > $2", "test_sh"
   };
-  TestLogWriter::TaskLogMap task_to_logs;
+  folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
 
   int pipe_fd = -1;
   {
@@ -343,12 +349,14 @@ TEST_F(TestTaskSubprocessQueue, NormalRun) {
   EXPECT_LE(1.0, timeSince(startTime_));
 
   // Exhaustively check the process's log outputs & events
-  EXPECT_EQ(1, task_to_logs.size());
-  // The base command should get 3 arguments appended to it:
-  cmd.insert(cmd.end(), {
-    "node", folly::to<std::string>("/dev/fd/", pipe_fd), "json_arg"
-  });
-  checkNormalTaskLogs(task_to_logs[std::make_pair("job", "node")], cmd, rt);
+  SYNCHRONIZED(task_to_logs) {
+    EXPECT_EQ(1, task_to_logs.size());
+    // The base command should get 3 arguments appended to it:
+    cmd.insert(cmd.end(), {
+      "node", folly::to<std::string>("/dev/fd/", pipe_fd), "json_arg"
+    });
+    checkNormalTaskLogs(task_to_logs[std::make_pair("job", "node")], cmd, rt);
+  }
 }
 
 // A multi-task clone of NormalRun
@@ -359,7 +367,7 @@ TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
     "/bin/sh", "-c",
     "sleep 1; echo stdout; echo stderr 1>&2; echo done > $2", "test_sh"
   };
-  TestLogWriter::TaskLogMap task_to_logs;
+  folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
   // The general case: many processes per threads, more than one thread.
   FLAGS_task_thread_pool_size = 2;
   const int32_t kNumTasks = 10;
@@ -395,17 +403,19 @@ TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
   EXPECT_LE(1.0, timeSince(startTime_));
 
   // Exhaustively check all the processes' log outputs & events
-  EXPECT_EQ(kNumTasks, task_to_logs.size());
-  for (int i = 0; i < kNumTasks; ++i) {
-    auto node = folly::to<std::string>("node", i);
-    auto full_cmd = cmd;
-    // The base command should get 3 arguments appended to it:
-    full_cmd.insert(full_cmd.end(), {
-      node, folly::to<std::string>("/dev/fd/", pipe_fd), "json_arg"
-    });
-    checkNormalTaskLogs(
-      task_to_logs[std::make_pair("job", node)], full_cmd, rt
-    );
+  SYNCHRONIZED(task_to_logs) {
+    EXPECT_EQ(kNumTasks, task_to_logs.size());
+    for (int i = 0; i < kNumTasks; ++i) {
+      auto node = folly::to<std::string>("node", i);
+      auto full_cmd = cmd;
+      // The base command should get 3 arguments appended to it:
+      full_cmd.insert(full_cmd.end(), {
+        node, folly::to<std::string>("/dev/fd/", pipe_fd), "json_arg"
+      });
+      checkNormalTaskLogs(
+        task_to_logs[std::make_pair("job", node)], full_cmd, rt
+      );
+    }
   }
 }
 
@@ -514,7 +524,7 @@ TEST_F(TestTaskSubprocessQueue, TermWithStatusExited) {
 }
 
 TEST_F(TestTaskSubprocessQueue, TermWaitKillWithStatusKilled) {
-  TestLogWriter::TaskLogMap task_to_logs;
+  folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
   // The SIGTERM 'trap' callback will be SIGKILLed while it sleeps.
   // Sleep 2 seconds, or 2 seconds after TERM
   cpp2::KillRequest req;
@@ -524,56 +534,58 @@ TEST_F(TestTaskSubprocessQueue, TermWaitKillWithStatusKilled) {
   EXPECT_LE(2.0, timeSince(startTime_));  // The original 2-second sleep runs.
 
   // Validate the event log and capture soft-kill timings
-  TimePoint process_exit_time, pipes_closed_time;
-  EXPECT_EQ(1, task_to_logs.size());
-  auto& logs = task_to_logs[std::make_pair("job", "node")];
-  EXPECT_EQ(0, logs.stdout_.size());
-  EXPECT_EQ(0, logs.stderr_.size());
-  size_t event_idx = 0;
-  for (auto& expected_event : std::vector<folly::dynamic>{
-    folly::dynamic::object
-      ("event", "running")
-      ("command", {}),  // I'm too lazy to check the command's contents.
-    folly::dynamic::object
-      ("event", "process_exited")
-      ("raw_status", "done")
-      // Since the task produced its own status, Bistro treats it as if it
-      // succeded -- this message is the only evidence of the SIGKILL.
-      ("message", "killed by signal 9"),
-    folly::dynamic::object
-      ("event", "task_pipes_closed")
-      ("raw_status", "done"),
-    folly::dynamic::object
-      ("event", "got_status")
-      ("raw_status", "done")
-      ("status", folly::dynamic::object("result_bits", 4)),
-  }) {
-    auto event = logs.events_[event_idx++];
-    event.erase("worker_host");
-    event.erase("invocation_start_time");
-    event.erase("invocation_rand");
-    if (auto* cmd = event.get_ptr("command")) {
-      cmd->erase(cmd->begin(), cmd->end());
+  SYNCHRONIZED(task_to_logs) {
+    TimePoint process_exit_time, pipes_closed_time;
+    EXPECT_EQ(1, task_to_logs.size());
+    auto& logs = task_to_logs[std::make_pair("job", "node")];
+    EXPECT_EQ(0, logs.stdout_.size());
+    EXPECT_EQ(0, logs.stderr_.size());
+    size_t event_idx = 0;
+    for (auto& expected_event : std::vector<folly::dynamic>{
+      folly::dynamic::object
+        ("event", "running")
+        ("command", {}),  // I'm too lazy to check the command's contents.
+      folly::dynamic::object
+        ("event", "process_exited")
+        ("raw_status", "done")
+        // Since the task produced its own status, Bistro treats it as if it
+        // succeded -- this message is the only evidence of the SIGKILL.
+        ("message", "killed by signal 9"),
+      folly::dynamic::object
+        ("event", "task_pipes_closed")
+        ("raw_status", "done"),
+      folly::dynamic::object
+        ("event", "got_status")
+        ("raw_status", "done")
+        ("status", folly::dynamic::object("result_bits", 4)),
+    }) {
+      auto event = logs.events_[event_idx++];
+      event.erase("worker_host");
+      event.erase("invocation_start_time");
+      event.erase("invocation_rand");
+      if (auto* cmd = event.get_ptr("command")) {
+        cmd->erase(cmd->begin(), cmd->end());
+      }
+      EXPECT_EQ(expected_event, event);
+      if (event["event"] == "process_exited") {
+        process_exit_time = logs.eventTimes_[event_idx - 1];
+      }
+      if (event["event"] == "task_pipes_closed") {
+        pipes_closed_time = logs.eventTimes_[event_idx - 1];
+      }
     }
-    EXPECT_EQ(expected_event, event);
-    if (event["event"] == "process_exited") {
-      process_exit_time = logs.eventTimes_[event_idx - 1];
-    }
-    if (event["event"] == "task_pipes_closed") {
-      pipes_closed_time = logs.eventTimes_[event_idx - 1];
-    }
-  }
-  EXPECT_EQ(event_idx, logs.events_.size());
+    EXPECT_EQ(event_idx, logs.events_.size());
 
-  // Check soft-kill timings
-  EXPECT_NE(TimePoint(), process_exit_time);  // initialized
-  EXPECT_NE(TimePoint(), pipes_closed_time);  // initialized
-  // The SIGKILL happens just over 1 sec after start
-  EXPECT_LE(1.0, timeDiff(process_exit_time, startTime_));
-  // The `sleep` child process waits the full 2 sec, and holds the pipe open.
-  EXPECT_LE(2.0, timeDiff(pipes_closed_time, startTime_));
-  // There should be a good gap between the SIGKILL and the sleep's exit.
-  EXPECT_LE(0.5, timeDiff(pipes_closed_time, process_exit_time));
+    // Check soft-kill timings
+    EXPECT_NE(TimePoint(), process_exit_time);  // initialized
+    EXPECT_NE(TimePoint(), pipes_closed_time);  // initialized
+    // The SIGKILL happens just over 1 sec after start
+    EXPECT_LE(1.0, timeDiff(process_exit_time, startTime_));
+    // The `sleep` child process waits the full 2 sec, and holds the pipe open.
+    EXPECT_LE(2.0, timeDiff(pipes_closed_time, startTime_));
+    // There should be a good gap between the SIGKILL and the sleep's exit.
+    EXPECT_LE(0.5, timeDiff(pipes_closed_time, process_exit_time));
+  }
 }
 
 TEST_F(TestTaskSubprocessQueue, RateLimitLog) {

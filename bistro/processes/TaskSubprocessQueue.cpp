@@ -204,7 +204,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
     }),
     collectAll(pipe_closed_futures).then([this, rt, state](
       std::vector<folly::Try<folly::Unit>>&& all_closed
-    ) {
+    ) noexcept {  // Logs and swallows all exceptions
       for (auto& try_pipe_closed : all_closed) {
         try {
           // DO: Use folly::exception_wrapper once wangle supports it.

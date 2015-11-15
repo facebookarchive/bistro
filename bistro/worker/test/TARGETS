@@ -3,9 +3,11 @@ cpp_library(
     srcs = [
         'BistroWorkerTestThread.cpp',
         'FakeBistroWorkerThread.cpp',
+        'utils.cpp',
     ],
     deps = [
         '@/bistro/bistro/worker:bistro_worker_lib',
+        '@/folly/experimental:test_util',
         '@/thrift/lib/cpp/concurrency:numa2',
         '@/thrift/lib/cpp/util:util',
         '@/thrift/lib/cpp2/util:util',

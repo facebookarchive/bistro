@@ -2,6 +2,7 @@ add_library(
   lib_bistro_worker_test STATIC
   BistroWorkerTestThread.cpp
   FakeBistroWorkerThread.cpp
+  utils.cpp
 )
 bistro_link_libraries(
   lib_bistro_worker_test

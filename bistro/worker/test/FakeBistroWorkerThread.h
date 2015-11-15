@@ -44,7 +44,9 @@ public:
     ssit_(std::make_shared<FakeBistroWorker>()) {
   }
 
-  cpp2::BistroWorker getBistroWorker();
+  cpp2::BistroWorker getBistroWorker() const;
+
+  const std::string& shard() const { return shard_; }
 
 private:
   std::string shard_;

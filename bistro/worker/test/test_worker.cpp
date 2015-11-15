@@ -7,12 +7,10 @@
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
-#include <boost/regex.hpp>
 #include <gtest/gtest.h>
 #include <thread>
 
 #include <folly/dynamic.h>
-#include <folly/experimental/TestUtil.h>
 #include <folly/json.h>
 #include <thrift/lib/cpp2/util/ScopedServerInterfaceThread.h>
 
@@ -21,6 +19,7 @@
 #include "bistro/bistro/if/gen-cpp2/common_constants.h"
 #include "bistro/bistro/server/test/ThriftMonitorTestThread.h"
 #include "bistro/bistro/worker/test/BistroWorkerTestThread.h"
+#include "bistro/bistro/worker/test/utils.h"
 #include "bistro/bistro/utils/LogLines.h"
 #include "bistro/bistro/utils/hostname.h"
 
@@ -59,21 +58,6 @@ struct TestWorker : public ::testing::Test {
   }
 };
 
-// Reads incrementally from fd until the entirety what we have consumed on
-// this run matches the given regex.  Caveat: this can easily consume more
-// than you intended, preventing your next wait from matching.
-void waitForRegexOnFd(folly::test::CaptureFD* fd, const char* regex) {
-  std::string all;
-  do {
-    all += fd->readIncremental();  // So that ChunkCob fires incrementally
-  } while (!boost::regex_match(all, boost::regex(regex)));
-}
-
-void echoChunks(folly::StringPiece s) {
-  if (!s.empty()) {
-    std::cout << "stderr: " << s << std::flush;
-  }
-}
 
 // This is racy (even as written), and basically impossible to get right.
 // There are three things at play: (i) both the worker and the scheduler
@@ -98,7 +82,7 @@ void waitForWorkerHealthy(
 }
 
 TEST_F(TestWorker, HandleNormal) {
-  folly::test::CaptureFD stderr(2, echoChunks);
+  folly::test::CaptureFD stderr(2, printString);
   ThriftMonitorTestThread scheduler;
   BistroWorkerTestThread worker(bind(
     &ThriftMonitorTestThread::getClient, &scheduler, std::placeholders::_1
@@ -159,7 +143,7 @@ TEST_F(TestWorker, HandleNormal) {
 }
 
 TEST_F(TestWorker, HandleKillTask) {
-  folly::test::CaptureFD stderr(2, echoChunks);
+  folly::test::CaptureFD stderr(2, printString);
   ThriftMonitorTestThread scheduler;
   BistroWorkerTestThread worker(bind(
     &ThriftMonitorTestThread::getClient, &scheduler, std::placeholders::_1
@@ -237,7 +221,7 @@ struct FakeBistroScheduler : public virtual cpp2::BistroSchedulerSvIf {
 };
 
 TEST_F(TestWorker, HandleBadProtocolVersion) {
-  folly::test::CaptureFD stderr(2, echoChunks);
+  folly::test::CaptureFD stderr(2, printString);
 
   auto scheduler = std::make_shared<FakeBistroScheduler>();
   apache::thrift::ScopedServerInterfaceThread ssit_(scheduler);

@@ -37,7 +37,7 @@ void FakeBistroWorker::async_tm_getRunningTasks(
   cb->result(tasks);
 }
 
-cpp2::BistroWorker FakeBistroWorkerThread::getBistroWorker() {
+cpp2::BistroWorker FakeBistroWorkerThread::getBistroWorker() const {
   cpp2::BistroWorker worker;
   worker.shard = shard_;
   auto name = getLocalHostName();

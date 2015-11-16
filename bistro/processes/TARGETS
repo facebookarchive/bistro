@@ -2,6 +2,7 @@ cpp_library(
     name = 'processes',
     srcs = [
         'AsyncReadPipeRateLimiter.cpp',
+        'SubprocessOutputWithTimeout.cpp',
         'TaskSubprocessQueue.cpp',
     ],
     deps = [

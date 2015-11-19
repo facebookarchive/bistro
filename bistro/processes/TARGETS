@@ -2,7 +2,6 @@ cpp_library(
     name = 'processes',
     srcs = [
         'AsyncReadPipeRateLimiter.cpp',
-        'SubprocessOutputWithTimeout.cpp',
         'TaskSubprocessQueue.cpp',
     ],
     deps = [
@@ -12,5 +11,20 @@ cpp_library(
         '@/bistro/bistro/stats:subprocess_stats_lib',
         '@/folly:subprocess',
         '@/wangle:wangle',
+        ':subprocess_with_timeout',
+    ],
+)
+
+cpp_library(
+    name = 'subprocess_with_timeout',
+    srcs = [
+        'SubprocessOutputWithTimeout.cpp',
+    ],
+    deps = [
+        '@/folly:subprocess',
+        '@/folly/futures:futures',
+    ],
+    external_deps = [
+        ('libevent', None),
     ],
 )

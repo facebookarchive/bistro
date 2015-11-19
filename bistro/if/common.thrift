@@ -21,6 +21,8 @@ const i16 kProtocolVersion = 0;
 enum PhysicalResources {
   RAM_MBYTES = 1,
   CPU_CORES = 2,
+  GPU_MBYTES = 3,
+  GPU_CORES = 4,
 }
 
 // Both members are required because we keep hundreds of millions of these

@@ -22,22 +22,31 @@ class SubprocessStatsChecker {
      SubprocessSystem available;
      EXPECT_EQ(0, getter->getSystem(&available));
 
-     memoryLimits_.first = 0.0;
-     memoryLimits_.second = available.rssMBytes;
-
-     cpuLimits_.first = 0.0;
-     cpuLimits_.second = available.numberCpuCores;
+     rssMemoryLimits_.first = 0.0;
+     rssMemoryLimits_.second = available.rssMBytes;
+     cpuCoresLimits_.first = 0.0;
+     cpuCoresLimits_.second = available.numberCpuCores;
+     gpuMemoryLimits_.first = 0.0;
+     gpuMemoryLimits_.second = available.gpuMBytes;
+     gpuCoresLimits_.first = 0.0;
+     gpuCoresLimits_.second = available.numberGpuCores;
    }
 
    void checkLimits(const SubprocessUsage& usage) const {
-     EXPECT_GE(usage.rssMBytes, memoryLimits_.first);
-     EXPECT_LE(usage.rssMBytes, memoryLimits_.second);
-     EXPECT_GE(usage.numberCpuCores, cpuLimits_.first);
-     EXPECT_LE(usage.numberCpuCores, cpuLimits_.second);
+     EXPECT_GE(usage.rssMBytes, rssMemoryLimits_.first);
+     EXPECT_LE(usage.rssMBytes, rssMemoryLimits_.second);
+     EXPECT_GE(usage.numberCpuCores, cpuCoresLimits_.first);
+     EXPECT_LE(usage.numberCpuCores, cpuCoresLimits_.second);
+     EXPECT_GE(usage.gpuMBytes, gpuMemoryLimits_.first);
+     EXPECT_LE(usage.gpuMBytes, gpuMemoryLimits_.second);
+     EXPECT_GE(usage.numberGpuCores, gpuCoresLimits_.first);
+     EXPECT_LE(usage.numberGpuCores, gpuCoresLimits_.second);
    }
  private:
-   std::pair<double, double> memoryLimits_;
-   std::pair<double, double> cpuLimits_;
+   std::pair<double, double> rssMemoryLimits_;
+   std::pair<double, double> cpuCoresLimits_;
+   std::pair<double, double> gpuMemoryLimits_;
+   std::pair<double, double> gpuCoresLimits_;
 };
 
 }} // facebook //bistro

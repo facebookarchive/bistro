@@ -19,7 +19,7 @@ cpp_unittest(
 cpp_unittest(
     name = 'test_subprocess_output_with_timeout',
     srcs = ['test_subprocess_output_with_timeout.cpp'],
-    deps = ['@/bistro/bistro/processes:processes'],
+    deps = ['@/bistro/bistro/processes:subprocess_with_timeout'],
 )
 
 cpp_unittest(

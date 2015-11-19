@@ -6,6 +6,7 @@ cpp_library(
     deps = [
         '@/folly:folly',
         '@/bistro/bistro/if:common-cpp2',
+        '@/bistro/bistro/processes:subprocess_with_timeout',
     ],
     external_deps=[
         ('sigar', 'any'),

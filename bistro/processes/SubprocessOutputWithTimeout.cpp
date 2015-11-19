@@ -32,9 +32,10 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
     // Create Subprocess object
     folly::Subprocess proc(cmd, opts);
 
-    // Get local thread event base
-    auto evb = folly::EventBaseManager::get()->getEventBase();
-    CHECK(evb);
+    // We can not use a local thread event base, it can be part of the other
+    // even_base driven system like IOThreadPool
+    folly::EventBase localEvb;
+    auto evb = &localEvb;
 
     // set read callback for pipes
     std::vector<folly::Future<folly::Unit>> pipe_futures;
@@ -112,7 +113,6 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
                << ", err: " << x.what();
   }
 
-  LOG(INFO) << "Subprocess finished, state: " << int(res.state());
   return res;
 }
 

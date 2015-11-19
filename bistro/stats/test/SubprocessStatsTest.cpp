@@ -22,7 +22,9 @@ void checkUsage(const SubprocessUsage& usage, bool logging) {
   if (logging) {
     LOG(INFO) << "Current usage"
               << ", numberCpuCores: " << usage.numberCpuCores
-              << ", rssMBytes: " << usage.rssMBytes;
+              << ", rssMBytes: " << usage.rssMBytes
+              << ", numberGpuCores: " << usage.numberGpuCores
+              << ", gpuMBytes: " << usage.gpuMBytes;
   }
 }
 

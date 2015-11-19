@@ -17,17 +17,25 @@
 namespace facebook { namespace bistro {
 
 struct SubprocessSystem {
-  // cpu
+  // cpu cores
   uint64_t numberCpuCores{0};
-  // memory
+  // RAM (MB)
   uint64_t rssMBytes{0};
+  // gpu cores
+  uint64_t numberGpuCores{0};
+  // gpu memory (MB)
+  uint64_t gpuMBytes{0};
 };
 
 struct SubprocessUsage {
-  // cpu
+  // cpu cores
   double numberCpuCores{0.};
-  // memory
+  // RAM (MB)
   double rssMBytes{0.};
+  // gpu cores
+  double numberGpuCores{0.};
+  // gpu memory (MB)
+  double gpuMBytes{0.};
 };
 
 /**

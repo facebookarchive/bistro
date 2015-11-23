@@ -61,7 +61,7 @@ TEST(TestSubprocessStats, HandleNew) {
 
 TEST(MutiThreadTestSubprocessStats, HandleNew) {
   auto getter = SubprocessStatsGetterFactory::get();
-  SubprocessStats processor(std::move(getter));
+  SubprocessStats processor(std::move(getter), 1, 1);
   const int kRounds = 4*1024;
   std::atomic<bool> started(false);
   // hold threads

@@ -15,27 +15,8 @@
 namespace facebook { namespace bistro {
 
 namespace {
-  // Sigar API doesn't provide the direct method to query network stats.
-  // Way around is to get list of all connections, for each connection get port,
-  // for each port get associated pid, compare with subprocess pid, and if there
-  // is a match=, request stats for that port. This is VERY slow
-
-  // Another approach to read stats from subprocess file
-  // cat /proc/<PID>/net/netstat | grep IpExt
-  // IpExt: InNoRoutes InTruncatedPkts InMcastPkts OutMcastPkts InBcastPkts
-  //        OutBcastPkts InOctets OutOctets InMcastOctets OutMcastOctets
-  //        InBcastOctets OutBcastOctets InCsumErrors
-  // IpExt: 3224 0 42679 42679 96946
-  //        3676 79239769367 79188721747 7089645 7089645
-  //        48172433 611797 0
-  // So we can get InOctets & OutOctets as totally transmitted & received bytes
-  // and calculate the difference
-
-  // For disk IO the following command line (requires root privileges)
-  // sudo iotop -b -n 1 -p <PID>
-  // Total DISK READ:       0.00 B/s | Total DISK WRITE:       0.00 B/s
-  // TID     PRIO  USER  DISK READ  DISK WRITE  SWAPIN      IO    COMMAND
-  // 1827763 be/4  root  0.00 B/s   0.00 B/s    0.00 %      0.00  ...
+  // Sigar API doesn't provide the direct method to query gpu stats.
+  // New approach is to run Nvidia utility "nvidia-smi" and get stats
 
   inline void removeTailNewLine(folly::StringPiece& str) {
     if (!str.empty() && str.back() == '\n') {
@@ -63,9 +44,40 @@ bool SubprocessStatsSigarGetter::initialize() {
     return false;
   }
 
+  if (!initRam() ||
+      !initCpus() ||
+      !initGpus()) {
+    return false;
+  }
+
+  LOG(INFO) << "System setup"
+            << ", cpu cores: " << installed_.numberCpuCores
+            << ", rss Mbytes: " << installed_.rssMBytes
+            << ", gpu cores: " << installed_.numberGpuCores
+            << ", gpu Mbytes: " << installed_.gpuMBytes;
+  // request usage right away because some usage like cpu
+  // can be calculated only as a difference in cpu time spent
+  SubprocessUsage dummy;
+  return 0 == getUsage(&dummy);
+}
+
+bool SubprocessStatsSigarGetter::initRam() {
+  // get system installed RAM
+  sigar_mem_t m;
+  auto res = sigar_mem_get(sigar_, &m);
+  if (res != SIGAR_OK) {
+    LOG(ERROR) << "Failed to call sigar_mem_get, res: " << res;
+    return false;
+  }
+
+  installed_.rssMBytes = m.ram; // ram in MB already
+  return true;
+}
+
+bool SubprocessStatsSigarGetter::initCpus() {
   // get system cpu cores
   sigar_cpu_info_list_t cil;
-  res = sigar_cpu_info_list_get(sigar_, &cil);
+  auto res = sigar_cpu_info_list_get(sigar_, &cil);
   const auto totalNumberCpuCores = cil.number;
   sigar_cpu_info_list_destroy(sigar_, &cil);
 
@@ -78,20 +90,15 @@ bool SubprocessStatsSigarGetter::initialize() {
   }
 
   installed_.numberCpuCores = totalNumberCpuCores;
+  return true;
+}
 
-  // get system installed RAM
-  sigar_mem_t m;
-  res = sigar_mem_get(sigar_, &m);
-  if (res != SIGAR_OK) {
-    LOG(ERROR) << "Failed to call sigar_mem_get, res: " << res;
-    return false;
-  }
-
-  installed_.rssMBytes = m.ram; // ram in MB already
-
+bool SubprocessStatsSigarGetter::initGpus() {
   // get GPU index, memory, persistence mode & accounting mode
+  // returns false only on format changes in nvidia-smi output
+  // otherwise returns true even no GPUs are installed on the machine
   std::vector<std::string> stdOutLines, stdErrLines,
-    queryFields{"index", "memory.total", "persistence_mode", "accounting.mode"};
+    queryFields{"memory.total", "persistence_mode", "accounting.mode"};
   auto retCode = subprocessOutputWithTimeout(
     {"/bin/sh", "-c", folly::to<std::string>(
      "nvidia-smi",
@@ -99,92 +106,53 @@ bool SubprocessStatsSigarGetter::initialize() {
      ' ', "--format=csv,noheader,nounits")
     }, &stdOutLines, &stdErrLines, kSubproccesTimeoutMs);
 
-  installed_.numberGpuCores = 0;
+  uint64_t numberGpuCores = 0;
   if (retCode.exited() && retCode.exitStatus() == 0) {
     uint64_t gpuMBytesTotal = 0;
     // expected output
     /*
-    0, 11519, Enabled, Disabled
-    1, 11519, Enabled, Disabled
-    2, 11519, Enabled, Disabled
+    0, 11519, Enabled, Enabled
+    ...
     */
-    // just get the number of lines and query each gpu separately.
+    // parse each line with the info per GPU.
     std::vector<std::string> stdOut, stdErr;
     for (const auto& line: stdOutLines) {
       std::vector<folly::StringPiece> parts;
       folly::split(", ", line, parts);
       if (parts.size() != queryFields.size()) {
-        LOG(FATAL) << "Invalid number of fields"
+        LOG(ERROR) << "Invalid number of fields"
                    << ", expected: " << queryFields.size()
                    << ", got: " << parts.size()
                    << ", input: " << line;
+        return false;
       } else {
         removeTailNewLine(parts.back());
       }
       // conversion may throw
-      int64_t idx = 0;
       try {
-        idx = folly::to<int64_t>(parts[0]);
-        gpuMBytesTotal += folly::to<int64_t>(parts[1]);
+        gpuMBytesTotal += folly::to<int64_t>(parts[0]);
       } catch (const std::exception& e) {
-        LOG(FATAL) << "Invalid field type format for nvidia-smi"
+        LOG(ERROR) << "Invalid field type format for nvidia-smi"
                    << ", reason: " << e.what()
                    << ", input: " << line;
+        return false;
       }
       // count GPUs, we need only the number of GPUs
-      ++installed_.numberGpuCores;
-      if (parts[2] != "Enabled") {
-        LOG(INFO) << "Enable persistence mode for gpu #" << idx;
-        // enable persistence mode
-        stdOut.clear();
-        stdErr.clear();
-        retCode = subprocessOutputWithTimeout(
-          {"/bin/sh", "-c", folly::to<std::string>(
-           "sudo nvidia-smi", ' ', "-i", ' ', idx,
-           ' ', "-pm ENABLED")
-          }, &stdOut, &stdErr, kSubproccesTimeoutMs);
-        if (retCode.exited() && retCode.exitStatus() == 0) {
-          LOG(INFO) << "Persistence mode is enabled.";
-        } else {
-          LOG(ERROR) << "Cannot enable persistence mode"
-                     << ", reason:" << folly::join(' ', stdErr);
-        }
-      }
-      if (parts[3] != "Enabled") {
-        // enable accounting mode
-        LOG(INFO) << "Enable accounting for gpu #" << idx;
-        stdOut.clear();
-        stdErr.clear();
-        retCode = subprocessOutputWithTimeout(
-          {"/bin/sh", "-c", folly::to<std::string>(
-           "sudo nvidia-smi", ' ', "-i", ' ', idx,
-           ' ', "-am ENABLED")
-          }, &stdOut, &stdErr, kSubproccesTimeoutMs);
-        if (retCode.exited() && retCode.exitStatus() == 0) {
-          LOG(INFO) << "Accounting mode is enabled.";
-        } else {
-          LOG(ERROR) << "Cannot enable accounting mode"
-                     << ", reason:" << folly::join(' ', stdErr);
-        }
+      // check if persistence mode and accounting mode are enabled
+      if (parts[1] == "Enabled" && parts[2] == "Enabled") {
+        ++numberGpuCores;
+      } else {
+        LOG(ERROR) << "Persistence mode and/or Accounting mode are disabled";
       }
     }
-    if (installed_.numberGpuCores) {
-      installed_.gpuMBytes = gpuMBytesTotal / installed_.numberGpuCores;
-    }
-  } else {
-    LOG(INFO) << "Cannot query gpu properties for available gpus"
-              << ", reason: " << folly::join(' ', stdErrLines);
-  }
+    // assign GPU cores
+    installed_.numberGpuCores = numberGpuCores;
 
-  LOG(INFO) << "System setup"
-            << ", cpu cores: " << installed_.numberCpuCores
-            << ", rss Mbytes: " << installed_.rssMBytes
-            << ", gpu cpores: " << installed_.numberGpuCores
-            << ", gpu Mbytes: " << installed_.gpuMBytes;
-  // request usage right away because some usage like cpu
-  // can be calculated only as a difference in cpu time spent
-  SubprocessUsage dummy;
-  return 0 == getUsage(&dummy);
+    if (numberGpuCores) {
+      installed_.gpuMBytes = gpuMBytesTotal / numberGpuCores;
+    }
+  }
+  return true;
 }
 
 int SubprocessStatsSigarGetter::getUsage(SubprocessUsage* usage) {
@@ -244,8 +212,8 @@ int SubprocessStatsSigarGetter::getUsage(SubprocessUsage* usage) {
     folly::ProcessReturnCode retCode = subprocessOutputWithTimeout(
       {"/bin/sh", "-c", folly::to<std::string>(
        "nvidia-smi",
-       ' ', "--query-accounted-apps=", folly::join(',', queryFields),
-       ' ', "--format=csv,noheader,nounits")
+       " --query-accounted-apps=", folly::join(',', queryFields),
+       " --format=csv,noheader,nounits")
       },
       &stdOutLines, &stdErrLines, kSubproccesTimeoutMs);
 
@@ -288,6 +256,12 @@ int SubprocessStatsSigarGetter::getUsage(SubprocessUsage* usage) {
   }
 
   return 0;
+}
+
+void SubprocessStatsSigarGetter::checkSystem() {
+  // Sometimes, GPUs fail and disappear from nvidia-smi on a running system,
+  // so monitor them continuously.
+  initGpus();
 }
 
 int SubprocessStatsSigarGetter::getSystem(SubprocessSystem* available) {

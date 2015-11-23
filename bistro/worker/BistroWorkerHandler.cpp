@@ -89,13 +89,6 @@ cpp2::BistroWorker makeWorker(
   worker.id.rand = folly::Random::rand64(folly::ThreadLocalPRNG());
   worker.heartbeatPeriodSec = FLAGS_heartbeat_period_sec;
   worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
-
-  // get machine resources
-  auto getter = SubprocessStatsGetterFactory::get();
-  CHECK(getter.get());
-  SubprocessStats stats(std::move(getter));
-  worker.totalResources = SubprocessStats::convert(stats.getSystem());
-
   LOG(INFO) << "Worker is ready: " << debugString(worker);
   log_state_transition_fn("initializing", worker, nullptr);
   return worker;
@@ -123,7 +116,8 @@ BistroWorkerHandler::BistroWorkerHandler(
     worker_(makeWorker(addr, locked_port, logStateTransitionFn_)),
     state_(RemoteWorkerState(worker_.id.startTime)),
     gotNewSchedulerInstance_(true),
-    canConnectToMyself_(false) {
+    canConnectToMyself_(false),
+    systemStatsGetter_(SubprocessStatsGetterFactory::get()) {
 
   // No scheduler associated yet, so use a dummy instance ID and timeouts
   schedulerState_->id.startTime = 0;
@@ -565,9 +559,17 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
   }
   try {
     cpp2::SchedulerHeartbeatResponse res;
+    // create a copy of worker and update system resources
+    cpp2::BistroWorker worker(worker_);
+    if (systemStatsGetter_) {
+      SubprocessSystem installed;
+      if (0 == systemStatsGetter_->getSystem(&installed)) {
+        worker.totalResources = SubprocessStats::convert(installed);
+      }
+    }
     schedulerClientFn_(
       folly::EventBaseManager::get()->getEventBase()
-    )->sync_processHeartbeat(res, worker_);
+    )->sync_processHeartbeat(res, worker);
     enforceWorkerSchedulerProtocolVersion(
       worker_.protocolVersion, res.protocolVersion
     );

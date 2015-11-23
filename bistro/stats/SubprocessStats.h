@@ -49,6 +49,9 @@ class SubprocessStatsGetter {
    // first call, should be done before getUsage
    // returns linux system err or 0 on success
    virtual int getSystem(SubprocessSystem* available) = 0;
+   // refresh system stats, usually system stats are constant
+   // however some stats like GPUs can be lost due to nvidia software bugs.
+   virtual void checkSystem() = 0;
    // returns linux system err or 0 on success
    virtual int getUsage(SubprocessUsage* usage) = 0;
 };
@@ -63,15 +66,15 @@ class SubprocessStatsGetterFactory {
 };
 
 /**
- * class is thread safe, and uses internal caching for the frequent calls
- * once cache gets expired the next caller updates stats and swap caches
+ * This class is provides synchronization and caching for a per-PID getter
+ * (which need not be thread-safe). The getter does the actual work of getting
+ * system and per-PID resources.
  **/
 class SubprocessStats : boost::noncopyable {
  public:
   explicit SubprocessStats(std::unique_ptr<SubprocessStatsGetter> getter,
-                           uint32_t updateIntervalSec = 1);
-  // explicitly update stats
-  int refreshStats();
+                           time_t processUpdateIntervalSec = 1,
+                           time_t systemUpdateIntervalSec = 900);
   // if stats are fresh returns cache, otherwise atomically updates new values
   SubprocessUsage getUsage();
   SubprocessSystem getSystem();
@@ -83,16 +86,22 @@ class SubprocessStats : boost::noncopyable {
   static
   std::map<cpp2::PhysicalResources, double> convert(const SubprocessSystem&);
  private:
+   // explicitly update stats
+   int refreshStats(time_t now);
+
+ private:
   std::unique_ptr<SubprocessStatsGetter> getter_; // getter
   // two storages, one is active and stores the latest stats data
   // another gets updated by one thread, if stale data detected
   // and then active index gets swapped
   constexpr static size_t kNumStorages = 2;
   SubprocessUsage storage_[kNumStorages];
-  const uint32_t updateIntervalSec_;
-  std::atomic<uint32_t> lastUpdateTimeSec_;
-  std::atomic<int> storageIdx_; // active storage index
-  std::atomic<bool> locked_; // lock flag
+  const time_t processUpdateIntervalSec_;
+  const time_t systemUpdateIntervalSec_;
+  std::atomic<time_t> lastProcessUpdateTimeSec_{0};
+  std::atomic<time_t> lastSystemUpdateTimeSec_{0};
+  std::atomic<int> storageIdx_{0}; // active storage index
+  std::atomic<bool> locked_{false}; // lock flag
 };
 
 }}

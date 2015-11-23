@@ -29,15 +29,16 @@ SubprocessStatsGetterFactory::get(pid_t pid, int, bool init) {
 
 ///////////////////// - SubprocessStats
 SubprocessStats::SubprocessStats(std::unique_ptr<SubprocessStatsGetter> getter,
-                                 uint32_t updateIntervalSec)
+                                 time_t processUpdateIntervalSec,
+                                 time_t systemUpdateIntervalSec)
  : getter_(std::move(getter))
- , updateIntervalSec_(updateIntervalSec)
- , lastUpdateTimeSec_(0)
- , storageIdx_(0)
- , locked_(false) {
+ , processUpdateIntervalSec_(processUpdateIntervalSec)
+ , systemUpdateIntervalSec_(systemUpdateIntervalSec) {
+   // because getter gets initialized, set lastSystemUpdateTimeSec_ to now
+   lastSystemUpdateTimeSec_ = time(nullptr);
 }
 
-int SubprocessStats::refreshStats() {
+int SubprocessStats::refreshStats(time_t now) {
   // try to lock
   bool locked = false;
   if (!(locked = locked_.compare_exchange_strong(locked, true))) {
@@ -46,7 +47,7 @@ int SubprocessStats::refreshStats() {
   }
 
   // update last time right away
-  lastUpdateTimeSec_.store(time(nullptr));
+  lastProcessUpdateTimeSec_.store(now);
   // get active storage index
   const auto idxActive = storageIdx_.load();
   // calculate passive storage index
@@ -62,15 +63,24 @@ int SubprocessStats::refreshStats() {
   }
   // release the lock
   CHECK(locked_.compare_exchange_strong(locked, false));
+
+  // check system stats, if not up to date
+  const auto lastRefresh = lastSystemUpdateTimeSec_.load();
+  // check cache expiration
+  if (now >= lastRefresh + systemUpdateIntervalSec_) { // stale system check
+    lastSystemUpdateTimeSec_.store(now);
+    getter_->checkSystem();
+  }
+
   return res;
 }
 
 SubprocessUsage SubprocessStats::getUsage() {
   const auto now = time(nullptr);
-  const auto lastUpdate = lastUpdateTimeSec_.load();
+  const auto lastUpdate = lastProcessUpdateTimeSec_.load();
   // check cache expiration
-  if (now >= lastUpdate + updateIntervalSec_) { // stale cache
-    refreshStats();
+  if (now >= lastUpdate + processUpdateIntervalSec_) { // stale cache
+    refreshStats(now);
   }
   // return active storage
   return storage_[storageIdx_.load()];

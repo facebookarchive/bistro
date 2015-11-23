@@ -208,6 +208,9 @@ private:
   // prevents us from sending the heartbeat before the worker's Thrift
   // server is up.
   bool canConnectToMyself_;  // Used only by the heartbeat() thread.
+
+  // Physical resources monitoring
+  std::unique_ptr<SubprocessStatsGetter> systemStatsGetter_;
 };
 
 }}

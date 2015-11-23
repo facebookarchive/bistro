@@ -21,10 +21,16 @@ class SubprocessStatsSigarGetter : public SubprocessStatsGetter {
    ~SubprocessStatsSigarGetter();
 
    int getSystem(SubprocessSystem* available) override;
+   void checkSystem() override;
    int getUsage(SubprocessUsage* usage) override;
 
  private:
   bool initialize();
+
+  bool initRam();
+  bool initCpus();
+  bool initGpus();
+
  private:
   const sigar_pid_t processId_;
   sigar_t* sigar_{nullptr};

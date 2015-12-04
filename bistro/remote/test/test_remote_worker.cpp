@@ -10,14 +10,19 @@
 #include <gtest/gtest.h>
 
 #include <folly/experimental/TestUtil.h>
+#include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/if/gen-cpp2/common_constants.h"
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/remote/RemoteWorker.h"
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 
 using namespace facebook::bistro;
 using namespace folly::test;
+
+using apache::thrift::debugString;
 
 DECLARE_bool(allow_bump_unhealthy_worker);
 DECLARE_int32(unsure_if_running_check_initial_period);
@@ -33,15 +38,34 @@ void expectUpdateEq(const RemoteWorkerUpdate& a, const RemoteWorkerUpdate& b) {
   );
 }
 
+// Copy-pasta'd from worker/test/utils.cpp
+void printString(folly::StringPiece s) {
+  if (!s.empty()) {
+    std::cout << "stderr: " << s << std::flush;
+  }
+}
+
+// Use a non-default scheduler ID in the initial WorkerSetID since
+// RemoteWorker::updateCurrentWorker expects the initial set ID to come from
+// a different scheduler than the current one (with caveats).  This lets
+// most tests use the default 0/0 schedulerID for less code.
+cpp2::WorkerSetID initialSetID() {
+  cpp2::WorkerSetID wid;
+  wid.schedulerID.startTime = 3141592654;
+  return wid;
+}
+
 RemoteWorker initializeWorker(
     int64_t test_time,
     const std::vector<cpp2::RunningTask>& running_tasks) {
 
   cpp2::BistroWorker bw;
   bw.protocolVersion = cpp2::common_constants::kProtocolVersion();
+  bw.id.startTime = 2718281828;  // Make it easier to read WorkerSetIDs
 
   // RemoteWorkers creates a worker whenever it sees a new shard ID.
-  RemoteWorker worker(test_time, bw);
+  RemoteWorker worker(test_time, bw, initialSetID(), cpp2::BistroInstanceID());
+  EXPECT_EQ(initialSetID(), worker.initialWorkerSetID());
   EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
 
   // Check that updateState() requests a health-check & new tasks
@@ -78,24 +102,35 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
   // A healthcheck isn't enough, send a fresh heartbeat.
   RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
 
+  // This is only called on new workers, so the default version of 0 is ok.
+  cpp2::WorkerSetID wid;
+
   // consensus_permits_becoming_healthy is needed to get healthy for the
   // first time.
   EXPECT_TRUE(worker->processHeartbeat(
-    &update, worker->getBistroWorker(), false
+    &update, worker->getBistroWorker(), wid, false
   ).hasValue());
   EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker->getState());
   EXPECT_FALSE(worker->hasBeenHealthy());
 
   // Just as above, but consensus_permits_becoming_healthy is true.
+  // Drive-by test: make sure the worker set ID is echoed correctly.
+  EXPECT_NE(cpp2::BistroInstanceID(), worker->getBistroWorker().id);
+  ASSERT_TRUE(worker->workerSetID().hasValue());
+  EXPECT_EQ(wid, worker->workerSetID())
+    << debugString(wid) << " != " << debugString(*worker->workerSetID());
+  addWorkerIDToHash(&wid.hash, worker->getBistroWorker().id);
+  ++wid.version;
   EXPECT_TRUE(worker->processHeartbeat(
-    &update, worker->getBistroWorker(), true
+    &update, worker->getBistroWorker(), wid, true
   ).hasValue());
+  EXPECT_EQ(wid, worker->workerSetID());
   EXPECT_TRUE(worker->hasBeenHealthy());
   EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker->getState());
 
   // consensus_permits_becoming_healthy isn't needed once we've been healthy
   EXPECT_TRUE(worker->processHeartbeat(
-    &update, worker->getBistroWorker(), false
+    &update, worker->getBistroWorker(), wid, false
   ).hasValue());
   EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker->getState());
 
@@ -104,7 +139,7 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
 }
 
 TEST(TestRemoteWorker, HandleNormal) {
-  CaptureFD stderr(2);  // Don't capture stdout, since gtest errors go there
+  CaptureFD stderr(2, printString);
   int64_t test_time = 0;
 
   auto worker = initializeWorker(test_time, {});
@@ -138,8 +173,10 @@ TEST(TestRemoteWorker, HandleNormal) {
   // Another heartbeat, and it'll be healthy again.
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
+    cpp2::WorkerSetID wid;  // Must increment version to avoid error logs.
+    wid.version = worker.workerSetID()->version + 1;
     EXPECT_TRUE(worker.processHeartbeat(
-      &update, bw, /*permit_becoming_healthy =*/ false
+      &update, bw, wid, /*permit_becoming_healthy =*/ false
     ).hasValue());
     EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
 
@@ -153,13 +190,18 @@ TEST(TestRemoteWorker, HandleNormal) {
 }
 
 TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {
-  CaptureFD stderr(2);  // Don't capture stdout, since gtest errors go there
+  CaptureFD stderr(2, printString);
   int64_t test_time = 0;
 
   cpp2::BistroWorker bw;
   bw.protocolVersion = cpp2::common_constants::kProtocolVersion();
   // The worker has been unhealthy long enough that it's about to be lost.
-  RemoteWorker worker(test_time - FLAGS_lose_unhealthy_worker_after - 1, bw);
+  RemoteWorker worker(
+    test_time - FLAGS_lose_unhealthy_worker_after - 1,
+    bw,
+    initialSetID(),
+    cpp2::BistroInstanceID()
+  );
   EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
 
   // Give it a running task (exercises running task tracking)
@@ -200,7 +242,7 @@ TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {
 
 // Covers all the ways for processHeartbeat to replace the current worker.
 TEST(TestRemoteWorker, WorkerReplacement) {
-  CaptureFD stderr(2);
+  CaptureFD stderr(2, printString);
   int64_t test_time = 0;
 
   // Make a worker with a running task
@@ -222,7 +264,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker.processHeartbeat(
-      &update, bw_new, /*permit_becoming_healthy =*/ true
+      &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ true
     ).hasValue());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_EQ(bw_new, worker.getBistroWorker());
@@ -247,7 +289,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
     EXPECT_FALSE(worker.processHeartbeat(
-      &update, bw_new, /*permit_becoming_healthy =*/ false
+      &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ false
     ).hasValue());
     EXPECT_PCRE_MATCH(glogWarningPattern(), stderr.readIncremental());
     EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
@@ -267,9 +309,9 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
     EXPECT_TRUE(worker.processHeartbeat(
-      &update, bw_new, /*permit_becoming_healthy =*/ true
+      &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ true
     ).hasValue());
-    EXPECT_PCRE_MATCH(glogErrorPattern(), stderr.readIncremental());
+    EXPECT_PCRE_MATCH("E[^\\n]* different rands:.*", stderr.readIncremental());
     EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_EQ(bw_new, worker.getBistroWorker());  // The bad one wins
@@ -298,7 +340,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_FALSE(worker.processHeartbeat(
-      &update, bw_new, /*permit_becoming_healthy =*/ false
+      &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ false
     ).hasValue());
     EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
     EXPECT_EQ(bw_old, worker.getBistroWorker());  // The old one wins
@@ -338,7 +380,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_FALSE(worker.processHeartbeat(
-      &update, bw_new, /*permit_becoming_healthy =*/ true
+      &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ true
     ).hasValue());
     EXPECT_TRUE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
@@ -358,7 +400,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker.processHeartbeat(
-      &update, bw_new, /*permit_becoming_healthy =*/ true
+      &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ true
     ).hasValue());
     EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
@@ -379,7 +421,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker.processHeartbeat(
-      &update, bw_new, /*permit_becoming_healthy =*/ true
+      &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ true
     ).hasValue());
     EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
@@ -412,7 +454,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker.processHeartbeat(
-      &update, bw_old, /*permit_becoming_healthy =*/ true
+      &update, bw_old, cpp2::WorkerSetID(), /*permit_becoming_healthy =*/ true
     ).hasValue());
     EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, worker.getState());
     EXPECT_EQ(bw_old, worker.getBistroWorker());
@@ -432,7 +474,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker.processHeartbeat(
-      &update, bw_new, /*permit_becoming_healthy =*/ true
+      &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ true
     ).hasValue());
     EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
@@ -451,7 +493,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
 // Covers unsure-if-running task checks, and their exponential backoff.
 TEST(TestRemoteWorker, UnsureIfRunning) {
-  CaptureFD stderr(2);
+  CaptureFD stderr(2, printString);
   int64_t test_time = 0;
 
   // Make a worker with a running task
@@ -460,6 +502,8 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
   auto worker = initializeWorker(test_time, {rt});
   makeWorkerHealthy(test_time, &worker);
   const auto& bw = worker.getBistroWorker();
+  cpp2::WorkerSetID wid;  // The version can only increase
+  wid.version = worker.workerSetID()->version + 1;
 
   int p = std::max(1, FLAGS_unsure_if_running_check_initial_period);
   for (int i = 0; i < 3; ++i) {  // Run through thrice to test 2 transitions
@@ -491,7 +535,7 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
 
       RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
       EXPECT_TRUE(worker.processHeartbeat(
-        &update, bw, /*permit_becoming_healthy =*/ false
+        &update, bw, wid, /*permit_becoming_healthy =*/ false
       ).hasValue());
       EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
 
@@ -537,14 +581,16 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
 // Exercise recordRunningTaskStatus, recordFailedTask, and
 // recordNonRunningTaskStatus.
 TEST(TestRemoteWorker, RecordStatuses) {
-  CaptureFD stderr(2);
+  CaptureFD stderr(2, printString);
   int64_t test_time = 0;
 
   // recordNonRunningTaskStatus throws if the worker is in the NEW state
   {
     cpp2::BistroWorker bw;
     bw.protocolVersion = cpp2::common_constants::kProtocolVersion();
-    RemoteWorker worker(test_time, bw);
+    RemoteWorker worker(
+      test_time, bw, initialSetID(), cpp2::BistroInstanceID()
+    );
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_THROW(
       worker.recordNonRunningTaskStatus(

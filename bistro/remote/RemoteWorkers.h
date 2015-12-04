@@ -57,10 +57,13 @@ private:
   };
 
 public:
-  explicit RemoteWorkers(
-    time_t start_time
+  RemoteWorkers(
+    time_t start_time,
+    cpp2::BistroInstanceID scheduler_id
   ) : startTime_(start_time),
+      schedulerID_(std::move(scheduler_id)),
       workerPool_("all workers") {
+    nonMustDieWorkerSetID_.schedulerID = schedulerID_;
   }
 
   RemoteWorkers(const RemoteWorkers&) = delete;
@@ -70,7 +73,8 @@ public:
 
   folly::Optional<cpp2::SchedulerHeartbeatResponse> processHeartbeat(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& worker
+    const cpp2::BistroWorker& worker,
+    const cpp2::WorkerSetID& worker_set_id
   );
 
   void updateState(RemoteWorkerUpdate* update);
@@ -116,6 +120,11 @@ public:
     return mutableHostWorkerPool(hostname);
   }
 
+  // For unit tests
+  cpp2::WorkerSetID nonMustDieWorkerSetID() const {
+    return nonMustDieWorkerSetID_;
+  }
+
 private:
   RemoteWorker* getNonConstWorker(const std::string& shard) {
     auto it = workerPool_.find(shard);
@@ -143,6 +152,15 @@ private:
 
   bool inInitialWait_{true};
   time_t startTime_;  // For the "initial wait" computation
+
+
+  // Temporarily empty, will be populated in future diffs.
+  cpp2::WorkerSetID nonMustDieWorkerSetID_;
+
+
+  // Only used so that RemoteWorkers can decide whether a WorkerSetID they
+  // receive comes from the current scheduler.
+  cpp2::BistroInstanceID schedulerID_;
 
 
   RoundRobinWorkerPool workerPool_;

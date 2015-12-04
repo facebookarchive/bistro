@@ -47,6 +47,7 @@ cpp2::BistroWorker FakeBistroWorkerThread::getBistroWorker() const {
   worker.addr.ip_or_host = ssit_.getAddress().getAddressStr();
   worker.addr.port = port;
   worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
+  worker.id = id_;
   return worker;
 }
 

@@ -14,6 +14,7 @@
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/runners/RemoteWorkerRunner.h"
 #include "bistro/bistro/remote/RemoteWorker.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/statuses/TaskStore.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/server/HTTPMonitor.h"
@@ -38,6 +39,19 @@ struct TestRemoteRunner : public ::testing::Test {
   }
 };
 
+cpp2::BistroInstanceID randInstanceID() {
+  cpp2::BistroInstanceID id;
+  id.startTime = folly::Random::rand64();
+  id.rand = folly::Random::rand64();
+  return id;
+}
+
+cpp2::WorkerSetID workerSetID(const FakeBistroWorkerThread& wt) {
+  cpp2::WorkerSetID ws;  // Leave .version and .schedulerID as default
+  addWorkerIDToHash(&ws.hash, wt.getBistroWorker().id);
+  return ws;
+}
+
 void addFakeWorker(
     RemoteWorkerRunner* runner,
     std::shared_ptr<const Config> config,
@@ -47,7 +61,7 @@ void addFakeWorker(
 
   // Connect the worker to the Runner.
   runner->processWorkerHeartbeat(
-    wt.getBistroWorker(),
+    wt.getBistroWorker(), workerSetID(wt),
     // Cannot use UNIT_TEST_TIME here or elsewhere, since RemoteWorkerRunner
     // has a background thread that calls updateState with the system time.
     RemoteWorkerUpdate()
@@ -73,12 +87,12 @@ void addFakeWorker(
     rt,
     TaskStatus::done(),
     runner->getSchedulerID(),
-    cpp2::BistroInstanceID()
+    wt.getBistroWorker().id
   );
 
   // The minimum worker_check_interval is 1 second, so send another heartbeat.
   runner->processWorkerHeartbeat(
-    wt.getBistroWorker(),
+    wt.getBistroWorker(), workerSetID(wt),
     RemoteWorkerUpdate()
   );
 
@@ -99,7 +113,7 @@ TEST_F(TestRemoteRunner, HandleResources) {
   // Create the worker thread first so that the worker exits *after* the
   // runner does (this avoids harmless error messages about the runner being
   // unable to talk to the worker).
-  FakeBistroWorkerThread worker("test_worker");
+  FakeBistroWorkerThread worker("test_worker", randInstanceID());
 
   const auto kConfig = make_shared<Config>(dynamic::object
     ("enabled", true)
@@ -192,8 +206,8 @@ TEST_F(TestRemoteRunner, TestBusiestSelector) {
   );
 
   // Like in HandleResources, make the workers before making the runner.
-  FakeBistroWorkerThread worker1("w1");
-  FakeBistroWorkerThread worker2("w2");
+  FakeBistroWorkerThread worker1("w1", randInstanceID());
+  FakeBistroWorkerThread worker2("w2", randInstanceID());
 
   auto task_statuses = make_shared<TaskStatuses>(make_shared<NoOpTaskStore>());
   RemoteWorkerRunner runner(task_statuses, shared_ptr<Monitor>());

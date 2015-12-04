@@ -39,9 +39,12 @@ public:
 class FakeBistroWorkerThread {
 
 public:
-  explicit FakeBistroWorkerThread(std::string shard = getLocalHostName()) :
-    shard_(std::move(shard)),
-    ssit_(std::make_shared<FakeBistroWorker>()) {
+  explicit FakeBistroWorkerThread(
+    std::string shard = getLocalHostName(),
+    cpp2::BistroInstanceID id = cpp2::BistroInstanceID()
+  ) : shard_(std::move(shard)),
+      id_(std::move(id)),
+      ssit_(std::make_shared<FakeBistroWorker>()) {
   }
 
   cpp2::BistroWorker getBistroWorker() const;
@@ -50,6 +53,7 @@ public:
 
 private:
   std::string shard_;
+  cpp2::BistroInstanceID id_;
   apache::thrift::ScopedServerInterfaceThread ssit_;
 };
 

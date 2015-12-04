@@ -36,7 +36,8 @@ using namespace apache::thrift;
 RemoteWorkerRunner::RemoteWorkerRunner(
     shared_ptr<TaskStatuses> task_statuses,
     std::shared_ptr<Monitor> monitor)
-  : workers_(folly::construct_in_place, time(nullptr)),
+  : TaskRunner(),  // Initializes schedulerID_
+    workers_(folly::construct_in_place, time(nullptr), schedulerID_),
     workerLevel_(StringTable::NotFound),
     taskStatuses_(task_statuses),
     eventBase_(new folly::EventBase()),
@@ -329,10 +330,11 @@ LogLines RemoteWorkerRunner::getJobLogs(
 
 cpp2::SchedulerHeartbeatResponse RemoteWorkerRunner::processWorkerHeartbeat(
     const cpp2::BistroWorker& worker,
+    const cpp2::WorkerSetID& worker_set_id,
     RemoteWorkerUpdate update) {
 
   // Throws on protocol version mismatch, does not add worker to pool.
-  auto r = workers_->processHeartbeat(&update, worker);
+  auto r = workers_->processHeartbeat(&update, worker, worker_set_id);
   // This will often result in the healthcheck or getRunningTasks arriving
   // before the heartbeat response does (meaning the worker does not yet
   // know the scheduler).  As a result, "new worker" healthchecks are

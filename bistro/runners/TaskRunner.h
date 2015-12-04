@@ -122,6 +122,7 @@ public:
    */
   virtual cpp2::SchedulerHeartbeatResponse processWorkerHeartbeat(
     const cpp2::BistroWorker&,
+    const cpp2::WorkerSetID&,
     RemoteWorkerUpdate update = RemoteWorkerUpdate()
   ) { throw std::logic_error("Not implemented"); }
 

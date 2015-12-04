@@ -16,6 +16,7 @@
 #include "bistro/bistro/remote/RemoteWorker.h"
 #include "bistro/bistro/remote/RemoteWorkers.h"
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 
 using namespace facebook::bistro;
 using namespace folly::test;
@@ -24,28 +25,37 @@ using IDSet = std::set<cpp2::BistroInstanceID>;
 
 DECLARE_int32(CAUTION_startup_wait_for_workers);
 
+cpp2::BistroInstanceID randInstanceID() {
+  cpp2::BistroInstanceID id;
+  id.startTime = folly::Random::rand64();
+  id.rand = folly::Random::rand64();
+  return id;
+}
+
 cpp2::BistroWorker makeWorker(std::string shard) {
   cpp2::BistroWorker worker;
   worker.shard = shard;
   worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
-  worker.id.startTime = folly::Random::rand64();
-  worker.id.rand = folly::Random::rand64();
+  worker.id = randInstanceID();
   return worker;
 }
 
 TEST(TestRemoteWorkers, ProtocolMismatch) {
   auto worker = makeWorker("w");
   RemoteWorkerUpdate update;
-  RemoteWorkers r(0);
+  RemoteWorkers r(0, randInstanceID());
 
   // Mismatched version
   worker.protocolVersion = -1;
-  EXPECT_THROW(r.processHeartbeat(&update, worker), std::runtime_error);
+  EXPECT_THROW(
+    r.processHeartbeat(&update, worker, cpp2::WorkerSetID()),
+    std::runtime_error
+  );
   EXPECT_TRUE(r.workerPool().begin() == r.workerPool().end());
 
   // Matched version
   worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
-  auto res = r.processHeartbeat(&update, worker);
+  auto res = r.processHeartbeat(&update, worker, cpp2::WorkerSetID());
   EXPECT_TRUE(res.hasValue());
   EXPECT_FALSE(r.workerPool().begin() == r.workerPool().end());
   EXPECT_TRUE(++r.workerPool().begin() == r.workerPool().end());
@@ -68,7 +78,7 @@ TEST(TestRemoteWorkers, WorkerPools) {
   // This test mostly does not inspect `update`, since that is supposed to
   // be exhaustively tested by test_remote_worker.cpp.
   RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 0);
-  RemoteWorkers r(0);
+  RemoteWorkers r(0, randInstanceID());
 
   // 3 workers on 2 hosts
   auto w1 = makeWorker("w1");
@@ -86,19 +96,19 @@ TEST(TestRemoteWorkers, WorkerPools) {
   // getNextWorkerByHost
   EXPECT_EQ(
     static_cast<int>(RemoteWorkerState::State::NEW),
-    r.processHeartbeat(&update, w1)->workerState
+    r.processHeartbeat(&update, w1, cpp2::WorkerSetID())->workerState
   );
   EXPECT_EQ(IDSet{w1.id}, dredgeHostPool(r, "host1"));
 
   EXPECT_EQ(
     static_cast<int>(RemoteWorkerState::State::NEW),
-    r.processHeartbeat(&update, w2)->workerState
+    r.processHeartbeat(&update, w2, cpp2::WorkerSetID())->workerState
   );
   EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
 
   EXPECT_EQ(
     static_cast<int>(RemoteWorkerState::State::NEW),
-    r.processHeartbeat(&update, w3)->workerState
+    r.processHeartbeat(&update, w3, cpp2::WorkerSetID())->workerState
   );
   EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
   EXPECT_EQ(IDSet({w3.id}), dredgeHostPool(r, "host2"));
@@ -139,7 +149,7 @@ TEST(TestRemoteWorkers, WorkerPools) {
     );
     EXPECT_EQ(
       static_cast<int>(RemoteWorkerState::State::NEW),
-      r.processHeartbeat(&update2, w1new)->workerState
+      r.processHeartbeat(&update2, w1new, cpp2::WorkerSetID())->workerState
     );
     // Sanity check: w1new should have bumped w1
     EXPECT_EQ(1, update2.suicideWorkers().size());
@@ -167,7 +177,7 @@ const time_t kSafeInitialWait = 27 + 9 + 3 + 1 + 1;
 
 // Check the timeouts with no workers.
 TEST_F(TestRemoteWorkersInitialWait, NoWorkers) {
-  RemoteWorkers r(0);
+  RemoteWorkers r(0, randInstanceID());
   // The last 3 shows that once the wait is over, it can't be turned back on.
   for (time_t t : std::vector<time_t>{0, 1, 5, 39, 40, kSafeInitialWait, 3}) {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, t);
@@ -190,11 +200,11 @@ TEST_F(TestRemoteWorkersInitialWait, OneWorkerWithRunningTasks) {
   // workers will commit suicide first, so use an unsafe one.
   const int kInitialWait = 10;
   FLAGS_CAUTION_startup_wait_for_workers = kInitialWait;
-  RemoteWorkers r(0);
+  RemoteWorkers r(0, randInstanceID());
   auto w = makeWorker("w");
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 0);
-    r.processHeartbeat(&update, w);
+    r.processHeartbeat(&update, w, cpp2::WorkerSetID());
     // processHeartbeat does not set the initial wait message.
     EXPECT_EQ("unknown", update.initialWaitMessage());
   }

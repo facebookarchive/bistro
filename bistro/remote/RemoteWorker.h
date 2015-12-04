@@ -47,13 +47,19 @@ public:
    * Given a heartbeat from a previously unknown worker, make a
    * RemoteWorker.  You should call processHeartbeat after construction.
    */
-  RemoteWorker(int64_t cur_time, const cpp2::BistroWorker& w_new)
-    : worker_(w_new),
+  RemoteWorker(
+    int64_t cur_time,
+    const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id,
+    cpp2::BistroInstanceID scheduler_id
+  ) : worker_(w_new),
       state_(cur_time),
+      initialWorkerSetID_(worker_set_id),
       // New worker: trigger a healthcheck in the next updateState
       timeLastHealthcheckSent_(INT64_MIN),
       timeOfLastUnsureIfRunningCheck_(INT64_MIN),
-      repeatsOfUnsureIfRunningCheck_(0) {
+      repeatsOfUnsureIfRunningCheck_(0),
+      schedulerID_(std::move(scheduler_id)) {
   }
 
   bool isHealthy() const {
@@ -64,6 +70,12 @@ public:
   bool hasBeenHealthy() const { return state_.hasBeenHealthy_; }
   const cpp2::BistroWorker& getBistroWorker() const { return worker_; }
 
+  const folly::Optional<cpp2::WorkerSetID>& workerSetID() const {
+    return workerSetID_;
+  }
+  const cpp2::WorkerSetID& initialWorkerSetID() const {
+    return initialWorkerSetID_;
+  }
 
   /**
    * Returns folly::none if the heartbeat should be rejected. Note that the
@@ -72,6 +84,7 @@ public:
   folly::Optional<cpp2::SchedulerHeartbeatResponse> processHeartbeat(
     RemoteWorkerUpdate* update,
     const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id,
     bool consensus_permits_becoming_healthy  // See README.worker_set_consensus
   );
 
@@ -185,7 +198,8 @@ private:
    */
   void updateNewWorker(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& w_new
+    const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id
   );
 
   /**
@@ -194,6 +208,7 @@ private:
   void updateCurrentWorker(
     RemoteWorkerUpdate* update,
     const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id,
     bool consensus_permits_becoming_healthy
   );
 
@@ -228,6 +243,20 @@ private:
   cpp2::BistroWorker worker_;
   RemoteWorkerState state_;  // Always use setState to change state_.state_.
 
+  // The following fields are only used by the scheduler.
+  //
+  // When a worker instance first connects, its WorkerSetID typically**
+  // belongs to a prior scheduler instance.  We store it to see if the exact
+  // same set of workers will return as was had before.  Set once per worker
+  // instance.
+  //
+  // **In obscure cases, it might come from the *current* scheduler
+  // instance, so remember to handle that reasonably.
+  cpp2::WorkerSetID initialWorkerSetID_;
+  // The most recent copy of this scheduler's nonMustDieWorkerSetID_, which
+  // was returned by this worker.
+  folly::Optional<cpp2::WorkerSetID> workerSetID_;
+
   // TODO(lo-pri): Add exponential backoff to health checks. Otherwise, as
   // we churn workers, we will accumulate a lot of dead shard IDs that we'll
   // health-check pointlessly, wasting resources.  For now, restarts fix it.
@@ -250,6 +279,8 @@ private:
   std::unordered_map<TaskID, cpp2::RunningTask> unsureIfRunningTasks_;
   int64_t timeOfLastUnsureIfRunningCheck_;
   uint8_t repeatsOfUnsureIfRunningCheck_;  // for exponential backoff
+
+  cpp2::BistroInstanceID schedulerID_;
 };
 
 }}

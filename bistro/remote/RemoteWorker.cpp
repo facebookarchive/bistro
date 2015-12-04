@@ -15,6 +15,7 @@
 
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/Exception.h"
 
@@ -70,6 +71,7 @@ folly::Optional<cpp2::SchedulerHeartbeatResponse>
 RemoteWorker::processHeartbeat(
     RemoteWorkerUpdate* update,
     const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id,
     bool consensus_permits_becoming_healthy) {
 
   // We should never get here (since that means the worker is already added
@@ -125,7 +127,7 @@ RemoteWorker::processHeartbeat(
       return folly::none;
     }
     // Ignore consensus_permits_becoming_healthy since it's not relevant.
-    updateNewWorker(update, w_new);
+    updateNewWorker(update, w_new, worker_set_id);
   // A new worker instance at the same IP & port. Easy to handle, since
   // we're pretty sure that the current one is dead -- no need to check
   // health, or tell anyone to commit suicide.
@@ -143,7 +145,7 @@ RemoteWorker::processHeartbeat(
         << ", " << w_new.id.rand;
     }
     // Ignore consensus_permits_becoming_healthy since it's not relevant.
-    updateNewWorker(update, w_new);
+    updateNewWorker(update, w_new, worker_set_id);
   // It's the same worker instance as before, just update the metadata.
   } else {
     // Got a heartbeat from a MUST_DIE worker -- re-request suicide
@@ -151,7 +153,7 @@ RemoteWorker::processHeartbeat(
       update->requestSuicide(w_cur, "Current worker was already lost");
     }
     updateCurrentWorker(
-      update, w_new, consensus_permits_becoming_healthy
+      update, w_new, worker_set_id, consensus_permits_becoming_healthy
     );
   }
   return state_.getHeartbeatResponse();
@@ -364,13 +366,25 @@ bool RemoteWorker::recordNonRunningTaskStatusImpl(
 // since it would be spammy in the "same host, same port, new worker" case.
 void RemoteWorker::updateNewWorker(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& w_new) {
+    const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id) {
 
   // Any previous worker would have been killed, so make sure to lose those
   // running tasks (in the pathological case where the new worker has some
   // of the same running tasks, this logs "lost" followed by "running").
   loseRunningTasks(update);
-  *this = RemoteWorker(update->curTime(), w_new);
+  *this = RemoteWorker(
+    update->curTime(),
+    w_new,
+    worker_set_id,
+    std::move(schedulerID_)
+  );
+  // Read the 'This should never happen' comment in updateCurrentWorker.
+  if (worker_set_id.schedulerID == schedulerID_) {
+    LOG(ERROR) << "The scheduler ID of the initial WorkerSetID of "
+      << debugString(worker_) << " is the same as the current scheduler: "
+      << debugString(worker_set_id);
+  }
   state_.timeLastHeartbeatReceived_ = update->curTime();
   updateState(update, /*the consensus computation wasn't yet done: */ false);
 }
@@ -378,9 +392,57 @@ void RemoteWorker::updateNewWorker(
 void RemoteWorker::updateCurrentWorker(
     RemoteWorkerUpdate* update,
     const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id,
     bool consensus_permits_becoming_healthy) {
 
   worker_ = w_new;
+  // The scheduler might get a stale heartbeat containing a WorkerSetID from
+  // before this worker adopted this scheduler's worker set versioning.
+  // This would wreak havoc, so avoid it.
+  //
+  // NB: This isn't called from BistroWorkerHandler, so no worries about that.
+  if (worker_set_id.schedulerID == schedulerID_) {
+    // This should never happen, but I cannot quite rule it out. Roughly
+    // speaking, this means that the first time this worker instance
+    // connected (as far as the scheduler is concerned), it was already
+    // associated with this scheduler.  In this case, logging and doing
+    // nothing matches the behavior of the updateNewWorker() code path.  In
+    // particular, that means we preserve the invariant that workerSetID_ is
+    // always a later version than initialWorkerSetID_, and always contains
+    // the present worker.
+    if (worker_set_id.schedulerID == initialWorkerSetID_.schedulerID
+        && !WorkerSetIDEarlierThan()(
+          initialWorkerSetID_.version, worker_set_id.version
+        )) {
+      LOG(ERROR) << "The scheduler ID of the initial WorkerSetID of "
+        << debugString(worker_) << " is the same as the current scheduler: "
+        << debugString(initialWorkerSetID_) << " -- ignoring the current "
+        << "WorkerSetID since it is not later than the initial: "
+        << debugString(worker_set_id);
+    // Only increase the version, since the worker only increases its
+    // internal versions.  A decrease means out-of-order arrival.
+    //
+    // NB: This criterion could be used to discard all such heartbeats, but
+    // the extra complexity isn't worth the dubious gain.
+    } else if (!workerSetID_.hasValue() || WorkerSetIDEarlierThan()(
+      workerSetID_->version, worker_set_id.version
+    )) {
+      workerSetID_ = worker_set_id;
+    } else if (workerSetID_->version == worker_set_id.version) {
+      CHECK(*workerSetID_ == worker_set_id)
+        << debugString(*workerSetID_) << " != " << debugString(worker_set_id);
+    } else {  // This can happen occasionally (e.g. under heavy load).
+      LOG(WARNING) << "Ignoring out-of-order WorkerSetID -- current: "
+        << debugString(*workerSetID_) << ", new: "
+        << debugString(worker_set_id);
+    }
+  // This equality will hold just after the RemoteWorker was first created,
+  // but any other kind of mismatch should not happen, so log those.
+  } else if (worker_set_id != initialWorkerSetID_) {
+    LOG(ERROR) << "Scheduler " << debugString(schedulerID_) << " got "
+      << "a heartbeat with a WorkerSetID whose schedulerID does not match: "
+      << debugString(w_new) << " / " << debugString(worker_set_id);
+  }
   state_.timeLastHeartbeatReceived_ = update->curTime();
   updateState(update, consensus_permits_becoming_healthy);
 }

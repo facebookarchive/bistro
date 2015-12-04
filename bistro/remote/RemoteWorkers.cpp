@@ -13,6 +13,7 @@
 
 #include "bistro/bistro/remote/RemoteWorker.h"
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/utils/Exception.h"
 
 DEFINE_int32(
@@ -46,7 +47,8 @@ using apache::thrift::debugString;
 folly::Optional<cpp2::SchedulerHeartbeatResponse>
 RemoteWorkers::processHeartbeat(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& worker) {
+    const cpp2::BistroWorker& worker,
+    const cpp2::WorkerSetID& worker_set_id) {
 
   // It's best not to add the bad worker to the pool, so check outside of
   // RemoteWorker.  At present, we do not tell that worker to commit
@@ -61,10 +63,12 @@ RemoteWorkers::processHeartbeat(
     // Even though we're adding another element, the "nextShard_"
     // round-robin iterators need not be updated, since new elements should
     // be distributed randomly throughout the hash tables.
-    auto res = workerPool_.emplace(
-      shard,
-      std::make_shared<RemoteWorker>(update->curTime(), worker)
-    );
+    auto res = workerPool_.emplace(shard, std::make_shared<RemoteWorker>(
+      update->curTime(),
+      worker,
+      worker_set_id,
+      schedulerID_
+    ));
     // Add the same pointer to the right host worker pool
     CHECK(mutableHostWorkerPool(worker.machineLock.hostname).emplace(
       shard, res.first->second
@@ -93,11 +97,18 @@ RemoteWorkers::processHeartbeat(
   auto response = worker_it->second->processHeartbeat(
     update,
     worker,
+    worker_set_id,
     true
   );
   // NB: We cannot call updateInitialWait() here since it relies on knowing
   // whether any of the workers are new, and doing that here makes each
   // heartbeat take O(# workers).
+  if (response.hasValue()) {
+    // The above callbacks maintain a key invariant: The worker itself must
+    // always be part of the WorkerSetID in our reply -- this is needed for
+    // proper maintenance of RemoteWorker::firstContainingWorkerSetID_.
+    response->workerSetID = nonMustDieWorkerSetID_;
+  }
   return std::move(response);
 }
 

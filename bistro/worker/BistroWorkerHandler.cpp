@@ -132,6 +132,10 @@ BistroWorkerHandler::BistroWorkerHandler(
   schedulerState_->workerState = static_cast<int>(
     RemoteWorkerState::State::NEW  // not used
   );
+  // ->workerSetID defaults to 'no workers' and a scheduler ID of 0/0, which
+  // ensures that the scheduler perceives this set as belonging to a
+  // different scheduler (take care to initialize your scheduler ID in unit
+  // tests!).
 
   runInBackgroundLoop(bind(&BistroWorkerHandler::healthcheck, this));
   runInBackgroundLoop(bind(&BistroWorkerHandler::heartbeat, this));

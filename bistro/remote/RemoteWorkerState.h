@@ -168,6 +168,7 @@ struct RemoteWorkerState {
     // Tells the worker when the scheduler moved it from NEW to UNHEALTHY.
     r.workerState = static_cast<int32_t>(state_);
     r.protocolVersion = cpp2::common_constants::kProtocolVersion();
+    // workerSetID is added by RemoteWorkers::processHeartbeat()
     // No need to transmit hasBeenHealthy_ since transmitting workerState_
     // has the same effect.
     return r;

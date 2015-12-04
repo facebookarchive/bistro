@@ -375,7 +375,7 @@ void RemoteWorkerRunner::remoteUpdateStatus(
 
 TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   const std::shared_ptr<const Job>& job,
-  const std::shared_ptr<const Node>& node,
+  const Node& node,
   cpp2::RunningTask& rt,
   folly::dynamic& job_args,
   function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
@@ -404,7 +404,7 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       )->findWorker(
         config_.get(),
         *job,
-        *node,
+        node,
         workerLevel_,  // Needed for checking worker-level job filters.
         monitor_.get(),
         &workerResources_,

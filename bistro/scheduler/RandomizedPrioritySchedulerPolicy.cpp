@@ -31,7 +31,7 @@ struct JobPicker {
       jobs.begin(),
       jobs.end(),
       back_inserter(priorities),
-      [](const JobWithNodes& jwn) { return jwn.job->priority(); }
+      [](const JobWithNodes& jwn) { return jwn.job()->priority(); }
     );
     d_ = discrete_distribution<>(priorities.begin(), priorities.end());
   }
@@ -49,28 +49,21 @@ private:
 
 int RandomizedPrioritySchedulerPolicy::schedule(
     vector<JobWithNodes>& jobs,
-    ResourcesByNodeType& resources_by_node,
     TaskRunnerCallback cb) {
 
   int scheduled_tasks = 0;
   auto picker = make_unique<JobPicker>(jobs);
   while (!jobs.empty()) {
     const int job_idx = picker->pick();
-    JobWithNodes& job_with_nodes = jobs[job_idx];
-    if (job_with_nodes.nodes.empty()) {
+    JobWithNodes& jwn = jobs[job_idx];
+    if (jwn.nodes.empty()) {
       jobs.erase(jobs.begin() + job_idx);
       picker.reset(new JobPicker(jobs));
       continue;
     }
-    while (!job_with_nodes.nodes.empty()) {
-      NodePtr node = job_with_nodes.nodes.back();
-      job_with_nodes.nodes.pop_back();
-      const auto ret = try_to_schedule(
-        resources_by_node,
-        node,
-        job_with_nodes.job,
-        cb
-      );
+    while (!jwn.nodes.empty()) {
+      const auto ret = try_to_schedule(*jwn.nodes.back(), jwn, cb);
+      jwn.nodes.pop_back();
       if (ret == TaskRunnerResponse::RanTask) {
         ++scheduled_tasks;
         break;

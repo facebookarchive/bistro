@@ -8,6 +8,7 @@ cpp_library(
         'JobBackoffSettings.cpp',
         'JobFilters.cpp',
         'Node.cpp',
+        'NodeOrderType.cpp',
         'SchedulerType.cpp',
         'RemoteWorkerSelectorType.cpp',
     ],

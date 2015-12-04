@@ -19,7 +19,8 @@ using namespace std;
 TEST(TestNodes, CheckIterateOverLevel) {
   Nodes nodes;
   // Test both forms of add()
-  vector<NodePtr> nodes_vector = {make_shared<Node>("foo", 1, true)};
+  vector<std::shared_ptr<const Node>> nodes_vector =
+    {make_shared<Node>("foo", 1, true)};
   nodes.add(nodes_vector.begin(), nodes_vector.end());
   EXPECT_EQ("bar", nodes.add("bar", 2, true)->name());
 

@@ -40,13 +40,13 @@ struct MockRunner : public TaskRunner {
 
   virtual TaskRunnerResponse runTaskImpl(
     const std::shared_ptr<const Job>& job,
-    const std::shared_ptr<const Node>& node,
+    const Node& node,
     cpp2::RunningTask& rt,
     folly::dynamic& job_args,
     std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
   ) noexcept override {
     cb(rt, TaskStatus::running());  // Otherwise the scheduler won't know.
-    events_.emplace_back(EventType::RUN, job->name(), node->name());
+    events_.emplace_back(EventType::RUN, job->name(), node.name());
     return RanTask;
   }
 

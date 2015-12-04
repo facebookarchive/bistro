@@ -117,8 +117,8 @@ TEST_F(TestRemoteRunner, HandleResources) {
   RemoteWorkerRunner runner(task_statuses, shared_ptr<Monitor>());
 
   auto job = make_shared<Job>(*kConfig, "foo_job", kJob);
-  auto node1 = make_shared<Node>("test_node1");
-  auto node2 = make_shared<Node>("test_node2");
+  Node node1("test_node1");
+  Node node2("test_node2");
 
   // Cannot run a task without workers
   runner.updateConfig(kConfig);
@@ -367,7 +367,7 @@ TEST_F(TestRemoteRunner, TestBusiestSelector) {
         ("owner", "owner")
         ("resources", std::get<2>(t))
       ),
-      make_shared<Node>("test_node"),
+      Node("test_node"),
       nullptr,  // no previous status
       [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
         ASSERT_EQ(std::get<0>(t), rt.job);

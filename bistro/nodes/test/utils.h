@@ -13,13 +13,15 @@
 
 namespace facebook { namespace bistro {
 
-boost::iterator_range<std::vector<NodePtr>::const_iterator>
+boost::iterator_range<std::vector<std::shared_ptr<const Node>>::const_iterator>
 iterate_non_instance_nodes(const Nodes& n) {
   CHECK(n.size() > 0);
   return boost::make_iterator_range(n.begin() + 1, n.end());
 }
 
-NodePtr getNodeVerySlow(const Nodes& nodes, const std::string& name) {
+std::shared_ptr<const Node> getNodeVerySlow(
+    const Nodes& nodes,
+    const std::string& name) {
   for (const auto& node : nodes) {
     if (node->name() == name) {
       return node;

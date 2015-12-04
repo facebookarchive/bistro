@@ -72,7 +72,7 @@ public:
 protected:
  TaskRunnerResponse runTaskImpl(
      const std::shared_ptr<const Job>& job,
-     const std::shared_ptr<const Node>& node,
+     const Node& node,
      cpp2::RunningTask& rt,
      folly::dynamic& job_args,
      std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)>

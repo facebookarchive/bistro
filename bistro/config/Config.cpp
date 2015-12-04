@@ -159,12 +159,9 @@ using namespace folly;
 using namespace std;
 
 Config::Config(const dynamic& d)
-  : enabled(false),
-    idleWait(chrono::milliseconds(5000)),
+  : idleWait(chrono::milliseconds(5000)),
     workingWait(chrono::milliseconds(500)),
-    levels({"instance"}),
-    schedulerType(SchedulerType::RoundRobin),
-    remoteWorkerSelectorType(RemoteWorkerSelectorType::RoundRobin) {
+    levels({"instance"}) {
 
   auto it = d.find("enabled");
   if (it != d.items().end()) {
@@ -204,6 +201,9 @@ Config::Config(const dynamic& d)
     throw BistroException("Nodes is required in the config");
   }
   auto& node_settings = it->second;
+  if (auto p = node_settings.get_ptr(kNodeOrder)) {
+    nodeOrderType = getNodeOrderType(p->asString());
+  }
   auto jt = node_settings.find("levels");
   if (jt == node_settings.items().end() || !jt->second.isArray()) {
     throw BistroException("Levels is required in the nodes config");

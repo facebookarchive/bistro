@@ -1,12 +1,13 @@
 cpp_library(
     name = 'scheduler_lib',
     srcs = [
-        'RankedPrioritySchedulerPolicy.cpp',
-        'RandomizedPrioritySchedulerPolicy.cpp',
-        'RoundRobinSchedulerPolicy.cpp',
         'LongTailSchedulerPolicy.cpp',
+        'RandomizedPrioritySchedulerPolicy.cpp',
+        'RankedPrioritySchedulerPolicy.cpp',
+        'RoundRobinSchedulerPolicy.cpp',
         'Scheduler.cpp',
         'SchedulerPolicy.cpp',
+        'UnitTestSchedulerPolicy.cpp',
         'utils.cpp',
     ],
     deps = [

@@ -22,7 +22,7 @@ using namespace std;
 // inefficient (iterating over newly added nodes).  This is better than
 // copying the new nodes, because typically we'll have more children than
 // parents.
-pair<NodeLevel, vector<NodePtr>> getMyLevelAndParents(
+pair<NodeLevel, vector<std::shared_ptr<const Node>>> getMyLevelAndParents(
     const Config& config,
     const NodeConfig& node_config,
     const Nodes* all_nodes) {
@@ -38,7 +38,10 @@ pair<NodeLevel, vector<NodePtr>> getMyLevelAndParents(
   }
 
   auto p = all_nodes->iterateOverLevel(parent_level);
-  return std::make_pair(my_level, vector<NodePtr>(p.begin(), p.end()));
+  return std::make_pair(
+    my_level,
+    vector<std::shared_ptr<const Node>>(p.begin(), p.end())
+  );
 }
 
 }}

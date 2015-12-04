@@ -20,15 +20,12 @@ namespace facebook { namespace bistro {
 
 class Node;
 class Job;
-
-typedef std::shared_ptr<const Job> JobPtr;
-typedef std::shared_ptr<const Node> NodePtr;
+class JobWithNodes;
 
 TaskRunnerResponse try_to_schedule(
-  ResourcesByNodeType& resources_by_node,
-  const NodePtr& node_ptr,
-  const JobPtr& job,
-  TaskRunnerCallback cb
+  const Node&,
+  const JobWithNodes&,
+  TaskRunnerCallback
 );
 
 }}

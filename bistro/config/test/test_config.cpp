@@ -24,7 +24,6 @@ TEST(TestConfig, HandleConstruction) {
     ("working_wait", 0.5)
     ("idle_wait", 5.5)
     ("scheduler", "ranked_priority")
-    ("remote_worker_selector", "busiest")
     ("nodes", dynamic::object
       ("levels", { "level1" , "level2" })
       ("node_source", "range_label")
@@ -71,7 +70,8 @@ TEST(TestConfig, HandleConstruction) {
   EXPECT_EQ(chrono::milliseconds(500), c.workingWait);
   EXPECT_EQ(chrono::milliseconds(5500), c.idleWait);
   EXPECT_EQ(SchedulerType::RankedPriority, c.schedulerType);
-  EXPECT_EQ(RemoteWorkerSelectorType::Busiest, c.remoteWorkerSelectorType);
+  EXPECT_EQ(RemoteWorkerSelectorType::RoundRobin, c.remoteWorkerSelectorType);
+  EXPECT_EQ(NodeOrderType::Random, c.nodeOrderType);
 
   ASSERT_EQ(3, c.nodeConfigs.size());
   EXPECT_EQ("range_label", c.nodeConfigs[0].source);
@@ -88,6 +88,14 @@ TEST(TestConfig, HandleConstruction) {
 
   cpp2::TaskSubprocessOptions task_opts;
   EXPECT_EQ(task_opts, c.taskSubprocessOptions);
+
+  // Check non-default enums
+  d["remote_worker_selector"] = "busiest";
+  EXPECT_EQ(
+    RemoteWorkerSelectorType::Busiest, Config(d).remoteWorkerSelectorType
+  );
+  d["nodes"][kNodeOrder] = "original";
+  EXPECT_EQ(NodeOrderType::Original, Config(d).nodeOrderType);
 
   // Check non-default task options
   d[kTaskSubprocess] = folly::dynamic::object

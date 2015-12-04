@@ -90,17 +90,17 @@ std::chrono::milliseconds Bistro::scheduleOnce(
     nodes,
     status_snapshot,
     [this, &status_snapshot, config]
-    (const JobPtr& job, const NodePtr& node) noexcept {
+    (const JobPtr& job, const Node& node) noexcept {
       // The lifetime of the inner callback is potentially very long, so
       // just copy and capture the data that it needs.
       const auto job_id = job->id();
-      const auto node_id = node->id();
+      const auto node_id = node.id();
       return taskRunner_->runTask(
         *config,
         job,
         node,
         // The previous status, if any.
-        status_snapshot.getPtr(job->id(), node->id()),
+        status_snapshot.getPtr(job->id(), node.id()),
         [this, job_id, node_id](
           const cpp2::RunningTask& running_task, TaskStatus&& status
         ) noexcept {

@@ -34,13 +34,13 @@ TaskRunner::TaskRunner()
 TaskRunnerResponse TaskRunner::runTask(
   const Config& config,
   const std::shared_ptr<const Job>& job,
-  const std::shared_ptr<const Node>& node,
+  const Node& node,
   const TaskStatus* prev_status,
   std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
 ) noexcept {
   // These pieces of data are always passed to the job, though your runner
   // could add more.
-  const auto& path_to_node = node->getPathToNode();
+  const auto& path_to_node = node.getPathToNode();
   folly::dynamic job_args = folly::dynamic::object
     ("id", job->name())
     ("path_to_node", folly::dynamic(path_to_node.begin(), path_to_node.end()))
@@ -54,13 +54,13 @@ TaskRunnerResponse TaskRunner::runTask(
   // Capture the essential details for a task in a RunningTask struct.
   cpp2::RunningTask rt;
   rt.job = job->name();
-  rt.node = node->name();
+  rt.node = node.name();
 
   // Record the resources used by this task, see comment on struct RunningTask.
   // Also prepare a dynamic version of the same data to pass to the task.
   const auto& job_resources = job->resources();
   auto& resources_by_node = job_args.at("resources_by_node");
-  for (const auto& n : node->traverseUp()) {
+  for (const auto& n : node.traverseUp()) {
     addNodeResourcesToRunningTask(
       &rt,
       &resources_by_node,

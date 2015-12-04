@@ -41,12 +41,9 @@ enum TaskRunnerResponse {
   DoNotRunMoreTasks,
 };
 
-typedef std::function<
-  TaskRunnerResponse(
-    const std::shared_ptr<const Job>&,
-    const std::shared_ptr<const Node>&
-  )
-> TaskRunnerCallback;
+using TaskRunnerCallback = std::function<
+  TaskRunnerResponse(const std::shared_ptr<const Job>&, const Node&)
+>;
 
 /**
  * Performs the action we take to actually 'run' the task.
@@ -88,7 +85,7 @@ public:
   TaskRunnerResponse runTask(
     const Config& config,
     const std::shared_ptr<const Job>& job,
-    const std::shared_ptr<const Node>& node,
+    const Node& node,
     const TaskStatus* prev_status,
     // Must be thread-safe
     std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
@@ -175,7 +172,7 @@ public:
    */
   virtual TaskRunnerResponse runTaskImpl(
     const std::shared_ptr<const Job>& job,
-    const std::shared_ptr<const Node>& node,
+    const Node& node,
     cpp2::RunningTask& rt,
     folly::dynamic& job_args,
     // Must be thread-safe

@@ -30,7 +30,7 @@ LocalRunner::LocalRunner(
 
 TaskRunnerResponse LocalRunner::runTaskImpl(
   const std::shared_ptr<const Job>& job,
-  const std::shared_ptr<const Node>& node,
+  const Node&,
   cpp2::RunningTask& running_task,
   folly::dynamic& job_args,
   function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb

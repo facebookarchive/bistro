@@ -1,4 +1,15 @@
 cpp_unittest(
+    name = 'test_scheduler',
+    srcs = [
+        'test_scheduler.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/scheduler:scheduler_lib',
+        '@/bistro/bistro/runners:runners_lib',
+    ],
+)
+
+cpp_unittest(
     name = 'test_job_dependency',
     srcs = [
         'test_job_dependency.cpp',

@@ -57,7 +57,7 @@ TEST(TestLocalRunner, HandleAll) {
   LocalRunner runner(cmdFile.getFilename(), tmp_dir.getPath());
 
   auto job = make_shared<Job>(kConfig, "foo_job", kJob);
-  auto node = make_shared<Node>("test_node");
+  Node node("test_node");
 
   auto start_time = time(nullptr);
   Synchronized<TaskStatus> status;
@@ -83,7 +83,7 @@ TEST(TestLocalRunner, HandleAll) {
     auto log = runner.getJobLogs(
       logtype,
       vector<string>{job->name()},
-      vector<string>{node->name()},
+      vector<string>{node.name()},
       0,  // line_id
       true,  // is_ascending
       ".*.*"  // a match-all regex filter
@@ -95,7 +95,7 @@ TEST(TestLocalRunner, HandleAll) {
       ASSERT_EQ(4, log.lines.size());
       ASSERT_LE(start_time, log.lines[0].time);
       ASSERT_EQ(job->name(), log.lines[0].jobID);
-      ASSERT_EQ(node->name(), log.lines[0].nodeID);
+      ASSERT_EQ(node.name(), log.lines[0].nodeID);
       EXPECT_EQ("running", parseJson(log.lines[0].line)["event"].asString());
       int proc_exit_idx = 2;
       if (folly::parseJson(log.lines[1].line)["event"]
@@ -116,7 +116,7 @@ TEST(TestLocalRunner, HandleAll) {
     }
     ASSERT_LE(start_time, log.lines.back().time);
     ASSERT_EQ(job->name(), log.lines.back().jobID);
-    ASSERT_EQ(node->name(), log.lines.back().nodeID);
+    ASSERT_EQ(node.name(), log.lines.back().nodeID);
     ASSERT_EQ(LogLine::kNotALineID, log.nextLineID);
   }
 }
@@ -160,7 +160,7 @@ TEST(TestLocalRunner, HandleKill) {
   };
 
   for (size_t i = 0; i < kNumNodes; ++i) {
-    auto node = make_shared<Node>(to<string>("node", i));
+    Node node(to<string>("node", i));
     runner.runTask(
       kConfig,
       job,

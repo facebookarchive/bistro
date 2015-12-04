@@ -27,7 +27,6 @@ class Node;
 class Nodes;
 class TaskStatusSnapshot;
 
-typedef std::shared_ptr<const Node> NodePtr;
 typedef std::shared_ptr<const Job> JobPtr;
 
 class Scheduler : boost::noncopyable {

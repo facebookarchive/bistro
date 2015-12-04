@@ -64,6 +64,12 @@ public:
 
   bool hasTags(const std::vector<std::string>& tags) const;
 
+  // TODO(9307131): This is a temporary hack, since it was a smaller code
+  // change o have this offset into PackedResources ride along directly on
+  // the node than to wrap them both in a struct (the right fix).  This
+  // works ok, since the scheduler is single-threaded at present.
+  mutable size_t offset = 0xffffffffffffffff;
+
 private:
   friend class detail::NodeParentIterator;
 
@@ -74,8 +80,6 @@ private:
   const Node* parent_;
   TagSet tags_;
 };
-
-typedef std::shared_ptr<const Node> NodePtr;
 
 namespace detail {
 

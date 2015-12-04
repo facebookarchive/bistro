@@ -18,6 +18,7 @@
 
 #include "bistro/bistro/config/JobBackoffSettings.h"
 #include "bistro/bistro/config/Node.h"
+#include "bistro/bistro/config/NodeOrderType.h"
 #include "bistro/bistro/config/RemoteWorkerSelectorType.h"
 #include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/scheduler/ResourceVector.h"
@@ -69,7 +70,7 @@ public:
   // Only counts explicitly given levels, excluding "instance" and "worker".
   int getNumConfiguredLevels() const { return levels.size() - 2; }
 
-  bool enabled;
+  bool enabled{false};
   std::chrono::milliseconds idleWait;
   std::chrono::milliseconds workingWait;
   folly::Optional<std::chrono::milliseconds> killOrphanTasksAfter;
@@ -82,8 +83,12 @@ public:
   // hard-to-find heisenbugs.  Any changes must propagate through the proper
   // ConfigLoader to ensure that configs have a monotonic history.
   std::unordered_map<std::string, JobPtr> jobs;
-  SchedulerType schedulerType;
-  RemoteWorkerSelectorType remoteWorkerSelectorType;
+  SchedulerType schedulerType{SchedulerType::RoundRobin};
+  RemoteWorkerSelectorType remoteWorkerSelectorType{
+    RemoteWorkerSelectorType::RoundRobin
+  };
+
+  NodeOrderType nodeOrderType{NodeOrderType::Random};
   ResourceVector defaultJobResources;
   // Weights are used e.g. to decide which worker is most loaded when
   // attempting to maximize the number of idle workers.
@@ -91,6 +96,7 @@ public:
   std::vector<ResourceVector> resourcesByLevel;
   std::vector<std::vector<int>> levelIDToResourceID;
   StringTable resourceNames;
+
   JobBackoffSettings defaultBackoffSettings;
   cpp2::TaskSubprocessOptions taskSubprocessOptions;
   cpp2::KillRequest killRequest;
@@ -119,21 +125,23 @@ void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req);
 
 // Field names: better duplicated string constants than typo-prone literals.
 namespace {
+// Nodes
+const char* kNodeOrder = "node_order";
 // Task subprocess
-const folly::dynamic kTaskSubprocess = "task_subprocess";
-const folly::dynamic kPollMs = "poll_ms";
-const folly::dynamic kMaxLogLinesPerPollInterval
+const char* kTaskSubprocess = "task_subprocess";
+const char* kPollMs = "poll_ms";
+const char* kMaxLogLinesPerPollInterval
   = "max_log_lines_per_poll_interval";
-const folly::dynamic kParentDeathSignal = "parent_death_signal";
-const folly::dynamic kProcessGroupLeader = "process_group_leader";
-const folly::dynamic kUseCanaryPipe = "use_canary_pipe";
+const char* kParentDeathSignal = "parent_death_signal";
+const char* kProcessGroupLeader = "process_group_leader";
+const char* kUseCanaryPipe = "use_canary_pipe";
 // Kill request
-const folly::dynamic kKillSubprocess = "kill_subprocess";
-const folly::dynamic kMethod = "method";
-const folly::dynamic kTermWaitKill = "term_wait_kill";
-const folly::dynamic kTerm = "term";
-const folly::dynamic kKill = "kill";
-const folly::dynamic kKillWaitMs = "kill_wait_ms";
-}
+const char* kKillSubprocess = "kill_subprocess";
+const char* kMethod = "method";
+const char* kTermWaitKill = "term_wait_kill";
+const char* kTerm = "term";
+const char* kKill = "kill";
+const char* kKillWaitMs = "kill_wait_ms";
+}  // anonymous namespace
 
 }}  // namespace facebook::bistro

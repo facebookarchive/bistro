@@ -156,7 +156,7 @@ TEST(TestRangeLabelFetcher, MultiLevel) {
   EXPECT_EQ(7, nodes.size());
 
   // Spot-check some nodes
-  vector<NodePtr> nodes_vec(nodes.begin(), nodes.end());
+  vector<std::shared_ptr<const Node>> nodes_vec(nodes.begin(), nodes.end());
   const auto& mid = nodes_vec[2], bottom = nodes_vec.back();
 
   EXPECT_EQ(1, mid->level());

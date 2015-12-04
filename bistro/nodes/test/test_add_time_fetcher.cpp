@@ -84,10 +84,16 @@ void check_schedule(  // Negative expected times mean "disabled node"
 
   // Must sort nodes for determinism; string sort is good enough
   auto nodes_iter = iterate_non_instance_nodes(nodes);
-  vector<NodePtr> sorted_nodes{begin(nodes_iter), end(nodes_iter)};
-  sort(begin(sorted_nodes), end(sorted_nodes), [](NodePtr a, NodePtr b){
-    return a->name() < b->name();
-  });
+  vector<std::shared_ptr<const Node>> sorted_nodes{
+    begin(nodes_iter), end(nodes_iter)
+  };
+  sort(
+    begin(sorted_nodes),
+    end(sorted_nodes),
+    [](std::shared_ptr<const Node> a, std::shared_ptr<const Node> b){
+      return a->name() < b->name();
+    }
+  );
 
   vector<string> names;
   vector<bool> enabled;

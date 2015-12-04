@@ -14,10 +14,11 @@
 namespace facebook { namespace bistro {
 
 enum class SchedulerType {
+  UnitTest,  // Cannot be returned by getSchedulerType()
   RoundRobin,
   RankedPriority,
   RandomizedPriority,
-  LongTail
+  LongTail,
 };
 
 SchedulerType getSchedulerType(const folly::fbstring& s);

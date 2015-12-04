@@ -207,6 +207,20 @@ private:
   bool consensusPermitsBecomingHealthy(const RemoteWorker& w) const;
 
   /**
+   * Versions that precede the earliest referenced version can be
+   * eliminated, since versions can never move backwards.
+   *
+   * It's not safe to prune unused versions beyond the earliest one, since a
+   * worker might potentially return a heartbeat containing a currently
+   * unused version, which is ahead of its current one.  This can happen
+   * because RemoteWorker::workerSetID() is just an echo of the last
+   * RemoteWorkers::nonMustDieWorkerSetID_ that was sent to the worker.
+   * It's not reasonable to track all versions we had set to the worker and
+   * mark them 'referenced', so we prune conservatively instead.
+   */
+  void pruneUnusedHistoryVersions();
+
+  /**
    * For each worker, find the highest version required by any worker in its
    * indirect set. See implementation and README.worker_set_consensus.
    */

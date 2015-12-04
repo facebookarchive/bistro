@@ -261,6 +261,117 @@ RemoteWorkers::processHeartbeat(
   return std::move(response);
 }
 
+namespace {
+void mergeHistoryStep(
+    const RemoteWorkers::HistoryStep& step,
+    std::unordered_set<std::string>* added) {
+  if (step.removed.hasValue()) {
+    auto it = added->find(*step.removed);
+    // We never merge steps from mid-history, so removed must always cancel.
+    CHECK(it != added->end()) << "Worker was never added: " << *step.removed;
+    added->erase(it);
+  }
+  for (const auto& shard : step.added) {
+    CHECK(added->insert(shard).second) << "Worker exists: " << shard;
+  }
+}
+}  // anonymous namespace
+
+void RemoteWorkers::pruneUnusedHistoryVersions() {
+  // Here is a typical timeline of a worker's first few seconds:
+  //  - It delivers the first heartbeat (the WorkerSetID is typically that
+  //    of another scheduler, with which it was previously associated).
+  //  - The scheduler's replies with the first WorkerSetID, which contains
+  //    this worker. This is to be echoed in the next heartbeat.
+  //
+  // Before the worker's next heartbeat arrives, the scheduler may try to
+  // prune its history.  However, there is no way to prune safely at this
+  // point, since the "in-flight" WorkerSetID can easily have a history
+  // version which is currently unreferenced.  There is no good workaround,
+  // either, since we don't want to count as referenced all the versions we
+  // had ever sent in replies, and pruning those would double the code
+  // complexity.  So, instead, we just postpone pruning history until all
+  // current workers are established.
+  CHECK_GE(
+    initialWorkerSetIDs_.size(), indirectVersionsOfNonMustDieWorkers_.size()
+  );
+  auto limbo_workers =
+    initialWorkerSetIDs_.size() - indirectVersionsOfNonMustDieWorkers_.size();
+  if (limbo_workers > 0) {
+    LOG(WARNING) << "Not pruning history until " << limbo_workers
+      << " workers echo their first WorkerSetID from this scheduler";
+    return;
+  }
+
+  folly::Optional<int64_t> first_referenced_version;
+  for (const auto& p : workerPool_) {
+    // It's easier to exclude MUST_DIE workers, since our other logic
+    // excludes MUST_DIE, too (see the history_.clear() clause below).
+    // README.worker_set_consensus explains why it is safe to exclude them.
+    if (p.second->getState() == RemoteWorkerState::State::MUST_DIE) {
+      continue;
+    }
+    if (auto wsid_ptr = p.second->workerSetID().get_pointer()) {
+      // We tested for limbo workers above, so this must be true.
+      CHECK(wsid_ptr);
+      if (!first_referenced_version.hasValue() || WorkerSetIDEarlierThan()(
+        wsid_ptr->version, *first_referenced_version
+      )) {
+        first_referenced_version = wsid_ptr->version;
+      }
+    }
+  }
+
+  if (!first_referenced_version) {
+    // There are no non-MUST_DIE workers with a workerSetID(), and there are
+    // no "limbo workers" (checked at start of function), so there must be
+    // none at all.
+    CHECK(initialWorkerSetIDs_.size() == 0);
+    history_.clear();  // No non-MUST_DIE workers, no need for a history.
+    return;
+  }
+
+  // Tally up all the removed / added workers from unused versions, and
+  // stuff them into the first referenced version.
+  std::unordered_set<std::string> added;
+  for (
+    // IMPORTANT: We rely on std::map's robustness to iterator invalidation.
+    // The iterator type is explicit, so that this breaks on any changes to
+    // the declared type of history_.
+    std::map<int64_t, HistoryStep, WorkerSetIDEarlierThan>::iterator it
+      = history_.begin();
+    it != history_.end();
+  ) {
+    // This lets us safely delete cur_it. `it` might now be at .end().
+    auto cur_it = it++;
+    auto& p = *cur_it;
+    if (WorkerSetIDEarlierThan()(p.first, *first_referenced_version)) {
+      mergeHistoryStep(p.second, &added);
+      // Remove the unused version entry. This is safe, since std::map's
+      // iterators are stable, and we already incremented `it`.
+      history_.erase(cur_it);
+      // cur_it and p are now invalid, so hurry out of this loop iteration.
+      continue;
+    }
+    // Found the first version that should not be pruned.
+    CHECK(first_referenced_version == p.first) << "First referenced "
+      << "WorkerSetID version was not found in the history";  // See below.
+    mergeHistoryStep(p.second, &added);
+    p.second.added = std::move(added);
+    p.second.removed.clear();
+    break;  // Unused versions pruned and merged.
+  }
+  // Versions are added to history_ by a RemoteWorker callback just as the
+  // worker connects (and well before it echoes the new WorkerSetID back,
+  // setting w.workerSetID()).  In that gap of time, the version would be at
+  // risk of being pruned -- but the `limbo_workers` check at the start
+  // prevents it.  Then, once w.workerSetID() is set, its version only
+  // increases.  Therefore, we will never prune a version that is unused
+  // now, but will be used in the future, and this check will never fire.
+  CHECK(added.empty()) << "First referenced WorkerSetID "
+    << " version was not found in the history";
+}
+
 // For each worker, find the highest version required by any worker in its
 // indirect set.  This is one step of an iterative label propagation
 // algorithm, whose goal is to lower-bound the transitive closure of
@@ -477,6 +588,9 @@ void RemoteWorkers::updateState(RemoteWorkerUpdate* update) {
   // Important to check this, but it's silly to check it inside the loop.
   CHECK(FLAGS_healthcheck_period > 0)
         << "--healthcheck_period must be positive";
+  // It shouldn't matter much whether we prune or propagate first, but doing
+  // it before updateState() means that workers should get healthy faster.
+  pruneUnusedHistoryVersions();
   propagateIndirectWorkerSets();
   for (auto& pair : workerPool_) {
     pair.second->updateState(

@@ -304,9 +304,15 @@ void addWorker(
     // Second pass: run an updateState so that we can check the initial wait
     // message, and ensure nothing else changes.
     } else {
-      EXPECT_NO_PCRE_MATCH(no_consensus_re, fd->readIncremental());
+      // We're not supposed to prune history when any workers are NEW.
+      std::string not_pruning_re(".*Not pruning history until.*");
+      auto out = fd->readIncremental();
+      EXPECT_NO_PCRE_MATCH(no_consensus_re, out);
+      EXPECT_NO_PCRE_MATCH(not_pruning_re, out);
       r->updateState(&update);
-      EXPECT_NO_PCRE_MATCH(no_consensus_re, fd->readIncremental());
+      out = fd->readIncremental();
+      EXPECT_NO_PCRE_MATCH(no_consensus_re, out);
+      EXPECT_PCRE_MATCH(not_pruning_re, out);
       EXPECT_PCRE_MATCH(".*Waiting for all.*", update.initialWaitMessage());
     }
     auto rw = r->getWorker(w.shard);
@@ -545,7 +551,7 @@ void checkWorkerSetIDs(
  * The goal is to cover:
  *  - consensusPermitsBecomingHealthy(RemoteWorker)
  *  - indirectVersionsOfNonMustDieWorkers_ (including version propagation)
- *  - history_ (including adding/removing workers)
+ *  - history_ (including adding/removing workers, pruning history steps)
  *  - mutation of RemoteWorker::indirectWorkerSetID()
  *
  * It also covers updates to nonMustDieWorkerSetID_ via addWorker().
@@ -572,7 +578,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
 
   ///
   /// Add w1. Make sure w1's workerSetID becomes {w1}, then do not give it
-  /// more updates.  Propagate, observe the desired outcomes.
+  /// more updates.  Propagate / prune, observe the desired outcomes.
   ///
 
   auto wid1 = workerSetID(r, 1, hash1);
@@ -593,7 +599,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
 
   ///
   /// Add w2. Ensure w2's workerSetID becomes {w1, w2}.
-  /// Propagate, observe the desired outcomes, especially:
+  /// Propagate / prune, observe the desired outcomes, especially:
   ///  * w1's indirect version is not updated (nor its denorm)
   ///
 
@@ -617,7 +623,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
 
   ///
   /// Add w3. Ensure w3's workerSetID becomes {w1, w2, w3}.
-  /// Propagate, observe desired outcome, especially:
+  /// Propagate / prune, observe desired outcome, especially:
   ///  * w1 & w2's indirect versions not updated (nor denorm)
   ///
 
@@ -642,7 +648,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   ///
   /// Ensure w2's workerSetID() becomes {w1, w2, w3}
   ///  * w2's indirect version **is** immediately updated (and its denorm)
-  /// Propagate, observe desired outcome, especially:
+  /// Propagate / prune, observe desired outcome, especially:
   ///  * no workers' indirect versions are updated (nor the denorms)
   ///
 
@@ -667,7 +673,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
 
   ///
   /// Add w4. Ensure w4's workerSetID becomes {w1, w2, w3, w4}.
-  /// Propagate, observe desired outcome, incl:
+  /// Propagate / prune, observe desired outcome, incl:
   ///  * no indirect versions are updated (nor denorm)
   ///
 
@@ -693,7 +699,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   ///
   /// Ensure w2's workerSetID becomes {w1, w2, w3, w4}
   ///  * w2's indirect version **is** immediately updated (and its denorm)
-  /// Propagate, observe desired outcome, incl:
+  /// Propagate / prune, observe desired outcome, incl:
   ///  * w3's indirect version **is** updated (and its denorm)
 
   {
@@ -702,8 +708,8 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   }
   EXPECT_EQ(wid1234, r.getWorker("w2")->workerSetID());
 
-  // Before propagation: w2's indirectWorkerSetID just got bumped by the
-  // heartbeat.
+  // Before propagation/pruning: w2's indirectWorkerSetID just got bumped by
+  // the heartbeat.
   updateWorkers(
     &r,
     {{1, "w1"}, {4, "w2"}, {3, "w3"}, {4, "w4"}},  // Bump w2's version
@@ -713,7 +719,8 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
     // w1 doesn't know about any worker but itself, which blocks everyone.
     {{"w1", false}, {"w2", false}, {"w3", false}, {"w4", false}}
   );
-  // After propagation: Label propagation advances w3 to match.
+  // After propagation/pruning: Label propagation advances w3 to match.
+  // There is nothing to prune, since w1 is still alive.
   for (int i = 0; i < 2; ++i) {  // Ensure the second pass is a no-op
     updateWorkers(
       &r,
@@ -727,7 +734,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   }
 
   ///
-  /// Lose w1.
+  /// Lose w1 to test history pruning.
   ///
 
   auto wid234 = workerSetID(r, 5, hash234);
@@ -771,6 +778,13 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
     {{"w1", false}, {"w2", false}, {"w3", false}, {"w4", false}}
   );
 
+  // Now that updateState ran once, we should have pruned history versions 1-3
+  history.erase(1);
+  history.erase(2);
+  history.erase(3);
+  history.insert(  // History got pruned: w3 is keeping version 3 alive.
+    {3, {folly::none, {w1.shard, w2.shard, w3.shard}}}
+  );
   for (int i = 0; i < 2; ++i) {  // Ensure the second pass is a no-op
     updateWorkers(
       &r,
@@ -804,7 +818,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
     r, {{"w1", wid12}, {"w2", wid1234}, {"w3", wid234}, {"w4", wid1234}}
   );
 
-  // w3 no longer keeping v3 alive.
+  // w3 no longer keeping v3 alive, but history is not yet pruned.
   updateWorkers(
     &r,
     {{4, "w2"}, {5, "w3"}, {4, "w4"}},  // w2 & w4 have not yet propagated
@@ -812,6 +826,11 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
     history,
     // w2 and w4's workerSetID is still old, so they are blocked
     {{"w1", false}, {"w2", false}, {"w3", true}, {"w4", false}}
+  );
+  history.erase(3);
+  history.erase(4);
+  history.insert(  // History got pruned: w2 and w4 are keeping v4 alive.
+    {4, {folly::none, {w1.shard, w2.shard, w3.shard, w4.shard}}}
   );
   updateWorkers(
     &r,

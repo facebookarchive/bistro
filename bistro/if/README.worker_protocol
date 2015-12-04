@@ -36,6 +36,24 @@ remediation is that one of the workers ends up getting a suicide request
 Aside from the above pathology, a running worker instance cannot return to
 the NEW state, nor can it leave the MUST_DIE state.
 
+= Scheduler startup and initial wait =
+
+On startup, the scheduler does not know the set of available workers, and
+does not know what tasks are already running.  It simply waits for workers
+to connect, and polls them for running tasks.  Eventually, enough time
+passes that it can conclude that any workers that were up, and separated by
+a network partition, would have had to commit suicide by now.  At that
+point, the list of already-connected workers is known to be complete.
+
+In setups where the "time to lose a worker" is long (e.g. to protect 
+fragile, long-running tasks in HPC-like settings), this initial wait
+can be inconveniently long. 
+
+See remote/README.worker_set_consensus for a description of Bistro's current
+solution to this problem.  The 'worker set consensus' mechanism drastically
+shortens this initial wait in the common case by having each workers record
+a hash of the most recently seen set of workers.
+
 = Core calls =
 
 The core calls of the scheduler-worker protocol maintain the

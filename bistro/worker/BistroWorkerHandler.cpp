@@ -135,7 +135,7 @@ BistroWorkerHandler::BistroWorkerHandler(
   // ->workerSetID defaults to 'no workers' and a scheduler ID of 0/0, which
   // ensures that the scheduler perceives this set as belonging to a
   // different scheduler (take care to initialize your scheduler ID in unit
-  // tests!).
+  // tests!), and that it cannot achieve consensus.
 
   runInBackgroundLoop(bind(&BistroWorkerHandler::healthcheck, this));
   runInBackgroundLoop(bind(&BistroWorkerHandler::heartbeat, this));

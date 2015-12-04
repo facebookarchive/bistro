@@ -435,6 +435,13 @@ void RemoteWorker::updateCurrentWorker(
       workerSetID_->version, worker_set_id.version
     )) {
       workerSetIDChangeCob_(*this, worker_set_id);
+      if (!firstAssociatedWorkerSetID_.hasValue()) {
+        CHECK(!workerSetID_.hasValue());
+        CHECK(initialWorkerSetID_ != worker_set_id)
+          << debugString(initialWorkerSetID_) << " == "
+          << debugString(worker_set_id);
+        firstAssociatedWorkerSetID_ = worker_set_id;
+      }
       workerSetID_ = worker_set_id;
     } else if (workerSetID_->version == worker_set_id.version) {
       CHECK(*workerSetID_ == worker_set_id)

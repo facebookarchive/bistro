@@ -71,7 +71,7 @@ public:
     // new value, either from folly::none or from an existing value.  Never
     // called with initialWorkerSetID_, never called with an ID whose
     // version is earlier than workerSetID_->version.  Called **before**
-    // RemoteWorker alters its firstContainingWorkerSetID_.
+    // RemoteWorker sets its firstAssociatedWorkerSetID_.
     WorkerSetIDChangeCob worker_set_id_change_cob = NoOpWorkerSetIDChangeCob()
   ) : worker_(w_new),
       state_(cur_time),
@@ -101,6 +101,8 @@ public:
   const cpp2::WorkerSetID& initialWorkerSetID() const {
     return initialWorkerSetID_;
   }
+  const folly::Optional<cpp2::WorkerSetID>&
+    firstAssociatedWorkerSetID() const { return firstAssociatedWorkerSetID_; }
 
   /**
    * Returns folly::none if the heartbeat should be rejected. Note that the
@@ -281,6 +283,10 @@ private:
   // The most recent copy of this scheduler's nonMustDieWorkerSetID_, which
   // was returned by this worker.
   folly::Optional<cpp2::WorkerSetID> workerSetID_;
+  // The first nonMustDieWorkerSetID_, which contains this worker (all
+  // subsequent versions do, by definition).  Set once per worker instance,
+  // at the same time as workerSetID_ is first set.
+  folly::Optional<cpp2::WorkerSetID> firstAssociatedWorkerSetID_;
 
   // TODO(lo-pri): Add exponential backoff to health checks. Otherwise, as
   // we churn workers, we will accumulate a lot of dead shard IDs that we'll

@@ -67,7 +67,36 @@ RemoteWorkers::processHeartbeat(
       update->curTime(),
       worker,
       worker_set_id,
-      schedulerID_
+      schedulerID_,
+      // The following 3 callbacks maintain WorkerSetID-related state.
+      //
+      // New worker -- first heartbeat from this instance ID.
+      [this](const RemoteWorker& w) {
+        initialWorkerSetIDs_.emplace(w.initialWorkerSetID());
+
+        CHECK(!w.workerSetID().hasValue());
+        CHECK(!w.firstAssociatedWorkerSetID().hasValue());
+
+        // Add the new worker to the non-MUST_DIE set. This would cause a
+        // consensus to emerge while some workers are in the NEW state, but
+        // that's not a problem because updateInitialWait() explicitly
+        // prohibits leaving initial wait while any workers are NEW.
+        const auto& bw = w.getBistroWorker();
+        addWorkerIDToHash(&nonMustDieWorkerSetID_.hash, bw.id);
+        ++nonMustDieWorkerSetID_.version;
+      },
+      // Dead worker: either became MUST_DIE or got bumped by another worker.
+      [this](const RemoteWorker& w) {
+        auto ws_it = initialWorkerSetIDs_.find(w.initialWorkerSetID());
+        CHECK(ws_it != initialWorkerSetIDs_.end());
+        initialWorkerSetIDs_.erase(ws_it);
+
+        const auto& bw = w.getBistroWorker();
+
+        // Remove the dead worker from the non-MUST_DIE set, update history_.
+        removeWorkerIDFromHash(&nonMustDieWorkerSetID_.hash, bw.id);
+        ++nonMustDieWorkerSetID_.version;
+      }
     ));
     // Add the same pointer to the right host worker pool
     CHECK(mutableHostWorkerPool(worker.machineLock.hostname).emplace(
@@ -105,8 +134,9 @@ RemoteWorkers::processHeartbeat(
   // heartbeat take O(# workers).
   if (response.hasValue()) {
     // The above callbacks maintain a key invariant: The worker itself must
-    // always be part of the WorkerSetID in our reply -- this is needed for
-    // proper maintenance of RemoteWorker::firstContainingWorkerSetID_.
+    // always be part of the WorkerSetID in our reply -- this ensures that
+    // RemoteWorker::firstAssociatedWorkerSetID_ is always the first
+    // WorkerSetID that contains this worker.
     response->workerSetID = nonMustDieWorkerSetID_;
   }
   return std::move(response);
@@ -151,10 +181,33 @@ void RemoteWorkers::updateInitialWait(RemoteWorkerUpdate* update) {
     }
   }
 
+  // Are exactly the same workers connected to the scheduler now, as before
+  // the restart?
+  bool initial_worker_set_id_consensus =
+    // The initial worker set ID is the same for all non-MUST_DIE workers,
+    initialWorkerSetIDs_.end()
+      == initialWorkerSetIDs_.upper_bound(*initialWorkerSetIDs_.begin())
+    // ... and it matches our non-MUST_DIE worker set, meaning that exactly
+    // the same workers are connected now as the scheduler had before its
+    // restart.
+    && nonMustDieWorkerSetID_.hash == initialWorkerSetIDs_.begin()->hash;
+  if (!initial_worker_set_id_consensus) {
+    msg += "No initial worker set ID consensus. ";
+  }
+
   // The scheduler is eligible to exit initial wait if:
   //  (i) there are no NEW workers, AND
-  //  (ii) the wait expired
-  if (min_start_time < startTime_) {
+  //  (ii) --min_startup_wait_for_workers has expired, AND
+  //  (iii) EITHER the wait expired, OR all connected workers have the same
+  //        initial WorkerSetID, which matches the non-MUST_DIE worker set.
+  //
+  // If the wait expires, we deliberately do not wait for the WorkerSetID
+  // consensus, for two reasons.  Firstly, people "who know what they are
+  // doing" need to be able to manually shorten the initial wait.  Secondly,
+  // if the initial wait is safe, there is really no benefit to waiting for
+  // the consensus -- but it *can* needlessly slow down startup if some
+  // workers become unhealthy.
+  if (min_start_time < startTime_ && !initial_worker_set_id_consensus) {
     msg += "Waiting for all workers to connect before running tasks.";
   // If we are eligible to exit initial wait, but are still querying running
   // tasks, then one of the 'new' workers (while transiently unresponsive)

@@ -82,7 +82,7 @@ RemoteWorker initializeWorker(
   worker.initializeRunningTasks(running_tasks);
   EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
   EXPECT_FALSE(worker.hasBeenHealthy());
-
+  EXPECT_FALSE(worker.firstAssociatedWorkerSetID().hasValue());
   return worker;
 }
 
@@ -110,6 +110,8 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
   EXPECT_TRUE(worker->processHeartbeat(
     &update, worker->getBistroWorker(), wid, false
   ).hasValue());
+  auto first_wid = wid;
+  EXPECT_EQ(wid, worker->firstAssociatedWorkerSetID());
   EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker->getState());
   EXPECT_FALSE(worker->hasBeenHealthy());
 
@@ -124,6 +126,7 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
   EXPECT_TRUE(worker->processHeartbeat(
     &update, worker->getBistroWorker(), wid, true
   ).hasValue());
+  EXPECT_EQ(first_wid, worker->firstAssociatedWorkerSetID());
   EXPECT_EQ(wid, worker->workerSetID());
   EXPECT_TRUE(worker->hasBeenHealthy());
   EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker->getState());
@@ -132,6 +135,7 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
   EXPECT_TRUE(worker->processHeartbeat(
     &update, worker->getBistroWorker(), wid, false
   ).hasValue());
+  EXPECT_EQ(first_wid, worker->firstAssociatedWorkerSetID());
   EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker->getState());
 
   RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);

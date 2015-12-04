@@ -124,6 +124,9 @@ public:
   cpp2::WorkerSetID nonMustDieWorkerSetID() const {
     return nonMustDieWorkerSetID_;
   }
+  const std::multiset<cpp2::WorkerSetID>& initialWorkerSetIDs() const {
+    return initialWorkerSetIDs_;
+  }
 
 private:
   RemoteWorker* getNonConstWorker(const std::string& shard) {
@@ -139,9 +142,15 @@ private:
    * report their running tasks, so that we do not accidentally re-start
    * tasks that are already running elsewhere.
    *
-   * This call can tell the scheduler to exit initial wait if it expired,
-   * which normally means that any non-connected workers would have
-   * committed suicide -- thus, we cannot start duplicate tasks.
+   * This call can tell the scheduler to exit initial wait, in one of
+   * two circumstances:
+   *  - The initial wait expired, meaning that any non-connected workers
+   *    would've committed suicide -- thus, we cannot start duplicate tasks.
+   *  - Our set of non-MUST_DIE workers matches the initial worker set
+   *    returned by every worker: i.e. all extant workers agree that the
+   *    connected workers are *all* the workers.  This can shorten the
+   *    initial wait dramatically.  See README.worker_set_consensus, as well
+   *    as the comments for WorkerSet-related member variables.
    */
   void updateInitialWait(RemoteWorkerUpdate* update);
 
@@ -154,7 +163,47 @@ private:
   time_t startTime_;  // For the "initial wait" computation
 
 
-  // Temporarily empty, will be populated in future diffs.
+  //
+  // IMPORTANT: All of the WorkerSetID members must be declared before the
+  // worker pools, so that all RemoteWorker cobs get destroyed first.
+  //
+
+  // Collects initial WorkerSetIDs of all non-MUST_DIE workers tracked by
+  // this scheduler.  These arrive in the first heartbeat from a worker
+  // instance, usually the WorkerSetID inherited from the old scheduler.
+  //
+  // This lets the scheduler exit initial wait quickly at startup -- if all
+  // healthy workers have the same initial WorkerSet, and that set matches
+  // the current worker set in nonMustDieWorkerSetID_, we conclude that all
+  // the workers have connected, and start running tasks.
+  //
+  // The goal is to allow the use of long --lose_unhealthy_worker_after
+  // values, without incurring the operational pain of a long initial wait.
+  // Workers can then survive long network partitions and scheduler outages,
+  //
+  // There is a race between a new worker connecting, and maybe not managing
+  // to become part of the consensus, just before a scheduler restart.  The
+  // common failure mode is that the new scheduler's workers do *not* agree
+  // on a consensus, and the full initial wait is required.  This is safe,
+  // if mildly inconvenient.  The less common failure mode is:
+  //  (i) A new worker W connects,
+  //  (ii) It starts running tasks before joining the consensus,
+  //  (iii) The scheduler restarts,
+  //  (iv) Other workers connect first, creating a consensus excluding W.
+  //  (v) The scheduler starts duplicates of W's tasks.
+  // To mitigate this, we implement consensusPermitsBecomingHealthy logic,
+  // which prevents starting tasks on a worker until it becomes a provably
+  // inextricable part of the consensus.  Surprisingly, this is efficient.
+  //
+  // Updated via the new/dead worker callbacks.
+  std::multiset<cpp2::WorkerSetID> initialWorkerSetIDs_;
+
+  // Collects the instance IDs of all non-MUST_DIE workers in workerPool_.
+  // If this matches initialWorkerSetIDs_, we can exit initial wait early.
+  // A new worker `w` cannot become eligible to run tasks until it requires
+  // all of these workers for consensus, **and** all these workers
+  // (indirectly) require `w` for consensus.  README.worker_set_consensus
+  // explains why only MUST_DIE is excluded, and other details.
   cpp2::WorkerSetID nonMustDieWorkerSetID_;
 
 

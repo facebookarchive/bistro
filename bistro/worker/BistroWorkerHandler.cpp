@@ -23,6 +23,7 @@
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
 #include "bistro/bistro/remote/RemoteWorker.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/utils/hostname.h"
 #include "bistro/bistro/utils/LogLines.h"
 #include "bistro/bistro/utils/LogWriter.h"
@@ -559,7 +560,7 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
   }
   try {
     cpp2::SchedulerHeartbeatResponse res;
-    // create a copy of worker and update system resources
+    // Create a copy of worker and update system resources
     cpp2::BistroWorker worker(worker_);
     if (systemStatsGetter_) {
       SubprocessSystem installed;
@@ -567,13 +568,16 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
         worker.totalResources = SubprocessStats::convert(installed);
       }
     }
+    auto scheduler_state = schedulerState_.copy();  // Take the lock only once
     schedulerClientFn_(
       folly::EventBaseManager::get()->getEventBase()
-    )->sync_processHeartbeat(res, worker);
+    )->sync_processHeartbeat(res, worker, scheduler_state.workerSetID);
     enforceWorkerSchedulerProtocolVersion(
       worker_.protocolVersion, res.protocolVersion
     );
-    gotNewSchedulerInstance_ = schedulerState_->id != res.id;
+    CHECK(res.workerSetID.schedulerID == res.id);
+
+    gotNewSchedulerInstance_ = scheduler_state.id != res.id;
     if (gotNewSchedulerInstance_) {
       LOG(INFO) << "Connected to new scheduler " << debugString(res);
       logStateTransitionFn_("connected_to_new_scheduler", worker_, nullptr);
@@ -604,6 +608,22 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
       // Normally, the healthcheck thread overwrites state_.state_, but this
       // is the only way to get out of RemoteWorkerState::State::NEW.
       setState(&state_, RemoteWorkerState::State(res.workerState), cur_time);
+
+      // Don't allow the worker set version to go backwards. NB: It could be
+      // better to also ignore other scheduler state, but this version is
+      // updated too rarely to be a useful sequence number.
+      if (!gotNewSchedulerInstance_ && WorkerSetIDEarlierThan()(
+        res.workerSetID.version, scheduler_state.workerSetID.version
+      )) {
+        LOG(ERROR) << "Got scheduler response with older WorkerSetID "
+          << "version, not updating workerSetID -- current: "
+          << debugString(scheduler_state.workerSetID) << ", received: "
+          << debugString(res.workerSetID);
+        // Holding back the workerSetID cannot cause schedulerState_.id and
+        // schedulerState_.workerSetID.schedulerID to diverge.
+        CHECK(scheduler_state.workerSetID.schedulerID == res.id);
+        res.workerSetID = scheduler_state.workerSetID;
+      }
 
       // Update scheduler timeouts _inside_ the state_ lock, so that from
       // the point of view of healthcheck(), both the state & timeouts

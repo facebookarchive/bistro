@@ -94,7 +94,8 @@ public:
 
   void processHeartbeat(
     cpp2::SchedulerHeartbeatResponse& out_response,
-    const cpp2::BistroWorker&
+    const cpp2::BistroWorker&,
+    const cpp2::WorkerSetID&
   ) override;
 
   void updateStatus(

@@ -13,10 +13,13 @@
 #include <folly/dynamic.h>
 #include <folly/json.h>
 #include <thrift/lib/cpp2/util/ScopedServerInterfaceThread.h>
+#include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
 #include "bistro/bistro/if/gen-cpp2/BistroWorker.h"
 #include "bistro/bistro/if/gen-cpp2/common_constants.h"
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/server/test/ThriftMonitorTestThread.h"
 #include "bistro/bistro/worker/test/BistroWorkerTestThread.h"
 #include "bistro/bistro/worker/test/utils.h"
@@ -209,13 +212,33 @@ TEST_F(TestWorker, HandleKillTask) {
   }
 }
 
-struct FakeBistroScheduler : public virtual cpp2::BistroSchedulerSvIf {
-  FakeBistroScheduler() : protocolVersion_(-1) {}  // Incompatible by default.
+template <typename SchedulerT>
+struct SchedulerWithWorker {
+  SchedulerWithWorker()
+    : scheduler_(new SchedulerT()),
+      ssit_(scheduler_),
+      worker_([this](folly::EventBase* event_base) {
+        return make_shared<cpp2::BistroSchedulerAsyncClient>(
+          HeaderClientChannel::newChannel(
+            async::TAsyncSocket::newSocket(event_base, ssit_.getAddress())
+          )
+        );
+      }) {}
+
+  std::shared_ptr<SchedulerT> scheduler_;
+  apache::thrift::ScopedServerInterfaceThread ssit_;
+  BistroWorkerTestThread worker_;
+};
+
+struct ProtocolVerFakeScheduler : public virtual cpp2::BistroSchedulerSvIf {
+  ProtocolVerFakeScheduler() : protocolVersion_(-1) {}  // Start incompatible.
   void processHeartbeat(
       cpp2::SchedulerHeartbeatResponse& res,
-      const cpp2::BistroWorker& worker) override {
-    res.id.startTime = 123;  // The "no scheduler" ID is 0/0, so change it.
+      const cpp2::BistroWorker& worker,
+      const cpp2::WorkerSetID& worker_set_id) override {
     res.protocolVersion = protocolVersion_.copy();
+    res.id.startTime = 123;  // The "no scheduler" ID is 0/0, so change it.
+    res.workerSetID.schedulerID = res.id;
   }
   folly::Synchronized<int16_t> protocolVersion_;
 };
@@ -223,16 +246,7 @@ struct FakeBistroScheduler : public virtual cpp2::BistroSchedulerSvIf {
 TEST_F(TestWorker, HandleBadProtocolVersion) {
   folly::test::CaptureFD stderr(2, printString);
 
-  auto scheduler = std::make_shared<FakeBistroScheduler>();
-  apache::thrift::ScopedServerInterfaceThread ssit_(scheduler);
-
-  BistroWorkerTestThread worker([&](folly::EventBase* event_base) {
-    return make_shared<cpp2::BistroSchedulerAsyncClient>(
-      HeaderClientChannel::newChannel(
-        async::TAsyncSocket::newSocket(event_base, ssit_.getAddress())
-      )
-    );
-  });
+  SchedulerWithWorker<ProtocolVerFakeScheduler> sw;
 
   waitForRegexOnFd(&stderr, folly::to<std::string>(
     ".*Unable to send heartbeat to scheduler: Worker-scheduler protocol "
@@ -243,6 +257,76 @@ TEST_F(TestWorker, HandleBadProtocolVersion) {
   const char* kNewSchedulerRegex = ".* Connected to new scheduler .*";
   EXPECT_NO_PCRE_MATCH(kNewSchedulerRegex, stderr.read());
 
-  scheduler->protocolVersion_ = cpp2::common_constants::kProtocolVersion();
+  sw.scheduler_->protocolVersion_ = cpp2::common_constants::kProtocolVersion();
   waitForRegexOnFd(&stderr, kNewSchedulerRegex);
+}
+
+cpp2::BistroInstanceID bistroWorkerID() {
+  cpp2::BistroInstanceID id;
+  id.startTime = 89342789023740;
+  id.rand = 129309723890472;
+  return id;
+}
+
+struct WorkerSetIDFakeScheduler : public virtual cpp2::BistroSchedulerSvIf {
+  WorkerSetIDFakeScheduler() {
+    // The "no scheduler" ID is 0/0, so change it.
+    workerSetID_->schedulerID.startTime = 123;
+    addWorkerIDToHash(&workerSetID_->hash, bistroWorkerID());
+  }
+  void processHeartbeat(
+      cpp2::SchedulerHeartbeatResponse& res,
+      const cpp2::BistroWorker& worker,
+      const cpp2::WorkerSetID& worker_set_id) override {
+    SYNCHRONIZED (workerSetIDs_) {
+      if (!workerSetIDs_.empty()) {
+        // Only the first heartbeat can be non-echoed.
+        ASSERT_NE(0, worker_set_id.schedulerID.startTime);
+      }
+      if (workerSetIDs_.empty() || workerSetIDs_.back() != worker_set_id) {
+        workerSetIDs_.emplace_back(worker_set_id);
+      }
+    }
+    res.protocolVersion = cpp2::common_constants::kProtocolVersion();
+    SYNCHRONIZED (workerSetID_) {
+      res.id = workerSetID_.schedulerID;
+      res.workerSetID = workerSetID_;
+    }
+  }
+  folly::Synchronized<std::vector<cpp2::WorkerSetID>> workerSetIDs_;
+  folly::Synchronized<cpp2::WorkerSetID> workerSetID_;
+};
+
+TEST_F(TestWorker, EchoWorkerSetID) {
+  SchedulerWithWorker<WorkerSetIDFakeScheduler> sw;
+
+  // Check that the worker echos the initial WorkerSetID.
+  while (sw.scheduler_->workerSetIDs_->size() < 2) {
+    /* sleep override */ this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+  SYNCHRONIZED(ids, sw.scheduler_->workerSetIDs_) {
+    ASSERT_EQ(2, ids.size());
+    EXPECT_EQ(cpp2::WorkerSetID(), ids[0]);  // The worker's ID starts empty
+    // Then, it echos what the scheduler gave it.
+    EXPECT_EQ(sw.scheduler_->workerSetID_.copy(), ids[1]);
+  }
+
+  // Move the version forward.
+  sw.scheduler_->workerSetID_->version = 1;
+  while (sw.scheduler_->workerSetIDs_->size() < 3) {
+    /* sleep override */ this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+  SYNCHRONIZED(ids, sw.scheduler_->workerSetIDs_) {
+    ASSERT_EQ(3, ids.size());
+    EXPECT_EQ(1, ids[2].version);
+  }
+
+  // Check that the version cannot go backward.
+  folly::test::CaptureFD stderr(2, printString);
+  sw.scheduler_->workerSetID_->version = 0;
+  waitForRegexOnFd(&stderr, ".*scheduler response with older WorkerSetID.*");
+  SYNCHRONIZED(ids, sw.scheduler_->workerSetIDs_) {
+    ASSERT_EQ(3, ids.size());
+    EXPECT_EQ(1, ids[2].version);
+  }
 }

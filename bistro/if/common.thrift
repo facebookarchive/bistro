@@ -15,7 +15,10 @@ namespace py facebook.bistro.common
 // some kind of error or warning about the log line fetching process.
 const i64 kNotALineID = -1;
 // The current protocol version, by default we reject connections from others.
-const i16 kProtocolVersion = 0;
+// == Changelog ==
+//  v1: Add WorkerSetID to SchedulerHeartbeatResponse, to be echoed
+//      by the worker with the next processHeartbeat.
+const i16 kProtocolVersion = 1;
 
 // Physical resources names - enum
 enum PhysicalResources {
@@ -70,6 +73,7 @@ struct BistroInstanceID {
 // This structure exists for two reasons:
 //  1) Bistro must remember the tasks it had started, even if the original
 //     job & node are no longer registered.  It should also persist these
+
 //     across restarts.
 //  2) The worker should have an easy and robust way of reporting back this
 //     same information to Bistro (in case of e.g. restart).
@@ -124,6 +128,41 @@ struct ServiceAddress {
   1: string ip_or_host,
   // Which port to connect to?
   2: i32 port,  // No unsigned 16-bit integer in Thrift
+}
+
+// Used for identifying a set of workers via their startTime and rand.  This
+// is not the most efficient use of bits, but it has the advantage of being
+// obviously commutative and invertible.  The odds of collision are very low
+// even just on account of xor(worker1.id.rand, ..., workerN.id.rand), but
+// if you want better odds, add Galois field multiplication.
+struct SetHash {
+  1: i64 addAll = 0,
+  2: i64 xorAll = 0,  // aka Galois field addition
+}
+
+// Lets a newly restarted scheduler decide whether the currently connected
+// workers are exactly the same as those it had before the restart.
+struct WorkerSetHash {
+  1: SetHash startTime,
+  2: SetHash rand,
+  3: i32 numWorkers = 0,
+}
+
+struct WorkerSetID {
+  // Each scheduler instance maintains an incremental history of worker set
+  // versions, which is much more efficient than storing a set of [shard
+  // name, worker instance id] pairs per worker.
+  1: BistroInstanceID schedulerID,
+  // Logically, the version increases every time the set of connected
+  // workers changes, but it should be able to overflow safely.  Therefore
+  // you must NEVER compare versions directly, and instead use the
+  // overflow-aware comparator WorkerSetIDEarlierThan.
+  2: i64 version,
+  // Each scheduler instance has a different version history, so on startup,
+  // the scheduler uses just the hash to decide if the set of connected
+  // workers equals the previous scheduler's consensus set as reported by
+  // the workers.
+  3: WorkerSetHash hash,
 }
 
 // Describes and uniquely identifies a worker instance
@@ -218,6 +257,9 @@ struct SchedulerHeartbeatResponse {
   // Tells the worker when the scheduler moved it from NEW to HEALTHY.
   6: i32 workerState,
   7: i16 protocolVersion = 0,  // Default must stay at 0
+  // The worker will send this right back to the scheduler, which enables a
+  // freshly restarted scheduler to know when all its old workers are back.
+  8: WorkerSetID workerSetID,
 }
 
 enum KillMethod {

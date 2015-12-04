@@ -29,3 +29,14 @@ cpp_unittest(
         '@/folly/experimental:test_util',
     ],
 )
+
+cpp_unittest(
+    name = 'test_worker_set_id',
+    srcs = [
+        'test_worker_set_id.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/remote:remote_lib',
+        '@/folly/experimental:test_util',
+    ],
+)

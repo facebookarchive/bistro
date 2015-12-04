@@ -240,6 +240,14 @@ service BistroScheduler extends fb303.FacebookService {
    * moment, there is no clear need to muddy up the logic this way, since
    * heartbeats are cheap.
    */
-  common.SchedulerHeartbeatResponse processHeartbeat(1: common.BistroWorker w);
+  common.SchedulerHeartbeatResponse processHeartbeat(
+    1: common.BistroWorker w,
+    // When a scheduler restarts, it inspects the IDs being sent by
+    // connecting workers to determine if all previous workers had already
+    // reconnected.  If we achieve complete consensus -- all connected
+    // workers report the same ID, which is also the ID of the set of
+    // connected workers -- then the scheduler exits its "initial wait".
+    2: common.WorkerSetID workerSetID,
+  );
 
 }

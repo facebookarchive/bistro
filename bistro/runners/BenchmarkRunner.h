@@ -61,8 +61,12 @@ public:
       std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb,
       const cpp2::RunningTask& rt,
       int ms) {
-
-    queue_->emplace(std::move(cb), rt, std::chrono::milliseconds(ms));
+    ++totalTasks_;
+    totalMs_ += ms;
+    SYNCHRONIZED(queue_) {
+     queue_.emplace(std::move(cb), rt, std::chrono::milliseconds(ms));
+     queueMax_ = std::max(queueMax_, queue_.size());
+    }
   }
 
 protected:
@@ -79,6 +83,9 @@ private:
   // no need to synchronize below because they are used together with queue_
   std::default_random_engine generator_;
   std::uniform_int_distribution<int> distribution_;
+  uint64_t totalMs_{0};
+  uint64_t totalTasks_{0};
+  size_t queueMax_{0};
 };
 
 }}

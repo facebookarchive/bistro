@@ -20,12 +20,9 @@ DEFINE_double(test_failure_rate, 0, "Probability of test task failures");
 
 namespace facebook { namespace bistro {
 
-using namespace std;
-using namespace folly;
-
 namespace {
   // wait to check queue for finished tasks
-  constexpr chrono::milliseconds kIdleWait(100);
+  constexpr std::chrono::milliseconds kIdleWait(100);
 }
 
 BenchmarkRunner::BenchmarkRunner()
@@ -58,6 +55,8 @@ BenchmarkRunner::BenchmarkRunner()
 }
 
 BenchmarkRunner::~BenchmarkRunner() {
+  LOG(INFO) << queue_->size() << " still in queue, " << totalMs_ << " ms, "
+    << totalTasks_ << " tasks, " << queueMax_ << " max queue size";
   stopBackgroundThreads();
 }
 

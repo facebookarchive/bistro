@@ -193,6 +193,45 @@ struct BistroWorker {
   7: map<PhysicalResources, double> totalResources, // machine resources
 }
 
+struct CGroupOptions {
+  // A cgroup for a particular task consists of four components:
+  //  root/subsystem/slice/task/
+  // Some example values:
+  //   root: /sys/fs/cgroup
+  //   subsystem: cpuset
+  //   slice: schedulers/bistro
+  //   task: 20151127235604:fbc3e1d89aa2764f:234098
+  // The task subgroup name is generated in TaskSubprocessQueue.
+  1: string root
+  2: string slice
+  // If this is nonempty, then for each new task, we will make a task cgroup
+  // inside our slice inside each subsystem, and will place the task's
+  // subprocess into the task cgroups.  All per-task cgroups are marked
+  // `notify_on_release`, but no other garbage-collection is provided -- you
+  // should set up your the root `release_agent` for each subsystem to
+  // `rmdir` emptied cgroups.  Bistro need not run as root; instead just
+  // ensure that it can create subdirectories in each of the paths in this
+  // map -- making dedicated parent cgroups for Bistro, and `chown`ing or
+  // ACLing them to be writable by Bistro's user is most appropriate.  As a
+  // side effect, you can set resource limits on all Bistro jobs as a whole.
+  3: list<string> subsystems
+  // In normal cgroups, control files are pre-made by sysfs. It's hard to
+  // replicate this in unit tests, so instead we only add O_CREAT during
+  // unit tests.
+  4: bool unitTestCreateFiles = 0,
+  // If nonzero, limit CPU shares for the task. Maps to `cpu.shares` in the
+  // `cpu` subsystem.  The sanest way to use this is to set every task's
+  // number of shares to to something like 1024 * number of requested cores.
+  // Then, so long as the scheduler's # cores is correct, each task is
+  // guaranteed at least as many cores as it requests.
+  5: i16 cpuShares = 0,
+  // If nonzero, sets a hard limit on the amount of memory used.
+  6: i64 memoryLimitInBytes = 0,
+  // Future: one could easily allow writing values to specific files in
+  // specific subsystems, but this flexibility seems more error-prone and
+  // unnecessary as of now.
+}
+
 // If you change the defaults, keep in mind that these must be appropriate
 // for Bistro's health-check tasks.
 struct TaskSubprocessOptions {
@@ -214,9 +253,10 @@ struct TaskSubprocessOptions {
   // SIGKILL.  README.task_termination explains the KILL
   3: i32 parentDeathSignal = 9
 
-  // When true, makes each task's child process a group leader, and
-  // signals the entire process group to kill the task.  See
-  // README.task_termination for the details.
+  // When true, makes each task's child process a group leader, and signals
+  // the entire process group to kill the task.  See README.task_termination
+  // for the details.  Using cgroupOptions is much more robust, so also
+  // enable that, if available.
   //
   // Defaults to `false` so that Ctrl-Z and Ctrl-C work when running
   // Bistro interactively in a terminal.
@@ -238,6 +278,8 @@ struct TaskSubprocessOptions {
 
   // Refresh the real resources usage in seconds
   6: i32 refreshResourcesSec = 2
+
+  7: CGroupOptions cgroupOptions
 }
 
 struct SchedulerHeartbeatResponse {

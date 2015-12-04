@@ -35,6 +35,14 @@ TaskRunnerResponse LocalRunner::runTaskImpl(
   folly::dynamic& job_args,
   function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
 ) noexcept {
+  // From the point of view of cgroup reaping, all tasks of LocalRunner will
+  // get lumped into a single shard -- see more details in
+  // TaskSubprocessState::makeCGroupProcsPaths.  This is equivalent to
+  // saying "there should only be **one** LocalRunner per whatever your
+  // current cgroup namespace happens to be.  That's probably not what
+  // people want, but until a use case comes up, this is good enough.
+  running_task.workerShard = "local";
+
   // Since it runs locally, the task treats the instance node as the worker.
   auto instance_node = Nodes::getInstanceNodeName();
   job_args["worker_node"] = instance_node;

@@ -30,3 +30,12 @@ cpp_unittest(
         '@/folly/experimental:test_util',
     ],
 )
+
+cpp_unittest(
+    name = 'test_cgroup_setup',
+    srcs = ['test_cgroup_setup.cpp'],
+    deps = [
+        '@/bistro/bistro/processes:processes',
+        '@/folly/experimental:test_util',
+    ],
+)

@@ -11,6 +11,7 @@ cpp_library(
         # Collections of utility functions
         'hostname.cpp',
         'shell.cpp',
+        'Exception.cpp',
     ],
     deps=[
         '@/folly:folly',

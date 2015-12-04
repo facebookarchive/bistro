@@ -15,6 +15,7 @@
 #include "bistro/bistro/processes/TaskSubprocessQueue.h"
 #include "bistro/bistro/stats/test/utils.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
+#include "bistro/bistro/test/utils.h"
 #include "bistro/bistro/utils/LogWriter.h"
 
 /**
@@ -59,24 +60,14 @@
 DECLARE_int32(task_thread_pool_size);
 
 using namespace facebook::bistro;
-using Clock = std::chrono::high_resolution_clock;
-using TimePoint = std::chrono::time_point<Clock>;
 
-namespace { // anonymous
-
+namespace {
 SubprocessStatsChecker statsChecker;
 
 void checkUsageLimits(const SubprocessUsage& usage) {
   statsChecker.checkLimits(usage);
 }
-
-double timeDiff(TimePoint a, TimePoint b) {
-  return
-    std::chrono::duration_cast<std::chrono::duration<double>>(a - b).count();
-}
-double timeSince(TimePoint t) { return timeDiff(Clock::now(), t); }
-
-}
+}  // anonymous namespace
 
 struct TestLogWriter : public BaseLogWriter {
   struct TaskLogs {
@@ -84,7 +75,7 @@ struct TestLogWriter : public BaseLogWriter {
     std::vector<std::string> stdout_;
     std::vector<std::string> stderr_;
     std::vector<folly::dynamic> events_;
-    std::vector<TimePoint> eventTimes_;
+    std::vector<TestTimePoint> eventTimes_;
   };
 
   using TaskLogMap = std::map<std::pair<std::string, std::string>, TaskLogs>;
@@ -149,7 +140,7 @@ struct TestLogWriter : public BaseLogWriter {
           // Don't log since TaskSubprocessQueue::logEvent already does.
           record_logs_fn([&d](TaskLogs* logs) {
             logs->events_.push_back(std::move(d));
-            logs->eventTimes_.push_back(Clock::now());
+            logs->eventTimes_.push_back(TestClock::now());
           });
         }
         break;
@@ -164,58 +155,91 @@ struct TestLogWriter : public BaseLogWriter {
 };
 
 struct TestTaskSubprocessQueue : public ::testing::Test {
-  TestTaskSubprocessQueue() : startTime_(Clock::now()) {
+  TestTaskSubprocessQueue() : startTime_(TestClock::now()) {
     // Need a default for determinism since some tests change this.
     FLAGS_task_thread_pool_size = 10;
   }
 
-  void runAndKill(const std::string& cmd, cpp2::TaskSubprocessOptions opts) {
+  // Default RunningTask used by runTask, runAndKill, etc.
+  static cpp2::RunningTask runningTask() {
     cpp2::RunningTask rt;
     rt.job = "job";
     rt.node = "node";
+    // CGroup namind depends on this, but most other tests don't care.
+    rt.workerShard = "shard";
+    return rt;
+  }
+
+  static cpp2::KillRequest requestSigkill() {
+    cpp2::KillRequest req;
+    req.method = cpp2::KillMethod::KILL;
+    return req;
+  }
+
+  // Status callback asserting the task was killed.
+  static void expectKilled(
+      const cpp2::RunningTask& rt,
+      TaskStatus&& status) noexcept {
+    EXPECT_EQ(runningTask(), rt);
+    EXPECT_EQ(
+      TaskStatusBits::Incomplete | TaskStatusBits::UsesBackoff
+        | TaskStatusBits::DoesNotAdvanceBackoff,
+      status.bits()
+    );
+    EXPECT_EQ(
+      "Task killed, no status returned",
+      (*status.data()).at("exception").asString().toStdString()
+    );
+  }
+
+  // Status callback asserting the task had an error matching this regex.
+  static void expectErrorRegex(
+      std::string regex,
+      const cpp2::RunningTask& rt,
+      TaskStatus&& st) noexcept {
+    EXPECT_EQ(runningTask(), rt);
+    EXPECT_EQ(TaskStatusBits::Error | TaskStatusBits::UsesBackoff, st.bits());
+    EXPECT_PCRE_MATCH(regex, (*st.data()).at("exception").asString());
+  }
+
+  // Run a task which will expect to be killed.
+  void runTask(
+      TaskSubprocessQueue* tsq,
+      const std::string& cmd,
+      cpp2::TaskSubprocessOptions opts,
+      TaskSubprocessQueue::StatusCob status_cob) {
+    tsq->runTask(
+      runningTask(),
+      std::vector<std::string>{"/bin/sh", "-c", cmd, "test_sh"},
+      "json_arg",
+      ".",
+      status_cob,
+      [](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+        EXPECT_EQ("job", rt.job);
+        EXPECT_EQ("node", rt.node);
+        checkUsageLimits(usage);
+      },
+      std::move(opts)
+    );
+  }
+
+  // Run a task and ensure it can be killed immediately.
+  void runAndKill(const std::string& cmd, cpp2::TaskSubprocessOptions opts) {
     TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>());
-    auto runTask = [&]() {
-      tsq.runTask(
-        rt,
-        std::vector<std::string>{"/bin/sh", "-c", cmd, "test_sh"},
-        "json_arg",
-        ".",
-        [](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-          EXPECT_EQ("job", rt.job);
-          EXPECT_EQ("node", rt.node);
-          EXPECT_EQ(
-            TaskStatusBits::Incomplete | TaskStatusBits::UsesBackoff
-              | TaskStatusBits::DoesNotAdvanceBackoff,
-            status.bits()
-          );
-          EXPECT_EQ(
-            "Task killed, no status returned",
-            (*status.data()).at("exception").asString()
-          );
-        },
-        [](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
-          EXPECT_EQ("job", rt.job);
-          EXPECT_EQ("node", rt.node);
-          checkUsageLimits(usage);
-        },
-        opts
-      );
-    };
-    runTask();
+    runTask(&tsq, cmd, std::move(opts), &expectKilled);
     // Ensure that we can't start the same task twice
     try {
-      runTask();
+      runTask(&tsq, cmd, std::move(opts), &expectKilled);
       FAIL() << "Should not be able to double-start a task";
     } catch (const std::runtime_error& ex) {
       EXPECT_PCRE_MATCH("Task already running: .* job .* node .*", ex.what());
     }
-    cpp2::KillRequest req;
-    req.method = cpp2::KillMethod::KILL;
     // We should fail to kill tasks with the wrong invocation ID.
+    auto rt = runningTask();
     ++rt.invocationID.rand;
-    EXPECT_THROW(tsq.kill(rt, req), std::runtime_error);
+    EXPECT_THROW(tsq.kill(rt, requestSigkill()), std::runtime_error);
     --rt.invocationID.rand;
-    tsq.kill(rt, req);
+    tsq.kill(rt, requestSigkill());
     EXPECT_GT(1.0, timeSince(startTime_));  // Start & kill take < 1 sec
   }
 
@@ -262,7 +286,7 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
   }
 
   folly::test::ChangeToTempDir td_;
-  TimePoint startTime_;
+  TestTimePoint startTime_;
   cpp2::TaskSubprocessOptions taskOpts_;
 };
 
@@ -535,7 +559,7 @@ TEST_F(TestTaskSubprocessQueue, TermWaitKillWithStatusKilled) {
 
   // Validate the event log and capture soft-kill timings
   SYNCHRONIZED(task_to_logs) {
-    TimePoint process_exit_time, pipes_closed_time;
+    TestTimePoint process_exit_time, pipes_closed_time;
     EXPECT_EQ(1, task_to_logs.size());
     auto& logs = task_to_logs[std::make_pair("job", "node")];
     EXPECT_EQ(0, logs.stdout_.size());
@@ -577,8 +601,8 @@ TEST_F(TestTaskSubprocessQueue, TermWaitKillWithStatusKilled) {
     EXPECT_EQ(event_idx, logs.events_.size());
 
     // Check soft-kill timings
-    EXPECT_NE(TimePoint(), process_exit_time);  // initialized
-    EXPECT_NE(TimePoint(), pipes_closed_time);  // initialized
+    EXPECT_NE(TestTimePoint(), process_exit_time);  // initialized
+    EXPECT_NE(TestTimePoint(), pipes_closed_time);  // initialized
     // The SIGKILL happens just over 1 sec after start
     EXPECT_LE(1.0, timeDiff(process_exit_time, startTime_));
     // The `sleep` child process waits the full 2 sec, and holds the pipe open.
@@ -628,4 +652,60 @@ TEST_F(TestTaskSubprocessQueue, RateLimitLog) {
   auto runtime = timeSince(startTime_);
   EXPECT_LE(1.0, runtime);  // Should be throttled to run for 1 sec.
   EXPECT_GT(1.5, runtime);  // Shouldn't take too long to print 3k lines.
+}
+
+// Basic integration test -- test_cgroup_setup.cpp has deeper coverage
+TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
+  folly::test::ChangeToTempDir td;
+  namespace p = std::placeholders;  // p::_1 to avoid conflicting with boost
+
+  // Nothing happens until we specify some subsystems.
+  cpp2::TaskSubprocessOptions opts;
+  opts.cgroupOptions.unitTestCreateFiles = true;
+  opts.cgroupOptions.root = "root";
+  opts.cgroupOptions.slice = "slice";
+  {
+    // tsq's destructor is the easiest way to await task exit :)
+    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>());
+    runTask(&tsq, "/bin/sleep 3600", opts, &expectKilled);
+    SCOPE_EXIT { tsq.kill(runningTask(), requestSigkill()); };
+    EXPECT_TRUE(boost::filesystem::is_empty("."));
+  }
+
+  // The slice directory must exist for this subsystem.
+  opts.cgroupOptions.subsystems = {"sys"};
+  {
+    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>());
+    runTask(&tsq, "/bin/sleep 3600", opts, std::bind(
+      &expectErrorRegex, ".*root/subsystem/slice must be a dir.*", p::_1, p::_2
+    ));
+  }
+
+  // Once we make the slice directory, everything works.
+  auto cg_dir =  // startTime & rand are 0 (The Epoch) & 0
+    folly::to<std::string>("root/sys/slice/shard:19700101000000:0:", getpid());
+  EXPECT_TRUE(boost::filesystem::create_directories("root/sys/slice"));
+  {
+    folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
+    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    runTask(&tsq, "/bin/echo ; exec /bin/sleep 3600", opts, &expectKilled);
+    SCOPE_EXIT { tsq.kill(runningTask(), requestSigkill()); };
+    while (  // Wait for the task to start.
+      task_to_logs->operator[](std::make_pair("job", "node")).stdout_.empty()
+    ) {
+      /* sleep override */
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    // Validate the contents of the cgroup directory.
+    auto check_file_fn = [&](std::string filename, std::string expected) {
+      std::string s;
+      auto path = cg_dir + "/" + filename;
+      EXPECT_TRUE(folly::readFile(path.c_str(), s));
+      EXPECT_EQ(expected, s) << " in " << path;
+      EXPECT_TRUE(boost::filesystem::remove(path));  // For is_empty(directory)
+    };
+    check_file_fn("cgroup.procs", "0");  // "0" means "add my PID".
+    check_file_fn("notify_on_release", "1");
+    EXPECT_TRUE(boost::filesystem::is_empty(cg_dir));   // No other files
+  }
 }

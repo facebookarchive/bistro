@@ -17,9 +17,16 @@
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/runners/TaskRunner.h"
 
+namespace facebook { namespace bistro {
 
-namespace facebook {
-namespace bistro {
+using TestClock = std::chrono::high_resolution_clock;
+using TestTimePoint = std::chrono::time_point<TestClock>;
+
+double timeDiff(TestTimePoint a, TestTimePoint b) {
+  return
+    std::chrono::duration_cast<std::chrono::duration<double>>(a - b).count();
+}
+double timeSince(TestTimePoint t) { return timeDiff(TestClock::now(), t); }
 
 struct BitBucketTaskStore : public TaskStore {
   void fetchJobTasks(const std::vector<std::string>& job_ids, Callback cb) {}
@@ -72,4 +79,4 @@ struct MockBistro {
   Bistro bistro_;
 };
 
-} } // facebook //bistro
+}}  // namespace facebook::bistro

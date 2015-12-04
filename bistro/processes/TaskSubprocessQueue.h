@@ -144,8 +144,11 @@ public:
   // only be used from the EventBase thread of the AsyncSubprocess.
   //
 
-  TaskSubprocessState(cpp2::TaskSubprocessOptions opts,
-                      TaskSubprocessQueue::ResourceCob&& resource_cb);
+  TaskSubprocessState(
+    const cpp2::RunningTask& rt,
+    cpp2::TaskSubprocessOptions opts,
+    TaskSubprocessQueue::ResourceCob&& resource_cb
+  );
   void asyncSubprocessCallback(const cpp2::RunningTask& rt,
                                folly::Subprocess& proc) noexcept;
 
@@ -171,6 +174,7 @@ public:
   void kill(cpp2::KillRequest r);
 
   const cpp2::TaskSubprocessOptions& opts() const { return opts_; }
+  const std::string& cgroupName() const { return cgroupName_; }
 
 private:
   int64_t getNumPolls() const {
@@ -188,13 +192,14 @@ private:
     // frequently then requested
     return std::ceil(resInterval / pollInterval);
   }
-private:
+
   const cpp2::TaskSubprocessOptions opts_;
   folly::MPMCQueue<cpp2::KillRequest> queue_;
   uint32_t killAfterTicks_{0};  // 0 says 'do not kill'; timer for operator()
   bool wasKilled_{false};
   TaskSubprocessQueue::ResourceCob resourceCallback_;
   int64_t numPolls_{0};
+  std::string cgroupName_;  // The last, per-task, part of the cgroup path.
 };
 }  // namespace detail
 

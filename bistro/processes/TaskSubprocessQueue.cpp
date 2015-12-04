@@ -16,6 +16,7 @@
 
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/processes/AsyncSubprocess.h"
+#include "bistro/bistro/processes/CGroupSetup.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/Exception.h"
 #include "bistro/bistro/utils/hostname.h"
@@ -104,6 +105,12 @@ void TaskSubprocessQueue::logEvent(
   }
 }
 
+namespace {
+uint32_t pollMs(const cpp2::TaskSubprocessOptions& opts) {
+  return std::max(1, opts.pollMs);
+}
+}  // anonymous namespace
+
 // Set up EventBased handlers to interact with the subprocess and its pipes.
 // Once the process exits, and the pipes close, the final callback removes
 // `state` from `tasks_`.
@@ -176,7 +183,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
   // running on the callbacks' EventBase before the callbacks even existed.
   state->pipeRateLimiter_.reset(new AsyncReadPipeRateLimiter(
     evb,
-    std::max(1, state->opts().pollMs),  // Poll at the Subprocess's rate
+    pollMs(state->opts()),  // Poll at the Subprocess's rate
     state->opts().maxLogLinesPerPollInterval,
     std::move(pipes)
   ));
@@ -188,6 +195,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
   );
   // Add callbacks to wait for the subprocess and pipes on the same EventBase.
   collectAll(
+    // 1) The moral equivalent of waitpid(), followed by wait for cgroup.
     asyncSubprocess(  // Never yields an exception
       evb,
       std::move(proc),
@@ -195,13 +203,14 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
       [rt, state](folly::Subprocess& p) {
         state->asyncSubprocessCallback(rt, p);
       },
-      std::max(1, state->opts().pollMs)
-    ).then([this, rt, state](folly::ProcessReturnCode&& rc) noexcept {
+      pollMs(state->opts())
+    ).then([this, rt, state, evb](folly::ProcessReturnCode&& rc) noexcept {
       logEvent(
         google::INFO, rt, state.get(), "process_exited",
         folly::dynamic::object("message", rc.str())
       );  // noexcept
     }),
+    // 2) Wait for the child to close all pipes
     collectAll(pipe_closed_futures).then([this, rt, state](
       std::vector<folly::Try<folly::Unit>>&& all_closed
     ) noexcept {  // Logs and swallows all exceptions
@@ -294,8 +303,11 @@ void TaskSubprocessQueue::runTask(
   // before setting up the callbacks, since those expect tasks_ to be ready,
   // and *may* run immediately.  Also, the destructor relies on tasks_ being
   // added to synchronously.
-  auto state = std::make_shared<detail::TaskSubprocessState>(std::move(opts),
-      std::move(resource_cob));
+  auto state = std::make_shared<detail::TaskSubprocessState>(
+    rt,
+    std::move(opts),
+    std::move(resource_cob)
+  );
   SYNCHRONIZED(tasks_) {
     if (!tasks_.emplace(makeInvocationID(rt), state).second) {
       throw BistroException(
@@ -348,9 +360,25 @@ void TaskSubprocessQueue::runTask(
       if (state->opts().processGroupLeader) {
         opts.processGroupLeader();
       }
-      // Can throw, and that's ok. Not inline to guarantee that `state` is
+      // folly::Subprocess() can throw, and that's ok. Do not make `proc`
+      // inline with waitForSubprocessAndPipes to ensure that `state` is
       // safe to use in the `catch` below.
-      folly::Subprocess proc(full_cmd, opts);
+      auto proc = [&state, &full_cmd](
+        // Pass by r-value, since opts will contain an invalid pointer after
+        // add_to_cgroups is destroyed below.
+        folly::Subprocess::Options&& opts
+      ) {
+        if (state->cgroupName().empty()) {
+          return folly::Subprocess(full_cmd, opts);
+        }
+        LOG(INFO) << "Making task cgroups named " << state->cgroupName();
+        // This must live only until folly::Subprocess's constructor exits.
+        AddChildToCGroups add_to_cgroups(cgroupSetup(
+          state->cgroupName(), state->opts().cgroupOptions
+        ));
+        opts.dangerousPostForkPreExecCallback(&add_to_cgroups);
+        return folly::Subprocess(full_cmd, opts);
+      }(std::move(opts));
       // IMPORTANT: This call must be last in the block and `noexcept` to
       // ensure that the below "remove from tasks_" cannot race the "remove
       // from tasks_" in the "subprocess exited and pipes closed" callback.
@@ -401,12 +429,45 @@ void TaskSubprocessQueue::kill(
 
 namespace detail {
 
+namespace {
+std::string makeCGroupName(
+    const cpp2::CGroupOptions& cgopts,
+    const cpp2::RunningTask& rt) {
+  if (cgopts.subsystems.empty()) {
+    return std::string();
+  }
+  // Create a unique ID based on the RunningTask and the supervisor's pid.
+  constexpr size_t kDateMax = 32; // 4+2+2+2+2+2+1 + 17 for sheer paranoia.
+  struct ::tm start_tm;
+  // Using localtime would cause DST headaches, and confusion in unit tests.
+  CHECK(gmtime_r(&rt.invocationID.startTime, &start_tm));
+  char start_time[kDateMax];
+  CHECK_LT(0, strftime(start_time, kDateMax, "%Y%m%d%H%M%S", &start_tm));
+  return folly::format(
+    // Tasks are never hierarchical, because e.g. `memory` hierarchy support
+    // is not cleanly composable, and `cpu` hierarchies also have interesting
+    // side effects. It was tempting to make the workerShard be a sub-cgroup,
+    // but it is a bad idea. Therefore, all tasks are flat.
+    //
+    // In fact, if you have multiple workers on your host, you should almost
+    // certainly allocate different slices to them.  Therefore, the presence
+    // of workerShard in the task ID is at best precautionary (avoiding
+    // collisions between worker instances), and aspirational (we could use
+    // it to have a worker re-adopt previously running tasks on startup).
+    "{}:{}:{:x}:{}", rt.workerShard, start_time, rt.invocationID.rand, getpid()
+  ).str();
+}
+}  // anonymous namespace
+
 // Hardcoded constant: 10 signals per ~10ms seems plenty.
-TaskSubprocessState::TaskSubprocessState(cpp2::TaskSubprocessOptions opts,
-  TaskSubprocessQueue::ResourceCob&& resource_cb)
-  : opts_(std::move(opts)),
+TaskSubprocessState::TaskSubprocessState(
+  const cpp2::RunningTask& rt,
+  cpp2::TaskSubprocessOptions opts,
+  TaskSubprocessQueue::ResourceCob&& resource_cb
+) : opts_(std::move(opts)),
     queue_(10),
-    resourceCallback_(std::move(resource_cb)) {
+    resourceCallback_(std::move(resource_cb)),
+    cgroupName_(makeCGroupName(opts_.cgroupOptions, rt)) {
 }
 
 void TaskSubprocessState::asyncSubprocessCallback(
@@ -434,7 +495,7 @@ void TaskSubprocessState::asyncSubprocessCallback(
         // Pick the earlier kill time of the two -- only one SIGKILL will fire.
         {
           uint32_t ticks =
-            std::max(0, kill_req.killWaitMs / opts_.pollMs);
+            std::max(0U, kill_req.killWaitMs / pollMs(opts_));
           killAfterTicks_ =
             (killAfterTicks_ == 0) ? ticks : std::min(ticks, killAfterTicks_);
         }
@@ -453,6 +514,11 @@ void TaskSubprocessState::asyncSubprocessCallback(
   // for when this callback runs, so sendSignal() is not racy, and is
   // guaranteed to go to the right process / pgid.
   if (signal != 0) {
+    // Do not signal the cgroup here because:
+    //  - Well-behaved tasks will respond just fine to signaling the PGID.
+    //  - Signaling only the cgroup takes longer and can fail in more ways.
+    //  - Signaling both can confuse applications that have SIGTERM handling.
+    // Therefore, cgroup killing only kicks in after the child has exited.
     CHECK(proc.returnCode().running());
     auto pid = proc.pid();
     CHECK(pid > 1);

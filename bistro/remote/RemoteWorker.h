@@ -103,6 +103,13 @@ public:
   }
   const folly::Optional<cpp2::WorkerSetID>&
     firstAssociatedWorkerSetID() const { return firstAssociatedWorkerSetID_; }
+  // Deliberately return a mutable ref, since it is only updated externally.
+  folly::Optional<cpp2::WorkerSetID>& indirectWorkerSetID() {
+    return indirectWorkerSetID_;
+  }
+  const folly::Optional<cpp2::WorkerSetID>& indirectWorkerSetID() const {
+    return indirectWorkerSetID_;
+  }
 
   /**
    * Returns folly::none if the heartbeat should be rejected. Note that the
@@ -287,6 +294,12 @@ private:
   // subsequent versions do, by definition).  Set once per worker instance,
   // at the same time as workerSetID_ is first set.
   folly::Optional<cpp2::WorkerSetID> firstAssociatedWorkerSetID_;
+  // If we think of `workerSetID_` as requiring its workers for a consensus,
+  // then this tries to track its transitive closure -- the union of the
+  // workers that are (indirectly) required by the workers in
+  // `workerSetID_`.  This is updated incrementally, and is at best a subset
+  // of the complete transitive closure.  See README.worker_set_consensus.
+  folly::Optional<cpp2::WorkerSetID> indirectWorkerSetID_;
 
   // TODO(lo-pri): Add exponential backoff to health checks. Otherwise, as
   // we churn workers, we will accumulate a lot of dead shard IDs that we'll

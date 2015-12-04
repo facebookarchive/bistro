@@ -46,26 +46,31 @@ cpp2::BistroInstanceID randInstanceID() {
   return id;
 }
 
-cpp2::WorkerSetID workerSetID(const FakeBistroWorkerThread& wt) {
-  cpp2::WorkerSetID ws;  // Leave .version and .schedulerID as default
-  addWorkerIDToHash(&ws.hash, wt.getBistroWorker().id);
-  return ws;
+cpp2::WorkerSetID addToWorkerSetID(
+    cpp2::WorkerSetID wsid,
+    const FakeBistroWorkerThread& wt) {
+  addWorkerIDToHash(&wsid.hash, wt.getBistroWorker().id);
+  ++wsid.version;
+  return wsid;
 }
 
-void addFakeWorker(
+cpp2::WorkerSetID addFakeWorker(
     RemoteWorkerRunner* runner,
     std::shared_ptr<const Config> config,
-    const FakeBistroWorkerThread& wt) {
+    const FakeBistroWorkerThread& wt,
+    cpp2::WorkerSetID wsid) {  // The current set of workers
 
   folly::test::CaptureFD stderr(2, printString);
 
   // Connect the worker to the Runner.
-  runner->processWorkerHeartbeat(
-    wt.getBistroWorker(), workerSetID(wt),
+  auto res = runner->processWorkerHeartbeat(
+    wt.getBistroWorker(), cpp2::WorkerSetID(),  // The 'old' scheduler's set ID
     // Cannot use UNIT_TEST_TIME here or elsewhere, since RemoteWorkerRunner
     // has a background thread that calls updateState with the system time.
     RemoteWorkerUpdate()
   );
+  wsid = addToWorkerSetID(wsid, wt);
+  EXPECT_EQ(wsid, res.workerSetID);
 
   // Wait the Runner to get running tasks & to request a healthcheck, in
   // either order.
@@ -90,11 +95,15 @@ void addFakeWorker(
     wt.getBistroWorker().id
   );
 
-  // The minimum worker_check_interval is 1 second, so send another heartbeat.
-  runner->processWorkerHeartbeat(
-    wt.getBistroWorker(), workerSetID(wt),
-    RemoteWorkerUpdate()
-  );
+  // The minimum worker_check_interval is 1 second, so send heartbeats to
+  // speed up the worker becoming healthy.  We need two -- the first sets
+  // RemoteWorker::workerSetID_, the second triggers 'consensus permits'.
+  for (int i = 0; i < 2; ++i) {
+    runner->processWorkerHeartbeat(
+      wt.getBistroWorker(), res.workerSetID,  // As if the worker echoed the ID
+      RemoteWorkerUpdate()
+    );
+  }
 
   waitForRegexOnFd(&stderr, folly::to<std::string>(
     ".* ", wt.shard(), " became healthy.*"
@@ -103,6 +112,8 @@ void addFakeWorker(
 
   // Register the new worker's resources
   runner->updateConfig(config);
+
+  return wsid;
 }
 
 const dynamic kJob = dynamic::object
@@ -145,7 +156,9 @@ TEST_F(TestRemoteRunner, HandleResources) {
   );
   ASSERT_EQ(TaskRunnerResponse::DoNotRunMoreTasks, res);
 
-  addFakeWorker(&runner, kConfig, worker);
+  cpp2::WorkerSetID wsid;
+  wsid.schedulerID = runner.getSchedulerID();
+  addFakeWorker(&runner, kConfig, worker, wsid);
 
   // The first task will consume all of `test_worker`'s `concurrency`.
   {
@@ -207,13 +220,22 @@ TEST_F(TestRemoteRunner, TestBusiestSelector) {
 
   // Like in HandleResources, make the workers before making the runner.
   FakeBistroWorkerThread worker1("w1", randInstanceID());
+
   FakeBistroWorkerThread worker2("w2", randInstanceID());
 
   auto task_statuses = make_shared<TaskStatuses>(make_shared<NoOpTaskStore>());
   RemoteWorkerRunner runner(task_statuses, shared_ptr<Monitor>());
 
-  addFakeWorker(&runner, kConfig, worker1);
-  addFakeWorker(&runner, kConfig, worker2);
+  cpp2::WorkerSetID wsid;
+  wsid.schedulerID = runner.getSchedulerID();
+  wsid = addFakeWorker(&runner, kConfig, worker1, wsid);
+  // Fake that w1 knows about w2, for consensusPermitsBecomingHealthy.
+  runner.processWorkerHeartbeat(
+    worker1.getBistroWorker(), addToWorkerSetID(wsid, worker2),
+    RemoteWorkerUpdate()
+  );
+  wsid = addFakeWorker(&runner, kConfig, worker2, wsid);
+
   // Wait for RemoteWorkerRunner to realize that the initial wait is over.
   while (runner.inInitialWaitForUnitTest()) {
     /* sleep override */ this_thread::sleep_for(std::chrono::milliseconds(5));

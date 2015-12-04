@@ -14,6 +14,7 @@
 #include <unordered_map>
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/utils/Exception.h"
 
 namespace facebook { namespace bistro {
@@ -56,7 +57,37 @@ private:
     std::string nextShard_;
   };
 
+  using VersionAndShard =
+    std::pair<int64_t /*WorkerSetID ver*/, std::string /*shard*/>;
+  // Provide a correct "less than" ordering in VersionShardSet even when the
+  // version overflows.
+  struct VersionAndShardEarlierThan {
+    bool operator()(const VersionAndShard& a, const VersionAndShard& b) {
+      return WorkerSetIDEarlierThan()(a.first, b.first) || (
+        (a.first == b.first) && (a.second < b.second)
+      );
+    }
+  };
+
 public:
+  struct HistoryStep {  // Exposed for unit tests
+    // Did a worker become MUST_DIE or get replaced at this step?  This
+    // doesn't have to be plural because we only prune the *prefix* of
+    // history, and thus never accumulate more than one removal per step.
+    // `removed` is always applied before `added`, which means that if a
+    // shard is added and removed in the same step, it appears in neither.
+    folly::Optional<std::string> removed;
+    // Newly connected workers added at or before this version (if initial).
+    std::unordered_set<std::string> added;
+    bool operator==(const HistoryStep& hs) const {
+      return hs.removed == removed && hs.added == added;
+    }
+  };
+  // The iterator must survive invalidation, so use std::map.
+  using History = std::map<int64_t, HistoryStep, WorkerSetIDEarlierThan>;
+  using VersionShardSet =  // Exposed for unit tests
+    std::set<VersionAndShard, VersionAndShardEarlierThan>;
+
   RemoteWorkers(
     time_t start_time,
     cpp2::BistroInstanceID scheduler_id
@@ -99,8 +130,9 @@ public:
   }
 
   // Return nullptr if there's no worker with this shard ID
-  const RemoteWorker* getWorker(const std::string& shard) {
-    return getNonConstWorker(shard);
+  const RemoteWorker* getWorker(const std::string& shard) const {
+    auto it = workerPool_.find(shard);
+    return it == workerPool_.end() ? nullptr : it->second.get();
   }
 
   // Returns nullptr if no worker is available
@@ -120,13 +152,20 @@ public:
     return mutableHostWorkerPool(hostname);
   }
 
-  // For unit tests
+  // All of these are for unit tests ONLY.
   cpp2::WorkerSetID nonMustDieWorkerSetID() const {
     return nonMustDieWorkerSetID_;
   }
   const std::multiset<cpp2::WorkerSetID>& initialWorkerSetIDs() const {
     return initialWorkerSetIDs_;
   }
+  const VersionShardSet& indirectVersionsOfNonMustDieWorkers() const {
+    return indirectVersionsOfNonMustDieWorkers_;
+  }
+  const bool consensusPermitsBecomingHealthyForUnitTest(std::string w) const {
+    return consensusPermitsBecomingHealthy(*getWorker(w));
+  }
+  const History& historyForUnitTest() const { return history_; }
 
 private:
   RemoteWorker* getNonConstWorker(const std::string& shard) {
@@ -158,6 +197,27 @@ private:
    * If hostname isn't found, makes an empty worker pool for more concise code.
    */
   RoundRobinWorkerPool& mutableHostWorkerPool(const std::string& hostname);
+
+  /**
+   * Goal: before letting a new worker `w` become healthy, we want it to be
+   * well-enough integrated into the other workers' consensus, so that on
+   * restart, the scheduler cannot reach an initial consensus that does not
+   * include `w`.
+   */
+  bool consensusPermitsBecomingHealthy(const RemoteWorker& w) const;
+
+  /**
+   * For each worker, find the highest version required by any worker in its
+   * indirect set. See implementation and README.worker_set_consensus.
+   */
+  void propagateIndirectWorkerSets();
+
+  /**
+   * Update nonMustDieWorkersByIndirectVersion_ and w->indirectWorkerSetID_,
+   * if this update changes this worker's indirect version.  See the
+   * algorithm in README.worker_set_consensus.
+   */
+  void updateIndirectWorkerSetVersion(RemoteWorker*, const cpp2::WorkerSetID&);
 
   bool inInitialWait_{true};
   time_t startTime_;  // For the "initial wait" computation
@@ -198,14 +258,45 @@ private:
   // Updated via the new/dead worker callbacks.
   std::multiset<cpp2::WorkerSetID> initialWorkerSetIDs_;
 
+  // Denormalizes RemoteWorker::inderctWorkerSetID()->version.  For each
+  // worker, this is first set when it echoes the first WorkerSetID from
+  // this scheduler, and is removed when the worker becomes MUST_DIE or is
+  // replaced.  Updated whenever indirectWorkerSetID() is updated.
+  //
+  // Firstly, lets consensusPermitsBecomingHealthy() efficiently determine
+  // if each worker indirectly requires a particular version (or above).
+  //
+  // Secondly, propagateIndirectWorkerSets() needs an efficient* way to
+  // iterate through the workers in increasing order of their
+  // indirectWorkerSetID version.
+  //
+  // * The shard in the key makes updates easier to impelement and more
+  // robust (since this becomes a unique-element set). In the unlikely event
+  // that hashing the shard ID hurts your perf, there is a way to store a
+  // RemoteWorker pointer here, it's just more error-prone.
+  VersionShardSet indirectVersionsOfNonMustDieWorkers_;
+
   // Collects the instance IDs of all non-MUST_DIE workers in workerPool_.
-  // If this matches initialWorkerSetIDs_, we can exit initial wait early.
-  // A new worker `w` cannot become eligible to run tasks until it requires
-  // all of these workers for consensus, **and** all these workers
-  // (indirectly) require `w` for consensus.  README.worker_set_consensus
-  // explains why only MUST_DIE is excluded, and other details.
+  // history_ is effectively a changelog of this set.
+  //
+  // Firstly, the scheduler can exit initial wait early if this set's hash
+  // matches the consensus set of initialWorkerSetIDs_.
+  //
+  // Secondly, a new worker `w` cannot become eligible to run tasks until it
+  // requires all of these workers for consensus, **and** all these workers
+  // (indirectly) require `w` for consensus.
+  //
+  // README.worker_set_consensus explains why only MUST_DIE is excluded, and
+  // other details.
   cpp2::WorkerSetID nonMustDieWorkerSetID_;
 
+  // nonMustDieWorkerSetID_ includes a version that points into the
+  // following history structure.  It is an ordered list of versions, each
+  // entry describes a change in the worker set.
+  //
+  // IMPORTANT: In order to safely handle the eventual overflow, always use
+  // WorkerSetIDEarlierThan to compare history versions.
+  History history_;
 
   // Only used so that RemoteWorkers can decide whether a WorkerSetID they
   // receive comes from the current scheduler.

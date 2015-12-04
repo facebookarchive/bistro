@@ -19,6 +19,9 @@
 #include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 
+// Future: could add a direct test for StatusChangeCob. For now, it's
+// adequately tested (indirectly) by test_remote_workers.cpp.
+
 using namespace facebook::bistro;
 using namespace folly::test;
 

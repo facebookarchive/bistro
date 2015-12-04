@@ -127,9 +127,9 @@ folly::Future<folly::ProcessReturnCode> asyncSubprocess(
   //  - The handler must have a stable address to be used with EventBase.
   //  - External ownership makes it possible for the object to be destroyed
   //    right before libevent invokes its callback (use-after-free).
-  new detail::AsyncSubprocess<RuntimeCallback>(
-    evb, std::move(proc), std::move(runtime_cob), poll_ms, &f
-  );
+  (new detail::AsyncSubprocess<RuntimeCallback>(
+    evb, std::move(proc), std::move(runtime_cob), poll_ms
+  ))->initialize(&f);
   return std::move(f.value());
 }
 namespace detail {
@@ -144,15 +144,20 @@ protected:
     folly::EventBase* event_base,
     folly::Subprocess proc,
     RuntimeCallback runtime_cob,
-    uint32_t poll_ms,
-    folly::Optional<folly::Future<folly::ProcessReturnCode>>* return_code
+    uint32_t poll_ms
   ) : AsyncTimeout(event_base),
       pollEveryMs_(poll_ms),
       runtimeCallback_(std::move(runtime_cob)),
-      subprocess_(std::move(proc)) {
+      subprocess_(std::move(proc)) {}
+
+  // Since Promise has a nontrivial destructor, it may be bad to `delete
+  // this` in the constructor, possibly even "undefined behavior"-bad :)
+  void initialize(
+    folly::Optional<folly::Future<folly::ProcessReturnCode>>* return_code
+  ) {
     *return_code = returnCode_.getFuture();
     scheduleTimeout(pollEveryMs_);
-    // CAREFUL: we're not in the EventBase thread here, but timeoutExpired
+    // CAREFUL: we're not in the EventBase thread here, so timeoutExpired
     // may already be running, and this may already be destroyed (!!!)
   }
 

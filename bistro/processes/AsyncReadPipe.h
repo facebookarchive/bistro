@@ -207,9 +207,8 @@ std::shared_ptr<AsyncReadPipe> asyncReadPipe(
   //  - The handler must have a stable address to be used with EventBase.
   //  - Purely external ownership would allow the object to be destroyed
   //    right before libevent invokes its callback (use-after-free).
-  new detail::AsyncReadPipeImpl<Callback>(
-    evb, std::move(pipe), std::move(cob), &p
-  );
+  (new detail::AsyncReadPipeImpl<Callback>(std::move(pipe), std::move(cob)))
+    ->initialize(evb, &p);
   return p;
 }
 
@@ -221,12 +220,13 @@ protected:
     folly::EventBase*, folly::File, Callback
   );
 
-  AsyncReadPipeImpl(
-    folly::EventBase* evb,
-    folly::File pipe,
-    Callback cob,
-    std::shared_ptr<AsyncReadPipe>* handler
-  ) : AsyncReadPipe(std::move(pipe)), self_(this), callback_(std::move(cob)) {
+  AsyncReadPipeImpl(folly::File pipe, Callback cob)
+    : AsyncReadPipe(std::move(pipe)), self_(this), callback_(std::move(cob)) {}
+
+  // Avoid "exception in constructor" shenanigans by two-stage initialization.
+  void initialize(
+      folly::EventBase* evb,
+      std::shared_ptr<AsyncReadPipe>* handler) {
     *handler = self_;
     // Enable nonblocking IO
     int fd = pipe_.fd();

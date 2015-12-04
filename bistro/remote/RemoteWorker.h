@@ -41,7 +41,16 @@ void enforceWorkerSchedulerProtocolVersion(int16_t worker, int16_t scheduler);
  * WARNING: Not thread-safe, the caller must provide its own mutex.
  */
 class RemoteWorker {
+  struct NoOpWorkerCob {
+    void operator()(const RemoteWorker&) const {}
+  };
+  struct NoOpWorkerSetIDChangeCob {
+    void operator()(RemoteWorker&, const cpp2::WorkerSetID&) const {}
+  };
 public:
+  using WorkerCob = std::function<void(const RemoteWorker&)>;
+  using WorkerSetIDChangeCob  // Non-const for indirectWorkerSetID_ changes.
+    = std::function<void(RemoteWorker&, const cpp2::WorkerSetID&)>;
 
   /**
    * Given a heartbeat from a previously unknown worker, make a
@@ -51,7 +60,19 @@ public:
     int64_t cur_time,
     const cpp2::BistroWorker& w_new,
     const cpp2::WorkerSetID& worker_set_id,
-    cpp2::BistroInstanceID scheduler_id
+    cpp2::BistroInstanceID scheduler_id,
+    // Called from this constructor -- this includes any time that
+    // processHeartbeat creates a new worker to bump the existing worker.
+    WorkerCob new_worker_cob = NoOpWorkerCob(),
+    // Called before the worker becomes lost, either due to timeout, or due
+    // to being bumped by a new and healthy worker.
+    WorkerCob dead_worker_cob = NoOpWorkerCob(),
+    // Called when the current worker's workerSetID_ is about to change to a
+    // new value, either from folly::none or from an existing value.  Never
+    // called with initialWorkerSetID_, never called with an ID whose
+    // version is earlier than workerSetID_->version.  Called **before**
+    // RemoteWorker alters its firstContainingWorkerSetID_.
+    WorkerSetIDChangeCob worker_set_id_change_cob = NoOpWorkerSetIDChangeCob()
   ) : worker_(w_new),
       state_(cur_time),
       initialWorkerSetID_(worker_set_id),
@@ -59,7 +80,11 @@ public:
       timeLastHealthcheckSent_(INT64_MIN),
       timeOfLastUnsureIfRunningCheck_(INT64_MIN),
       repeatsOfUnsureIfRunningCheck_(0),
-      schedulerID_(std::move(scheduler_id)) {
+      schedulerID_(std::move(scheduler_id)),
+      newWorkerCob_(std::move(new_worker_cob)),
+      deadWorkerCob_(std::move(dead_worker_cob)),
+      workerSetIDChangeCob_(std::move(worker_set_id_change_cob)) {
+    newWorkerCob_(*this);
   }
 
   bool isHealthy() const {
@@ -281,6 +306,10 @@ private:
   uint8_t repeatsOfUnsureIfRunningCheck_;  // for exponential backoff
 
   cpp2::BistroInstanceID schedulerID_;
+
+  WorkerCob newWorkerCob_;
+  WorkerCob deadWorkerCob_;
+  WorkerSetIDChangeCob workerSetIDChangeCob_;
 };
 
 }}

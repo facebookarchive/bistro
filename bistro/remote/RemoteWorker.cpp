@@ -193,6 +193,7 @@ void RemoteWorker::updateState(
     // Send a suicide request the moment we declare the worker lost (and
     // also on any heartbeat we receive from it thereafter).
     update->requestSuicide(worker_, "Current worker just became lost");
+    deadWorkerCob_(*this);
     loseRunningTasks(update);
     setState(RemoteWorkerState::State::MUST_DIE);
     return;
@@ -369,6 +370,9 @@ void RemoteWorker::updateNewWorker(
     const cpp2::BistroWorker& w_new,
     const cpp2::WorkerSetID& worker_set_id) {
 
+  if (state_.state_ != RemoteWorkerState::State::MUST_DIE) {
+    deadWorkerCob_(*this);
+  }
   // Any previous worker would have been killed, so make sure to lose those
   // running tasks (in the pathological case where the new worker has some
   // of the same running tasks, this logs "lost" followed by "running").
@@ -377,7 +381,10 @@ void RemoteWorker::updateNewWorker(
     update->curTime(),
     w_new,
     worker_set_id,
-    std::move(schedulerID_)
+    std::move(schedulerID_),
+    std::move(newWorkerCob_),
+    std::move(deadWorkerCob_),
+    std::move(workerSetIDChangeCob_)
   );
   // Read the 'This should never happen' comment in updateCurrentWorker.
   if (worker_set_id.schedulerID == schedulerID_) {
@@ -427,6 +434,7 @@ void RemoteWorker::updateCurrentWorker(
     } else if (!workerSetID_.hasValue() || WorkerSetIDEarlierThan()(
       workerSetID_->version, worker_set_id.version
     )) {
+      workerSetIDChangeCob_(*this, worker_set_id);
       workerSetID_ = worker_set_id;
     } else if (workerSetID_->version == worker_set_id.version) {
       CHECK(*workerSetID_ == worker_set_id)

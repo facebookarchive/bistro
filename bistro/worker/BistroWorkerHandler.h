@@ -118,6 +118,10 @@ public:
     return schedulerState_->id;
   }
 
+  // DO NOT USE. Public only for the unit test.
+  // Worker stops to accept new tasks and kills existing tasks.
+  void prepareSuicide();
+
 private:
   // TODO: Replace this with a common Thrift struct throughout Bistro &
   // worker, use it in RunningTask, etc.  (job, node are required)
@@ -137,8 +141,8 @@ private:
     ) : taskID(std::move(task_id)), status(std::move(status)) {}
   };
 
-  // Worker stops to accept new tasks, kills existing tasks, and quits.
-  void suicide();
+  void suicide();  // prepareSuicide(); log; _exit(1);
+  void throwIfSuicidal();  // Used by thrift calls
 
   // Don't run Thrift calls for another worker or from the wrong scheduler.
   void throwOnInstanceIDMismatch(
@@ -209,6 +213,11 @@ private:
   // prevents us from sending the heartbeat before the worker's Thrift
   // server is up.
   bool canConnectToMyself_;  // Used only by the heartbeat() thread.
+
+  // Flipped from true to false when the scheduler starts to commit suicide.
+  // While the worker kill its tasks, this has the effect of blocking new
+  // tasks from running.
+  std::atomic_bool committingSuicide_{false};
 
   // Physical resources monitoring
   std::unique_ptr<SubprocessStatsGetter> systemStatsGetter_;

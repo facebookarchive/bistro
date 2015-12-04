@@ -28,6 +28,7 @@
 
 DECLARE_int32(heartbeat_period_sec);
 DECLARE_int32(incremental_sleep_ms);
+DECLARE_int32(worker_suicide_task_kill_wait_ms);
 
 using namespace facebook::bistro;
 using namespace folly;
@@ -58,6 +59,8 @@ struct TestWorker : public ::testing::Test {
     FLAGS_heartbeat_period_sec = 0;
     // Make BackgroundThreads exit a lot faster.
     FLAGS_incremental_sleep_ms = 10;
+    // Speed up HandleSuicide
+    FLAGS_worker_suicide_task_kill_wait_ms = 1000;
   }
 };
 
@@ -142,6 +145,72 @@ TEST_F(TestWorker, HandleNormal) {
     ASSERT_EQ("test_job", log.lines.back().jobID);
     ASSERT_EQ("test_node", log.lines.back().nodeID);
     ASSERT_EQ(LogLine::kNotALineID, log.nextLineID);
+  }
+}
+
+bool findInLog(
+    BistroWorkerTestThread& worker,
+    std::string logtype,
+    std::string job,
+    std::string node,
+    std::string target,
+    int num_lines = 10) {
+  cpp2::LogLines ll;
+  worker.getClient()->sync_getJobLogsByID(
+    ll, logtype, {job}, {node}, 0, true, num_lines, ""
+  );
+  for (const auto& l : ll.lines) {
+    if (l.line == target) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST_F(TestWorker, HandleSuicide) {
+  // The setup essentially follows HandleNormal
+  ThriftMonitorTestThread scheduler;
+  BistroWorkerTestThread worker(bind(
+    &ThriftMonitorTestThread::getClient, &scheduler, std::placeholders::_1
+  ));
+  {
+    folly::test::CaptureFD stderr(2, printString);
+    waitForWorkerHealthy(worker, &stderr);
+  }
+
+  // Start two tasks, and wait for them to set signal handlers.
+  for (size_t i = 0; i < 2; ++i) {
+    const auto node = folly::to<std::string>("n", i);
+    cpp2::TaskSubprocessOptions subproc_opts;
+    subproc_opts.processGroupLeader = true;  // So we kill the `sleep`
+    worker.runTask("j", node, std::vector<std::string>{
+      // Use "" to break up the two strings we want to regex-match, so
+      // that we don't match the worker echoing the command.
+      "/bin/sh", "-c", folly::to<std::string>(
+        "trap 'echo TERM\"\"n", i, "; kill -9 $$' TERM; ",
+        "echo j_n", i, "_\"\"run; sleep 10000"
+      )
+    }, std::move(subproc_opts));
+    // Wait for the task to start.
+    while (!findInLog(
+      worker, "stdout", "j", node, folly::to<std::string>("j_n", i, "_run\n")
+    )) {}
+    // It has not seen SIGTERM yet.
+    EXPECT_FALSE(findInLog(
+      worker, "stdout", "j", node, folly::to<std::string>("TERMn", i, "\n")
+    ));
+  }
+
+  // TERM-WAIT-KILL all tasks.  This takes ~1 second since it is not
+  // implemented very efficiently.
+  worker.prepareSuicide();
+
+  // We should now have evidence of both tasks getting SIGTERM.
+  for (size_t i = 0; i < 2; ++i) {
+    while (!findInLog(
+      worker, "stdout", "j", folly::to<std::string>("n", i),
+      folly::to<std::string>("TERMn", i, "\n")
+    )) {}
   }
 }
 

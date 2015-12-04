@@ -64,7 +64,8 @@ shared_ptr<cpp2::BistroWorkerAsyncClient> BistroWorkerTestThread::getClient() {
 cpp2::RunningTask BistroWorkerTestThread::runTask(
   const string& job,
   const string& node,
-  const vector<string>& cmd
+  const vector<string>& cmd,
+  cpp2::TaskSubprocessOptions subproc_opts
 ) {
   cpp2::RunningTask rt;
   rt.job = job;
@@ -77,9 +78,13 @@ cpp2::RunningTask BistroWorkerTestThread::runTask(
     getSchedulerID(),
     getWorker().id,
     0,
-    cpp2::TaskSubprocessOptions()
+    std::move(subproc_opts)
   );
   return rt;
+}
+
+void BistroWorkerTestThread::prepareSuicide() {
+  return workerPtr_->prepareSuicide();
 }
 
 RemoteWorkerState::State BistroWorkerTestThread::getState() const {

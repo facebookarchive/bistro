@@ -49,6 +49,12 @@ DEFINE_string(
   "Note that storing log DBs on a networked FS is guaranteed to reduce "
   "your overall system reliability."
 );
+DEFINE_int32(
+  worker_suicide_task_kill_wait_ms, 5000,
+  "When the worker is going down due to suicide (i.e. a too-long network "
+  "partition, or a scheduler request), it TERM-wait-KILLs its tasks. This "
+  "is how long it waits."
+);
 
 namespace facebook { namespace bistro {
 
@@ -144,12 +150,24 @@ BistroWorkerHandler::BistroWorkerHandler(
 }
 
 BistroWorkerHandler::~BistroWorkerHandler() {
+  prepareSuicide();  // Block new requests, kill tasks, wait for them to exit
   stopBackgroundThreads();
+}
+
+void BistroWorkerHandler::throwIfSuicidal() {
+  if (committingSuicide_.load()) {
+    throw BistroWorkerException(
+      "Worker ", worker_.id.startTime, "/" , worker_.id.rand,
+      " is committing suicide"
+    );
+  }
 }
 
 void BistroWorkerHandler::getRunningTasks(
     std::vector<cpp2::RunningTask>& out_running_tasks,
     const cpp2::BistroInstanceID& worker) {
+
+  throwIfSuicidal();
 
   if (worker != worker_.id) {
     throw BistroWorkerException(
@@ -182,6 +200,8 @@ void BistroWorkerHandler::runTask(
     const cpp2::BistroInstanceID& worker,
     int64_t notify_if_tasks_not_running_sequence_num,
     const cpp2::TaskSubprocessOptions& opts) {
+
+  throwIfSuicidal();
 
   AutoTimer<> timer("runTask was slow");
   timer.setMinTimeToLog(0.1); // 100 ms per log => 10 tasks/sec
@@ -300,6 +320,9 @@ void BistroWorkerHandler::notifyIfTasksNotRunning(
     const cpp2::BistroInstanceID& worker,
     int64_t notify_if_tasks_not_running_sequence_num) {
 
+  // Don't check committingSuicide_ since if we manage to reply to such
+  // requests, it's overall better for consistency.
+
   throwOnInstanceIDMismatch("notifyIfTasksNotRunning", scheduler, worker);
   std::vector<cpp2::RunningTask> not_running_tasks;
 
@@ -352,10 +375,18 @@ void BistroWorkerHandler::requestSuicide(
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker) {
 
+  throwIfSuicidal();  // We're already killing tasks, so bugger off
   throwOnInstanceIDMismatch("requestSuicide", scheduler, worker);
   LOG(WARNING) << "Scheduler requested suicide";
   logStateTransitionFn_("scheduler_requested_suicide", worker_, nullptr);
-  suicide();
+  // Block running tasks even before we return to the scheduler.
+  committingSuicide_.store(true);
+  // This won't actually loop, but it's nicer not to block here, so that the
+  // scheduler's request will (usually) appear to succed.
+  runInBackgroundLoop([this]() {
+    suicide();
+    return std::chrono::seconds(1);  // Not reached.
+  });
 }
 
 void BistroWorkerHandler::killTask(
@@ -364,6 +395,7 @@ void BistroWorkerHandler::killTask(
     const cpp2::BistroInstanceID& worker,
     const cpp2::KillRequest& req) {
 
+  throwIfSuicidal();  // Technically, the kill will succeed, but ...
   throwOnInstanceIDMismatch("killTask", scheduler, worker);
   logStateTransitionFn_("kill_task_request", worker_, &rt);
   // Only sends the signal, does not wait -- if the task dies,
@@ -373,36 +405,42 @@ void BistroWorkerHandler::killTask(
 }
 
 void BistroWorkerHandler::suicide() {
+  prepareSuicide();  // Kill tasks, block new run requests.
   LOG(WARNING) << "Committing suicide";
   logStateTransitionFn_("suicide", worker_, nullptr);
+  // Future: tell the server to exit gracefully instead :D
   _exit(1);
-  // Rationale: As written, suicide is fast and fail-safe. A desirable
-  // alternative would be to take a few seconds to soft-kill all the child
-  // processes.  However, that would require the implementation to address a
-  // variety of race conditions and issues:
-  //
-  //  - Ensure the "soft-kill" process takes a well-defined amount of time.
-  //    This requires that we soft-kill many tasks in parallel, and
-  //    potentially have a timer to hard-quit early.
-  //
-  //  - Prevent new tasks from being started.
-  //
-  //  - Decide what to do with notifyFinished(), notifyNotRunning() and with
-  //    the unsent notifications.  In most cases, the scheduler won't want
-  //    or will be unable to receive our notifications, so a poor
-  //    implementation may generate a lot of 'failed notification' spam on
-  //    the worker and/or scheduler.
-  //
-  //  - Avoid sending heartbeats. Avoid double-suicide.
-  //
-  //  - Take care with locks on state_ and runningTasks_ to avoid deadlocks
-  //    and blocking for too long.
-  //
-  // Implementing all of the above correctly, and with tight control of
-  // timing is a lot of work, and not clearly all that much better.  In
-  // contrast, relying on PARENT_DEATH_SIGNAL is easy, and is good enough
-  // for well-behaved children.  If it's crucial for suicide to do
-  // soft-kills in your application, reopen the discussion.
+}
+
+void BistroWorkerHandler::prepareSuicide() {
+  committingSuicide_.store(true);
+  logStateTransitionFn_("kill_all_tasks", worker_, nullptr);
+  // While there are tasks, TERM-wait-KILL, rinse, and repeat.
+  cpp2::KillRequest req;
+  req.method = cpp2::KillMethod::TERM_WAIT_KILL;
+  req.killWaitMs = FLAGS_worker_suicide_task_kill_wait_ms;
+  while (true) {
+    LOG(WARNING) << "Trying to kill all tasks";
+    size_t num_running_tasks = 0;
+    SYNCHRONIZED(runningTasks_) {
+      for (const auto& p : runningTasks_) {
+        // This is slightly lame, but good enough. kill() only throws if the
+        // task invocation no longer exists, so that's how we count tasks.
+        try {
+          taskQueue_.kill(p.second, req);
+          ++num_running_tasks;
+        } catch (const std::exception&) {
+          // Not a running task any more
+        }
+      }
+    }
+    if (num_running_tasks == 0) {
+      break;
+    }
+    /*sleep override*/ std::this_thread::sleep_for(std::chrono::milliseconds(
+      FLAGS_worker_suicide_task_kill_wait_ms
+    ));
+  }
 }
 
 void BistroWorkerHandler::throwOnInstanceIDMismatch(
@@ -424,6 +462,10 @@ void BistroWorkerHandler::throwOnInstanceIDMismatch(
 }
 
 chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
+  // Not checking commitedSuicide_ here since, in rare cases, some good can
+  // come out of these notifications (the tasks are already done, so we
+  // might as well try to report them if the scheduler will listen).
+
   // Reset the client every 100 calls. DO(agoder): why did you do that?
   shared_ptr<cpp2::BistroSchedulerAsyncClient> client;
   try {
@@ -487,6 +529,9 @@ chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
  * reschedule the task.
  */
 chrono::seconds BistroWorkerHandler::notifyNotRunning() noexcept {
+  // Just as with notifyFinished, there is no benefit to checking
+  // committingSuicide_ here.
+
   // Reset the client every 100 calls. DO(agoder): why did you do that?
   shared_ptr<cpp2::BistroSchedulerAsyncClient> client;
   try {
@@ -544,6 +589,9 @@ void BistroWorkerHandler::setState(
 }
 
 chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
+  if (committingSuicide_.load()) {  // Stop sending heartbeats once dying.
+    return chrono::seconds(1);
+  }
   if (!canConnectToMyself_) {
     // Make a transient event base since we only use it for one sync call.
     EventBase evb;
@@ -649,6 +697,9 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
 }
 
 chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
+  if (committingSuicide_.load()) {  // No point in updating state_ any more.
+    return chrono::seconds(1);
+  }
   try {
     time_t cur_time = time(nullptr);
     SYNCHRONIZED(state_) {
@@ -698,6 +749,8 @@ void BistroWorkerHandler::getJobLogsByID(
     bool is_ascending,
     int limit,
     const string& regex_filter) {
+
+  // Even if we are committingSuicide_, there's no harm in returning logs.
 
   auto log = taskQueue_.getLogWriter()->getJobLogs(
     logtype,

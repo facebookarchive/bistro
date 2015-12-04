@@ -36,12 +36,15 @@ public:
   cpp2::RunningTask runTask(
     const std::string& job,
     const std::string& node,
-    const std::vector<std::string>& cmd
+    const std::vector<std::string>& cmd,
+    cpp2::TaskSubprocessOptions subproc_opts = cpp2::TaskSubprocessOptions()
   );
 
   RemoteWorkerState::State getState() const;
   cpp2::BistroWorker getWorker() const;
   cpp2::BistroInstanceID getSchedulerID() const;
+
+  void prepareSuicide();
 
 private:
   std::shared_ptr<BistroWorkerHandler> workerPtr_;

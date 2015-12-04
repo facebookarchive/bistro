@@ -109,17 +109,6 @@ protected:
          cb) noexcept override;
 
 private:
-  /**
-   * At startup, the scheduler has to wait for workers to connect, and to
-   * report their running tasks, so that we do not accidentally re-start
-   * tasks that are already running elsewhere.
-   *
-   * Should only be used from the background thread, **after** update is
-   * populated by RemoteWorkers::updateState.  Other places should use
-   * inInitialWait_.load(std::memory_order_relaxed).
-   */
-  void checkInitialWait(const RemoteWorkerUpdate& update);
-
   // Thrift helpers
   std::shared_ptr<cpp2::BistroWorkerAsyncClient> getWorkerClient(
     const cpp2::BistroWorker& w
@@ -173,8 +162,6 @@ private:
   // only experiences one write, true => false, it's fine to use
   // std::memory_order_relaxed with all accesses.
   std::atomic<bool> inInitialWait_;
-  // Used to enforce the initial wait.
-  time_t startTime_;
 
   // Used to report errors to the UI, can be null.
   std::shared_ptr<Monitor> monitor_;

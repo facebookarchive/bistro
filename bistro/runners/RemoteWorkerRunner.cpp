@@ -27,15 +27,6 @@
 #include "bistro/bistro/if/gen-cpp2/BistroWorker_custom_protocol.h"
 #include "bistro/bistro/flags/Flags.h"
 
-DEFINE_int32(
-  CAUTION_startup_wait_for_workers, -1,
-  "At startup, the scheduler has to wait for workers to connect, so that "
-  "we do not accidentally re-start tasks that are already running elsewhere. "
-  "The default of -1 computes a 'minimum safe wait' from your healthcheck "
-  "and worker loss timeouts. CAUTION: If you reduce these timeouts from one "
-  "scheduler run to the next, the new default wait may not be long enough. "
-);
-
 namespace facebook { namespace bistro {
 
 using namespace std;
@@ -45,19 +36,35 @@ using namespace apache::thrift;
 RemoteWorkerRunner::RemoteWorkerRunner(
     shared_ptr<TaskStatuses> task_statuses,
     std::shared_ptr<Monitor> monitor)
-  : workerLevel_(StringTable::NotFound),
+  : workers_(folly::construct_in_place, time(nullptr)),
+    workerLevel_(StringTable::NotFound),
     taskStatuses_(task_statuses),
     eventBase_(new folly::EventBase()),
     eventBaseThread_(bind(&folly::EventBase::loopForever, eventBase_.get())),
     inInitialWait_(true),
-    startTime_(time(nullptr)),
     monitor_(monitor) {
 
   // Monitor the workers: send healthchecks, mark them (un)healthy / lost, etc
   runInBackgroundLoop([this](){
     RemoteWorkerUpdate update;
     workers_->updateState(&update);
-    checkInitialWait(update);  // Must be called **after** updateState
+
+    // This cannot be in applyUpdate, since initial wait is only computed in
+    // updateState() and not in processHeartbeat().
+    //
+    // It is safe to end the initial wait before doing anything else, since we
+    // update TaskStatuses immediately after initializeRunningTasks().  I.e.,
+    // if we think that all workers have connected, then the scheduler is also
+    // aware of all their running tasks by this point.
+    DEFINE_MONITOR_ERROR(monitor_, error, "RemoteWorkerRunner initial wait");
+    const auto& init_wait_msg = update.initialWaitMessage();
+    if (init_wait_msg.empty()) {
+      inInitialWait_.store(false, std::memory_order_relaxed);
+      // No call to 'error' clears the "intial wait" errors from the UI.
+    } else {
+      LOG(WARNING) << error.report(init_wait_msg);
+    }
+
     applyUpdate(&update);
     return chrono::seconds(RemoteWorkerState::workerCheckInterval());
   });
@@ -531,58 +538,6 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   return RanTask;
 }
 
-// Must be called after "update" is populated by updateState.
-void RemoteWorkerRunner::checkInitialWait(const RemoteWorkerUpdate& update) {
-  DEFINE_MONITOR_ERROR(monitor_, error, "RemoteWorkerRunner initial wait");
-  if (!inInitialWait_.load(std::memory_order_relaxed)) {
-    return;  // Clear the "intial wait" errors from the UI.
-  }
-
-  time_t min_safe_wait =
-    RemoteWorkerState::maxHealthcheckGap() +
-    RemoteWorkerState::loseUnhealthyWorkerAfter() +
-    RemoteWorkerState::workerCheckInterval();  // extra safety gap
-  time_t min_start_time = time(nullptr);
-  if (FLAGS_CAUTION_startup_wait_for_workers < 0) {
-    min_start_time -= min_safe_wait;
-  } else {
-    min_start_time -= FLAGS_CAUTION_startup_wait_for_workers;
-    if (RemoteWorkerState::maxHealthcheckGap()
-        > FLAGS_CAUTION_startup_wait_for_workers) {
-      LOG(ERROR) << error.report(
-        "DANGER! DANGER! Your --CAUTION_startup_wait_for_workers ",
-        "of ", FLAGS_CAUTION_startup_wait_for_workers,
-        " is lower than the max healthcheck gap of ",
-        RemoteWorkerState::maxHealthcheckGap(), ", which makes it very ",
-        "likely that you will start second copies of tasks that are ",
-        "already running (unless your heartbeat interval is much smaller) "
-      );
-    } else if (min_safe_wait > FLAGS_CAUTION_startup_wait_for_workers) {
-      LOG(WARNING) << error.report(
-        "Your custom --CAUTION_startup_wait_for_workers is ",
-        "less than the minimum safe value of ", min_safe_wait,
-        " -- this increases the risk of starting second copies of tasks ",
-        "that were already running."
-      );
-    }
-  }
-
-  // If, after the initial wait time expired, we are still querying running
-  // tasks, then the scheduler may have restarted, and one of the workers,
-  // while slow, is running tasks we do not know about.  To be safe, stay in
-  // initial wait until all getRunningTasks succeed.
-  if (min_start_time < startTime_) {
-    LOG(INFO) << error.report("Waiting for all workers to connect");
-  } else if (update.newWorkers().empty()) {
-    inInitialWait_.store(false, std::memory_order_relaxed);
-  } else {
-    LOG(ERROR) << error.report(
-      "Initial wait time expired, but not all workers' running tasks were "
-      "fetched; not allowing tasks to start until all are fetched."
-    );
-  }
-}
-
 ///
 /// Thrift helpers
 ///
@@ -829,14 +784,7 @@ void RemoteWorkerRunner::fetchRunningTasksForNewWorkers(
               );
               // Atomically update RemoteWorker & TaskStatuses
               SYNCHRONIZED(workers_) {
-                auto worker = workers_.mutableWorkerOrAbort(w.shard);
-                // applyUpdate in another thread could have won (#5176536)
-                if (worker->getState() != RemoteWorkerState::State::NEW) {
-                  LOG(WARNING) << "Ignoring running tasks for non-new "
-                    << w.shard;
-                  return;
-                }
-                worker->initializeRunningTasks(running_tasks);
+                workers_.initializeRunningTasks(w, running_tasks);
                 // IMPORTANT: Update TaskStatuses **inside** the workers_ lock
                 for (const auto& rt : running_tasks) {
                   taskStatuses_->updateStatus(rt, TaskStatus::running());

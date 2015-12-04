@@ -57,11 +57,15 @@ private:
   };
 
 public:
-  RemoteWorkers() : workerPool_("all workers") {}
+  explicit RemoteWorkers(
+    time_t start_time
+  ) : startTime_(start_time),
+      workerPool_("all workers") {
+  }
 
   RemoteWorkers(const RemoteWorkers&) = delete;
-  RemoteWorkers(RemoteWorkers&&) = delete;
   RemoteWorkers& operator=(const RemoteWorkers&) = delete;
+  RemoteWorkers(RemoteWorkers&&) = delete;
   RemoteWorkers& operator=(RemoteWorkers&&) = delete;
 
   folly::Optional<cpp2::SchedulerHeartbeatResponse> processHeartbeat(
@@ -70,6 +74,11 @@ public:
   );
 
   void updateState(RemoteWorkerUpdate* update);
+
+  void initializeRunningTasks(
+    const cpp2::BistroWorker& worker,
+    const std::vector<cpp2::RunningTask>& running_tasks
+  );
 
   RemoteWorker* mutableWorkerOrAbort(const std::string& shard) {
     auto w = getNonConstWorker(shard);
@@ -117,9 +126,24 @@ private:
   }
 
   /**
+   * At startup, the scheduler has to wait for workers to connect, and to
+   * report their running tasks, so that we do not accidentally re-start
+   * tasks that are already running elsewhere.
+   *
+   * This call can tell the scheduler to exit initial wait if it expired,
+   * which normally means that any non-connected workers would have
+   * committed suicide -- thus, we cannot start duplicate tasks.
+   */
+  void updateInitialWait(RemoteWorkerUpdate* update);
+
+  /**
    * If hostname isn't found, makes an empty worker pool for more concise code.
    */
   RoundRobinWorkerPool& mutableHostWorkerPool(const std::string& hostname);
+
+  bool inInitialWait_{true};
+  time_t startTime_;  // For the "initial wait" computation
+
 
   RoundRobinWorkerPool workerPool_;
   // Per-host round-robin, with the pointers shared with workerPool_

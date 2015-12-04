@@ -60,13 +60,10 @@ public:
     return state_.state_ == RemoteWorkerState::State::HEALTHY;
   }
 
-  RemoteWorkerState::State getState() const {
-    return state_.state_;
-  }
+  RemoteWorkerState::State getState() const { return state_.state_; }
+  bool hasBeenHealthy() const { return state_.hasBeenHealthy_; }
+  const cpp2::BistroWorker& getBistroWorker() const { return worker_; }
 
-  const cpp2::BistroWorker& getBistroWorker() const {
-    return worker_;
-  }
 
   /**
    * Returns folly::none if the heartbeat should be rejected. Note that the
@@ -74,7 +71,8 @@ public:
    */
   folly::Optional<cpp2::SchedulerHeartbeatResponse> processHeartbeat(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& w_new
+    const cpp2::BistroWorker& w_new,
+    bool consensus_permits_becoming_healthy  // See README.worker_set_consensus
   );
 
   /**
@@ -85,7 +83,10 @@ public:
    * for the various worker timeouts to trigger responsively.  This is also
    * called on every worker heartbeat.
    */
-  void updateState(RemoteWorkerUpdate* update);
+  void updateState(
+    RemoteWorkerUpdate* update,
+    bool consensus_permits_becoming_healthy  // See README.worker_set_consensus
+  );
 
   /**
    * Used when the scheduler starts a task. Should be run atomically with
@@ -165,12 +166,15 @@ private:
    * This call is const so that processHealthcheck can check the correct
    * would-be state of the current worker without altering it.
    */
-  RemoteWorkerState::State computeState(int64_t cur_time) const {
+  std::pair<RemoteWorkerState::State, bool> computeState(
+      int64_t cur_time,
+      bool consensus_permits_becoming_healthy) const {
     return state_.computeState(
       cur_time,
       state_.maxHealthcheckGap(),
       worker_.heartbeatPeriodSec + state_.heartbeatGracePeriod(),
-      state_.loseUnhealthyWorkerAfter()
+      state_.loseUnhealthyWorkerAfter(),
+      consensus_permits_becoming_healthy
     );
   }
 
@@ -189,7 +193,8 @@ private:
    */
   void updateCurrentWorker(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& w_new
+    const cpp2::BistroWorker& w_new,
+    bool consensus_permits_becoming_healthy
   );
 
   /**
@@ -205,8 +210,23 @@ private:
     const TaskStatus& status
   ) noexcept;
 
+  // Set state_.state_.
+  void setState(RemoteWorkerState::State new_state) {
+    state_.state_ = new_state;
+    // A worker becomes HEALTHY for the first time when
+    // `consensus_permits_becoming_healthy` is true, and all other criteria
+    // for health are satisfied.  Then, state_.hasBeenHealthy_ becomes true
+    // for the lifetime of the worker, ensuring that it can become healthy
+    // regardless of the future value of `consensus_permits_becoming_healthy`.
+    // The worker process always sets `consensus_permits_becoming_healthy` to
+    // `false`, but updates hasBeenHealthy_ in the same way, thereby deferring
+    // the initial switch to HEALTHY to the scheduler.
+    state_.hasBeenHealthy_ = state_.hasBeenHealthy_
+      || (new_state == RemoteWorkerState::State::HEALTHY);
+  }
+
   cpp2::BistroWorker worker_;
-  RemoteWorkerState state_;
+  RemoteWorkerState state_;  // Always use setState to change state_.state_.
 
   // TODO(lo-pri): Add exponential backoff to health checks. Otherwise, as
   // we churn workers, we will accumulate a lot of dead shard IDs that we'll

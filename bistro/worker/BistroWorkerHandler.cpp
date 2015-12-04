@@ -533,6 +533,10 @@ void BistroWorkerHandler::setState(
     logStateTransitionFn_("became_healthy", worker_, nullptr);
   }
   state->state_ = new_state;
+  // Mirrors RemoteWorker::setState. This is how workers become HEALTHY for
+  // the first time, since they lacks `consensus_permits_becoming_healthy`.
+  state->hasBeenHealthy_ = state->hasBeenHealthy_
+    || (new_state == RemoteWorkerState::State::HEALTHY);
 }
 
 chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
@@ -646,7 +650,7 @@ chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
     SYNCHRONIZED(state_) {
       // Lock state_ first, then schedulerState_ -- and don't hold this lock.
       auto scheduler_state = schedulerState_.copy();
-      auto new_state = state_.computeState(
+      auto new_state_and_disallowed = state_.computeState(
         cur_time,
         scheduler_state.maxHealthcheckGap,
         worker_.heartbeatPeriodSec + scheduler_state.heartbeatGracePeriod,
@@ -657,9 +661,16 @@ chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
           // workers to be lost in a timely fashion (to avoid duplicate
           // tasks, e.g.), the worker tries to die a bit sooner than the
           // scheduler would lose it.
-          - scheduler_state.workerCheckInterval
+          - scheduler_state.workerCheckInterval,
+        // The worker never "transiently" allows itself to be healthy.
+        // Instead, this state transition happens when a heartbeat response
+        // updates state_->hasBeenHealthy_.
+        false
       );
-      setState(&state_, new_state, cur_time);
+      if (new_state_and_disallowed.second) {
+        LOG(INFO) << "Will be healthy upon achieving WorkerSetID consensus.";
+      }
+      setState(&state_, new_state_and_disallowed.first, cur_time);
     }
     if (state_->state_ == RemoteWorkerState::State::MUST_DIE) {
       LOG(ERROR) << "Scheduler was about to lose this worker; quitting.";

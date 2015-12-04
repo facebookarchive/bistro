@@ -34,6 +34,7 @@ class BistroWorkerHandler : public cpp2::BistroWorkerSvIf,
                             public fb303::FacebookBase2,
                             BackgroundThreadMixin {
 public:
+  // Must be thread-safe.
   typedef std::function<std::shared_ptr<cpp2::BistroSchedulerAsyncClient>(
     folly::EventBase* event_base
   )> SchedulerClientFn;

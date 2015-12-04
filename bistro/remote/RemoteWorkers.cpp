@@ -47,7 +47,7 @@ RemoteWorkers::processHeartbeat(
       shard, res.first->second
     ).second) << "Worker pool for hostname " << worker.machineLock.hostname
       << " already had " << " shard " << shard;
-    return res.first->second->processHeartbeat(update, worker);
+    return res.first->second->processHeartbeat(update, worker, true);
   }
   // If the hostname changed, move the worker to the new host pool
   const auto& old_hostname =
@@ -66,7 +66,7 @@ RemoteWorkers::processHeartbeat(
       << ": target already had shard " << shard;
   }
   // Update the worker's state (including the hostname)
-  return worker_it->second->processHeartbeat(update, worker);
+  return worker_it->second->processHeartbeat(update, worker, true);
   // TODO: Maybe remove everything in update->suicideWorkers_ from the
   // worker pools?
 }
@@ -76,7 +76,7 @@ void RemoteWorkers::updateState(RemoteWorkerUpdate* update) {
   CHECK(FLAGS_healthcheck_period > 0)
         << "--healthcheck_period must be positive";
   for (auto& pair : workerPool_) {
-    pair.second->updateState(update);
+    pair.second->updateState(update, true);
   }
   // TODO: Maybe remove everything in update->suicideWorkers_ from the
   // worker pools?

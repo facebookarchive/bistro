@@ -47,7 +47,7 @@ RemoteWorker initializeWorker(
   // Check that updateState() requests a health-check & new tasks
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    worker.updateState(&update);
+    worker.updateState(&update, /*permit_becoming_healthy =*/ false);
 
     RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     expected.addNewWorker(bw);
@@ -57,6 +57,7 @@ RemoteWorker initializeWorker(
 
   worker.initializeRunningTasks(running_tasks);
   EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
+  EXPECT_FALSE(worker.hasBeenHealthy());
 
   return worker;
 }
@@ -74,10 +75,27 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
   successfulHealthcheck(test_time, worker);
   EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker->getState());
 
-  // And a fresh heartbeat
+  // A healthcheck isn't enough, send a fresh heartbeat.
   RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
+
+  // consensus_permits_becoming_healthy is needed to get healthy for the
+  // first time.
   EXPECT_TRUE(worker->processHeartbeat(
-    &update, worker->getBistroWorker()
+    &update, worker->getBistroWorker(), false
+  ).hasValue());
+  EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker->getState());
+  EXPECT_FALSE(worker->hasBeenHealthy());
+
+  // Just as above, but consensus_permits_becoming_healthy is true.
+  EXPECT_TRUE(worker->processHeartbeat(
+    &update, worker->getBistroWorker(), true
+  ).hasValue());
+  EXPECT_TRUE(worker->hasBeenHealthy());
+  EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker->getState());
+
+  // consensus_permits_becoming_healthy isn't needed once we've been healthy
+  EXPECT_TRUE(worker->processHeartbeat(
+    &update, worker->getBistroWorker(), false
   ).hasValue());
   EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker->getState());
 
@@ -101,8 +119,9 @@ TEST(TestRemoteWorker, HandleNormal) {
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    worker.updateState(&update);
+    worker.updateState(&update, /*permit_becoming_healthy =*/ true);
     EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
+    EXPECT_TRUE(worker.hasBeenHealthy());
     EXPECT_PCRE_MATCH(glogWarningPattern(), stderr.readIncremental());
 
     // The default heartbeat grace period advances the time past the default
@@ -119,7 +138,9 @@ TEST(TestRemoteWorker, HandleNormal) {
   // Another heartbeat, and it'll be healthy again.
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    EXPECT_TRUE(worker.processHeartbeat(&update, bw).hasValue());
+    EXPECT_TRUE(worker.processHeartbeat(
+      &update, bw, /*permit_becoming_healthy =*/ false
+    ).hasValue());
     EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
 
     RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
@@ -127,6 +148,7 @@ TEST(TestRemoteWorker, HandleNormal) {
   }
   EXPECT_EQ(bw, worker.getBistroWorker());  // Got the new metadata
 
+  EXPECT_TRUE(worker.hasBeenHealthy());
   EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 }
 
@@ -148,11 +170,12 @@ TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {
   // the MUST_DIE state change?
   worker.addUnsureIfRunningTask(rt);
   EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
+  EXPECT_FALSE(worker.hasBeenHealthy());
 
   // Lose the worker
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    worker.updateState(&update);
+    worker.updateState(&update, /*permit_becoming_healthy =*/ true);
     EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, worker.getState());
 
     RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
@@ -164,13 +187,14 @@ TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {
   // Check that it stays lost, making no updates
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    worker.updateState(&update);
+    worker.updateState(&update, /*permit_becoming_healthy =*/ true);
     EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, worker.getState());
 
     RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     expectUpdateEq(expected, update);
   }
 
+  EXPECT_FALSE(worker.hasBeenHealthy());
   EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 }
 
@@ -197,7 +221,9 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     ++bw_new.id.startTime;
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    EXPECT_TRUE(worker.processHeartbeat(&update, bw_new).hasValue());
+    EXPECT_TRUE(worker.processHeartbeat(
+      &update, bw_new, /*permit_becoming_healthy =*/ true
+    ).hasValue());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_EQ(bw_new, worker.getBistroWorker());
 
@@ -220,7 +246,9 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
-    EXPECT_FALSE(worker.processHeartbeat(&update, bw_new).hasValue());
+    EXPECT_FALSE(worker.processHeartbeat(
+      &update, bw_new, /*permit_becoming_healthy =*/ false
+    ).hasValue());
     EXPECT_PCRE_MATCH(glogWarningPattern(), stderr.readIncremental());
     EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
     EXPECT_EQ(bw_old, worker.getBistroWorker());
@@ -238,8 +266,11 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
-    EXPECT_TRUE(worker.processHeartbeat(&update, bw_new).hasValue());
+    EXPECT_TRUE(worker.processHeartbeat(
+      &update, bw_new, /*permit_becoming_healthy =*/ true
+    ).hasValue());
     EXPECT_PCRE_MATCH(glogErrorPattern(), stderr.readIncremental());
+    EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_EQ(bw_new, worker.getBistroWorker());  // The bad one wins
 
@@ -266,7 +297,9 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     ++bw_new.machineLock.port;
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    EXPECT_FALSE(worker.processHeartbeat(&update, bw_new).hasValue());
+    EXPECT_FALSE(worker.processHeartbeat(
+      &update, bw_new, /*permit_becoming_healthy =*/ false
+    ).hasValue());
     EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
     EXPECT_EQ(bw_old, worker.getBistroWorker());  // The old one wins
 
@@ -284,7 +317,8 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    worker.updateState(&update);
+    worker.updateState(&update, /*permit_becoming_healthy =*/ true);
+    EXPECT_TRUE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
     EXPECT_PCRE_MATCH(glogWarningPattern(), stderr.readIncremental());
 
@@ -303,7 +337,10 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     ++bw_new.machineLock.port;
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    EXPECT_FALSE(worker.processHeartbeat(&update, bw_new).hasValue());
+    EXPECT_FALSE(worker.processHeartbeat(
+      &update, bw_new, /*permit_becoming_healthy =*/ true
+    ).hasValue());
+    EXPECT_TRUE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
     EXPECT_EQ(bw_old, worker.getBistroWorker());  // The old one wins
 
@@ -320,7 +357,10 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     ++bw_new.machineLock.port;
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    EXPECT_TRUE(worker.processHeartbeat(&update, bw_new).hasValue());
+    EXPECT_TRUE(worker.processHeartbeat(
+      &update, bw_new, /*permit_becoming_healthy =*/ true
+    ).hasValue());
+    EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_EQ(bw_new, worker.getBistroWorker());  // The new one wins
 
@@ -338,7 +378,10 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     ++bw_new.machineLock.port;
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    EXPECT_TRUE(worker.processHeartbeat(&update, bw_new).hasValue());
+    EXPECT_TRUE(worker.processHeartbeat(
+      &update, bw_new, /*permit_becoming_healthy =*/ true
+    ).hasValue());
+    EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_EQ(bw_new, worker.getBistroWorker());  // The new one wins
 
@@ -355,7 +398,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     auto bw_old = worker.getBistroWorker();
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    worker.updateState(&update);
+    worker.updateState(&update, /*permit_becoming_healthy =*/ true);
     EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, worker.getState());
 
     RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
@@ -368,7 +411,9 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     auto bw_old = worker.getBistroWorker();
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    EXPECT_TRUE(worker.processHeartbeat(&update, bw_old).hasValue());
+    EXPECT_TRUE(worker.processHeartbeat(
+      &update, bw_old, /*permit_becoming_healthy =*/ true
+    ).hasValue());
     EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, worker.getState());
     EXPECT_EQ(bw_old, worker.getBistroWorker());
 
@@ -376,6 +421,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     expected.requestSuicide(bw_old, "Current worker was already lost");
     expectUpdateEq(expected, update);
   }
+  EXPECT_FALSE(worker.hasBeenHealthy());
 
   // Now it can be replaced despite the flag being off
   FLAGS_allow_bump_unhealthy_worker = 0;
@@ -385,7 +431,10 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     ++bw_new.machineLock.port;
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    EXPECT_TRUE(worker.processHeartbeat(&update, bw_new).hasValue());
+    EXPECT_TRUE(worker.processHeartbeat(
+      &update, bw_new, /*permit_becoming_healthy =*/ true
+    ).hasValue());
+    EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_EQ(bw_new, worker.getBistroWorker());  // The new one wins
 
@@ -396,6 +445,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     expectUpdateEq(expected, update);
   }
 
+  EXPECT_FALSE(worker.hasBeenHealthy());
   EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 }
 
@@ -440,7 +490,9 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
       successfulHealthcheck(test_time, &worker);
 
       RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-      EXPECT_TRUE(worker.processHeartbeat(&update, bw).hasValue());
+      EXPECT_TRUE(worker.processHeartbeat(
+        &update, bw, /*permit_becoming_healthy =*/ false
+      ).hasValue());
       EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker.getState());
 
       RemoteWorkerUpdate
@@ -467,7 +519,7 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
 
     // Since there are no "unsure" tasks, this resets the backoff count
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    worker.updateState(&update);
+    worker.updateState(&update, /*permit_becoming_healthy =*/ false);
 
     RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     expectUpdateEq(expected, update);
@@ -478,6 +530,7 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
   // Note: The lost task test above already checked the interaction of
   // unsure-if-running tasks with loseRunningTasks.
 
+  EXPECT_TRUE(worker.hasBeenHealthy());
   EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 }
 

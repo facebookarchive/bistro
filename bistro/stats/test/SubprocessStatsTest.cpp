@@ -13,36 +13,34 @@
 
 using namespace facebook::bistro;
 
-namespace {
-
-SubprocessStatsChecker statsChecker;
-
-void checkUsage(const SubprocessUsage& usage, bool logging) {
-  statsChecker.checkLimits(usage);
-  if (logging) {
-    LOG(INFO) << "Current usage"
-              << ", numberCpuCores: " << usage.numberCpuCores
-              << ", rssMBytes: " << usage.rssMBytes
-              << ", numberGpuCores: " << usage.numberGpuCores
-              << ", gpuMBytes: " << usage.gpuMBytes;
+struct TestSubprocessStats : public ::testing::Test {
+  void checkUsage(const SubprocessUsage& usage, bool logging) {
+    statsChecker.checkLimits(usage);
+    if (logging) {
+      LOG(INFO) << "Current usage"
+                << ", numberCpuCores: " << usage.numberCpuCores
+                << ", rssMBytes: " << usage.rssMBytes
+                << ", numberGpuCores: " << usage.numberGpuCores
+                << ", gpuMBytes: " << usage.gpuMBytes;
+    }
   }
-}
 
-void threadFunction(int rounds,
-                    SubprocessStats& processor,
-                    std::atomic<bool>& starter) {
-  while (!starter) {
-    std::this_thread::yield();
+  void threadFunction(int rounds,
+                      SubprocessStats& processor,
+                      std::atomic<bool>& starter) {
+    while (!starter) {
+      std::this_thread::yield();
+    }
+    while (rounds-- > 0) {
+      checkUsage(processor.getUsage(), false);
+      std::this_thread::yield();
+    }
   }
-  while (rounds-- > 0) {
-    checkUsage(processor.getUsage(), false);
-    std::this_thread::yield();
-  }
-}
 
-}
+  SubprocessStatsChecker statsChecker;
+};
 
-TEST(TestSubprocessStats, HandleNew) {
+TEST_F(TestSubprocessStats, SingleThreaded) {
   auto getter = SubprocessStatsGetterFactory::get();
   EXPECT_NE(getter.get(), nullptr);
   SubprocessStats processor(std::move(getter));
@@ -59,7 +57,7 @@ TEST(TestSubprocessStats, HandleNew) {
   }
 }
 
-TEST(MutiThreadTestSubprocessStats, HandleNew) {
+TEST_F(TestSubprocessStats, MultiThreaded) {
   auto getter = SubprocessStatsGetterFactory::get();
   SubprocessStats processor(std::move(getter), 1, 1);
   const int kRounds = 4*1024;

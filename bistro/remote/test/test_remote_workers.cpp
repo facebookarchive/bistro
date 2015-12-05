@@ -767,7 +767,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   );
 
   // updateState hasn't run yet, so the only change is the loss of w1.
-  history.insert({5, {w1.shard, {}}});
+  history.insert({5, {w1.shard, std::unordered_set<std::string>{}}});
   updateWorkers(
     &r,
     {{4, "w2"}, {4, "w3"}, {4, "w4"}},
@@ -887,7 +887,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   EXPECT_EQ(wid1a234, r.getWorker("w4")->workerSetID());
   EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, r.getWorker("w4")->getState());
 
-  history.insert({7, {w4.shard, {}}});
+  history.insert({7, {w4.shard, std::unordered_set<std::string>{}}});
   updateWorkers(
     &r,
     {{5, "w2"}, {5, "w3"}, {6, "w1"}},

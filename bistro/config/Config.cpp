@@ -30,6 +30,76 @@ DEFINE_bool(
 
 namespace facebook { namespace bistro {
 
+namespace {  // If useful, export these to some utility file.
+const folly::dynamic* dynObjectPtr(
+    const folly::dynamic& d,
+    const folly::dynamic& key) {
+  const auto* p = d.get_ptr(key);
+  if (p && !p->isObject()) {
+    throw BistroException(key.asString(), " must be an object");
+  }
+  return p;
+}
+
+const folly::dynamic* dynArrayPtr(
+    const folly::dynamic& d,
+    const folly::dynamic& key) {
+  const auto* p = d.get_ptr(key);
+  if (p && !p->isArray()) {
+    throw BistroException(key.asString(), " must be an array");
+  }
+  return p;
+}
+
+const folly::Optional<std::string> dynGetString(
+    const folly::dynamic& d,
+    const folly::dynamic& key) {
+  if (const auto* p = d.get_ptr(key)) {
+    if (!p->isString()) {
+      throw BistroException(key.asString(), " must be a string");
+    }
+    return p->asString().toStdString();
+  }
+  return folly::none;
+}
+
+const folly::Optional<bool> dynGetBool(
+    const folly::dynamic& d,
+    const folly::dynamic& key) {
+  if (const auto* p = d.get_ptr(key)) {
+    if (!p->isBool()) {
+      throw BistroException(key.asString(), " must be a boolean");
+    }
+    return p->asBool();
+  }
+  return folly::none;
+}
+
+const folly::Optional<int64_t> dynGetInt(
+    const folly::dynamic& d,
+    const folly::dynamic& key) {
+  if (const auto* p = d.get_ptr(key)) {
+    if (!p->isInt()) {
+      throw BistroException(key.asString(), " must be an integer");
+    }
+    return p->asInt();
+  }
+  return folly::none;
+}
+
+const folly::Optional<double> dynGetDouble(
+    const folly::dynamic& d,
+    const folly::dynamic& key) {
+  if (const auto* p = d.get_ptr(key)) {
+    if (!p->isDouble() && !p->isInt()) {
+      throw BistroException(key.asString(), " must be a double");
+    }
+    return p->asDouble();
+  }
+  return folly::none;
+}
+}  // anonymous namespace
+
 namespace detail {
 void parseKillOrphanTasksAfter(
     const folly::dynamic& d,
@@ -68,63 +138,31 @@ folly::dynamic taskSubprocessOptionsToDynamic(
 void parseTaskSubprocessOptions(
     const folly::dynamic& d,
     cpp2::TaskSubprocessOptions* opts) {
-  if (const auto* tso = d.get_ptr(kTaskSubprocess)) {
-    if (!tso->isObject()) {
-      throw BistroException("task_subprocess must be an object");
+  if (const auto* tso = dynObjectPtr(d, kTaskSubprocess)) {
+    if (const auto p = dynGetInt(*tso, kPollMs)) {
+      opts->pollMs = *p;
     }
-    if (const auto* p = tso->get_ptr(kPollMs)) {
-      if (!p->isInt()) {
-        throw BistroException("poll_ms must be an integer");
-      }
-      opts->pollMs = p->asInt();
+    if (const auto p = dynGetInt(*tso, kMaxLogLinesPerPollInterval)) {
+      opts->maxLogLinesPerPollInterval = *p;
     }
-    if (const auto* p = tso->get_ptr(kMaxLogLinesPerPollInterval)) {
-      if (!p->isInt()) {
-        throw BistroException(
-          "max_log_lines_per_poll_interval must be an integer"
-        );
-      }
-      opts->maxLogLinesPerPollInterval = p->asInt();
+    if (const auto p = dynGetInt(*tso, kParentDeathSignal)) {
+      opts->parentDeathSignal = *p;
     }
-    if (const auto* p = tso->get_ptr(kParentDeathSignal)) {
-      if (!p->isInt()) {
-        throw BistroException("parent_death_signal must be an integer");
-      }
-      opts->parentDeathSignal = p->asInt();
+    if (const auto p = dynGetBool(*tso, kProcessGroupLeader)) {
+      opts->processGroupLeader = *p;
     }
-    if (const auto* p = tso->get_ptr(kProcessGroupLeader)) {
-      if (!p->isBool()) {
-        throw BistroException("process_group_leader must be a boolean");
-      }
-      opts->processGroupLeader = p->asBool();
+    if (const auto p = dynGetBool(*tso, kUseCanaryPipe)) {
+      opts->useCanaryPipe = *p;
     }
-    if (const auto* p = tso->get_ptr(kUseCanaryPipe)) {
-      if (!p->isBool()) {
-        throw BistroException("use_canary_pipe must be a boolean");
-      }
-      opts->useCanaryPipe = p->asBool();
-    }
-    if (const auto* cgp = tso->get_ptr(kCGroups)) {
-      if (!cgp->isObject()) {
-        throw BistroException("cgroups must be a boolean");
-      }
+    if (const auto* cgp = dynObjectPtr(*tso, kCGroups)) {
       auto& cgopts = opts->cgroupOptions;
-      if (const auto* p = cgp->get_ptr(kRoot)) {
-        if (!p->isString()) {
-          throw BistroException("cgroups root must be a string");
-        }
-        cgopts.root = p->asString().toStdString();
+      if (const auto p = dynGetString(*cgp, kRoot)) {
+        cgopts.root = p->toStdString();
       }
-      if (const auto* p = cgp->get_ptr(kSlice)) {
-        if (!p->isString()) {
-          throw BistroException("cgroups root must be a string");
-        }
-        cgopts.slice = p->asString().toStdString();
+      if (const auto p = dynGetString(*cgp, kSlice)) {
+        cgopts.slice = p->toStdString();
       }
-      if (const auto* p = cgp->get_ptr(kSubsystems)) {
-        if (!p->isArray()) {
-          throw BistroException("cgroups subsystems must be an array");
-        }
+      if (const auto* p = dynArrayPtr(*cgp, kSubsystems)) {
         for (const auto& s : *p) {
           if (!s.isString()) {
             throw BistroException("cgroups subsystems entries must be strings");
@@ -132,9 +170,81 @@ void parseTaskSubprocessOptions(
           cgopts.subsystems.emplace_back(s.asString().toStdString());
         }
       }
-      // cpuShares and and memoryLimitInBytes must be populated on a
-      // per-task basis, based on their worker resources.
-      // unitTestCreateFiles is obviously not parsed.
+      // cpuShares and and memoryLimitInBytes will be populated on a
+      // per-task basis, based on their worker resources using
+      // PhysicalResourceConfigs (below).  unitTestCreateFiles is for tests.
+    }
+  }
+}
+
+const std::map<
+  cpp2::PhysicalResource, std::set<cpp2::PhysicalResourceEnforcement>
+> kResourceToSupportedEnforcements = {
+  {cpp2::PhysicalResource::CPU_CORES, {
+    cpp2::PhysicalResourceEnforcement::NONE,
+    cpp2::PhysicalResourceEnforcement::SOFT,
+  }},
+  {cpp2::PhysicalResource::RAM_MBYTES, {
+    cpp2::PhysicalResourceEnforcement::NONE,
+    cpp2::PhysicalResourceEnforcement::HARD,
+  }},
+  {cpp2::PhysicalResource::GPU_CORES, {
+    cpp2::PhysicalResourceEnforcement::NONE,
+  }},
+};
+
+void parsePhysicalResourceConfigs(
+    const folly::dynamic& d,
+    cpp2::PhysicalResourceConfigs* cfgs) {
+  if (const auto* prs = dynObjectPtr(d, kPhysicalResources)) {
+    for (const auto& name_cfg : prs->items()) {
+      auto rsrc = [](const folly::dynamic& name) {
+        if (name == kRamMB) {
+          return cpp2::PhysicalResource::RAM_MBYTES;
+        } else if (name == kCPUCore) {
+          return cpp2::PhysicalResource::CPU_CORES;
+        } else if (name == kGPUCard) {
+          return cpp2::PhysicalResource::GPU_CORES;
+        } else {
+          // NB: Not supporting GPU_MBYTES since we don't have a usable
+          // story for it at the moment.
+          throw BistroException("Bad physical resource: ", name.asString());
+        }
+      }(name_cfg.first);
+      auto& cfg = cfgs->configs[rsrc];
+      cfg.physical = rsrc;
+      if (!name_cfg.second.isObject()) {
+        throw BistroException("physical_resources entries must be objects");
+      }
+      if (const auto p = dynGetString(name_cfg.second, kLogicalResource)) {
+        cfg.logical = p->toStdString();
+      } else {
+        throw BistroException(
+          "logical_resource is required in physical_resources entries"
+        );
+      }
+      if (const auto p = dynGetDouble(name_cfg.second, kMultiplyLogicalBy)) {
+        cfg.multiplyLogicalBy = *p;
+      }
+      if (const auto p = dynGetString(name_cfg.second, kEnforcement)) {
+        if (*p == kNone) {
+          cfg.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
+        } else if (*p == kSoft) {
+          cfg.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
+        } else if (*p == kHard) {
+          cfg.enforcement = cpp2::PhysicalResourceEnforcement::HARD;
+        } else {
+          throw BistroException("Bad resource enforcement type: ", *p);
+        }
+        auto it = kResourceToSupportedEnforcements.find(rsrc);
+        if (it == kResourceToSupportedEnforcements.end()
+            || !it->second.count(cfg.enforcement)) {
+          throw BistroException(
+            "Resource ", name_cfg.first.asString(), " does not support ",
+            "enforcement type ", *p
+          );
+        }
+      }
     }
   }
 }
@@ -159,14 +269,8 @@ folly::dynamic killRequestToDynamic(const cpp2::KillRequest& req) {
 }
 
 void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req) {
-  if (const auto* kr = d.get_ptr(kKillSubprocess)) {
-    if (!kr->isObject()) {
-      throw BistroException("kill_subprocess must be an object");
-    }
-    if (const auto* p = kr->get_ptr(kMethod)) {
-      if (!p->isString()) {
-        throw BistroException("method must be a string");
-      }
+  if (const auto* kr = dynObjectPtr(d, kKillSubprocess)) {
+    if (const auto p = dynGetString(*kr, kMethod)) {
       if (*p == kTermWaitKill) {
         req->method = cpp2::KillMethod::TERM_WAIT_KILL;
       } else if (*p == kTerm) {
@@ -174,14 +278,11 @@ void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req) {
       } else if (*p == kKill) {
         req->method = cpp2::KillMethod::KILL;
       } else {
-        throw BistroException("Unknown KillMethod ", p->asString());
+        throw BistroException("Unknown KillMethod ", *p);
       }
     }
-    if (const auto* p = kr->get_ptr(kKillWaitMs)) {
-      if (!p->isInt()) {
-        throw BistroException("kill_wait_ms must be an integer");
-      }
-      req->killWaitMs = p->asInt();
+    if (const auto p = dynGetInt(*kr, kKillWaitMs)) {
+      req->killWaitMs = *p;
     }
   }
 }
@@ -219,8 +320,8 @@ Config::Config(const dynamic& d)
     schedulerType = getSchedulerType(it->second.asString());
   }
 
-  if (auto* ptr = d.get_ptr("remote_worker_selector")) {
-    remoteWorkerSelectorType = getRemoteWorkerSelectorType(ptr->asString());
+  if (const auto maybe_sel = dynGetString(d, "remote_worker_selector")) {
+    remoteWorkerSelectorType = getRemoteWorkerSelectorType(*maybe_sel);
   }
 
   it = d.find("backoff");
@@ -233,8 +334,8 @@ Config::Config(const dynamic& d)
     throw BistroException("Nodes is required in the config");
   }
   auto& node_settings = it->second;
-  if (auto p = node_settings.get_ptr(kNodeOrder)) {
-    nodeOrderType = getNodeOrderType(p->asString());
+  if (auto maybe_order = dynGetString(node_settings, kNodeOrder)) {
+    nodeOrderType = getNodeOrderType(*maybe_order);
   }
   auto jt = node_settings.find("levels");
   if (jt == node_settings.items().end() || !jt->second.isArray()) {
@@ -255,15 +356,23 @@ Config::Config(const dynamic& d)
 
   detail::parseKillRequest(d, &killRequest);
 
+  detail::parsePhysicalResourceConfigs(d, &physicalResourceConfigs);
+  for (const auto& p : physicalResourceConfigs.configs) {  // Inverted index
+    if (!logicalToPhysical.emplace(p.second.logical, &p.second).second) {
+      throw BistroException(
+        "logical resource ", p.second.logical, " used in more than one ",
+        "physical_resources entry"
+      );
+    }
+  }
+
   // What is the node level that jobs will use to create tasks by default?
   // You probably don't want to specify "worker" because there are no nodes.
   // It's not forbidden in the spirit of laissez-faire.
-  if (const auto* level_for_tasks_ptr = d.get_ptr("level_for_tasks")) {
-    const auto& str_level_for_tasks =
-      level_for_tasks_ptr->asString().toStdString();
-    levelForTasks = levels.lookup(str_level_for_tasks);
+  if (const auto maybe_level_for_tasks = dynGetString(d, "level_for_tasks")) {
+    levelForTasks = levels.lookup(*maybe_level_for_tasks);
     if (levelForTasks == StringTable::NotFound) {
-      throw BistroException("Bad level_for_tasks: ", str_level_for_tasks);
+      throw BistroException("Bad level_for_tasks: ", *maybe_level_for_tasks);
     }
   } else {  // Default to the bottom level (the one just before "worker")
     levelForTasks = levels.size() - 2;
@@ -338,7 +447,7 @@ Config::Config(const dynamic& d)
     }
   }
 
-  if (const auto* ptr = d.get_ptr("worker_resources_override")) {
+  if (const auto* ptr = dynObjectPtr(d, "worker_resources_override")) {
     const int worker_level_id = levels.lookup("worker");
     CHECK(worker_level_id != StringTable::NotFound);
     CHECK(worker_level_id < resourcesByLevel.size());

@@ -79,12 +79,12 @@ class SubprocessStats : boost::noncopyable {
   SubprocessUsage getUsage();
   SubprocessSystem getSystem();
 
-  // convert SubprocessUsage to thrift map<PhysicalResources, double>
+  // convert SubprocessUsage to thrift map<PhysicalResource, double>
   static
-  std::map<cpp2::PhysicalResources, double> convert(const SubprocessUsage&);
-  // convert SubprocessSystem to thrift map<PhysicalResources, int64>
+  std::map<cpp2::PhysicalResource, double> convert(const SubprocessUsage&);
+  // convert SubprocessSystem to thrift map<PhysicalResource, int64>
   static
-  std::map<cpp2::PhysicalResources, double> convert(const SubprocessSystem&);
+  std::map<cpp2::PhysicalResource, double> convert(const SubprocessSystem&);
  private:
    // explicitly update stats
    int refreshStats(time_t now);

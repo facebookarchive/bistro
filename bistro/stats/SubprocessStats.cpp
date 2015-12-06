@@ -93,23 +93,23 @@ SubprocessSystem SubprocessStats::getSystem() {
   return resources;
 }
 
-/* static */ std::map<cpp2::PhysicalResources, double>
+/* static */ std::map<cpp2::PhysicalResource, double>
 SubprocessStats::convert(const SubprocessUsage& usage) {
-  std::map<cpp2::PhysicalResources, double> res;
-  res[cpp2::PhysicalResources::RAM_MBYTES] = usage.rssMBytes;
-  res[cpp2::PhysicalResources::CPU_CORES] = usage.numberCpuCores;
-  res[cpp2::PhysicalResources::GPU_MBYTES] = usage.gpuMBytes;
-  res[cpp2::PhysicalResources::GPU_CORES] = usage.numberGpuCores;
+  std::map<cpp2::PhysicalResource, double> res;
+  res[cpp2::PhysicalResource::RAM_MBYTES] = usage.rssMBytes;
+  res[cpp2::PhysicalResource::CPU_CORES] = usage.numberCpuCores;
+  res[cpp2::PhysicalResource::GPU_MBYTES] = usage.gpuMBytes;
+  res[cpp2::PhysicalResource::GPU_CORES] = usage.numberGpuCores;
   return res;
 }
 
-/* static */ std::map<cpp2::PhysicalResources, double>
+/* static */ std::map<cpp2::PhysicalResource, double>
 SubprocessStats::convert(const SubprocessSystem& resources) {
-  std::map<cpp2::PhysicalResources, double> res;
-  res[cpp2::PhysicalResources::RAM_MBYTES] = resources.rssMBytes;
-  res[cpp2::PhysicalResources::CPU_CORES] = resources.numberCpuCores;
-  res[cpp2::PhysicalResources::GPU_MBYTES] = resources.gpuMBytes;
-  res[cpp2::PhysicalResources::GPU_CORES] = resources.numberGpuCores;
+  std::map<cpp2::PhysicalResource, double> res;
+  res[cpp2::PhysicalResource::RAM_MBYTES] = resources.rssMBytes;
+  res[cpp2::PhysicalResource::CPU_CORES] = resources.numberCpuCores;
+  res[cpp2::PhysicalResource::GPU_MBYTES] = resources.gpuMBytes;
+  res[cpp2::PhysicalResource::GPU_CORES] = resources.numberGpuCores;
   return res;
 }
 

@@ -21,8 +21,12 @@ const i64 kNotALineID = -1;
 const i16 kProtocolVersion = 1;
 
 // Physical resources names - enum
-enum PhysicalResources {
+enum PhysicalResource {
+  // Enforcement: NONE and HARD. SOFT can be added, either via cgroups
+  // OOM-notifier, or (more flaky) by monitoring & killing tasks.
   RAM_MBYTES = 1,
+  // Enforcement: NONE and SOFT. A form of HARD could use cpuset.
+  // Fractional cores can be supported.
   CPU_CORES = 2,
   GPU_MBYTES = 3,
   GPU_CORES = 4,
@@ -91,7 +95,7 @@ struct RunningTask {
   // Disinguish different invocations of the same task.
   5: BistroInstanceID invocationID,
   6: BackoffDuration nextBackoffDuration,  // How long to back off on error
-  7: map<PhysicalResources, double> physicalResources,
+  7: map<PhysicalResource, double> physicalResources,
 }
 
 // This structure isn't for incoming connections, use ServiceAddress for
@@ -190,7 +194,28 @@ struct BistroWorker {
   // Make it unnecessary to manually set this config for the scheduler.
   5: i32 heartbeatPeriodSec,  // The scheduler adds a grace period
   6: i16 protocolVersion = 0,  // Default must stay at 0
-  7: map<PhysicalResources, double> totalResources, // machine resources
+  7: map<PhysicalResource, double> totalResources, // machine resources
+}
+
+// Not all enforcement options are available for all physical resources.
+enum PhysicalResourceEnforcement {
+  NONE = 1
+  // If there is no resource contention, like NONE, otherwise like HARD.
+  SOFT = 2
+  // Process is killed upon exceeding resource limit, or is denied the
+  // ability to exceed tit.
+  HARD = 3
+}
+
+struct PhysicalResourceConfig {
+  1: PhysicalResource physical
+  2: string logical  // Any user-specified worker resource name
+  3: double multiplyLogicalBy = 1  // 1024 takes logical GB to physical MB
+  4: PhysicalResourceEnforcement enforcement = NONE
+}
+
+struct PhysicalResourceConfigs {
+  1: map<PhysicalResource, PhysicalResourceConfig> configs
 }
 
 struct CGroupOptions {

@@ -100,6 +100,10 @@ public:
   JobBackoffSettings defaultBackoffSettings;
   cpp2::TaskSubprocessOptions taskSubprocessOptions;
   cpp2::KillRequest killRequest;
+  cpp2::PhysicalResourceConfigs physicalResourceConfigs;
+  // Inverted index: contains pointers into physicalResourceConfigs.
+  std::unordered_map<std::string, cpp2::PhysicalResourceConfig const*>
+    logicalToPhysical;
 
   // Optional override for worker resources, to indicate that some workers have
   // more resources available.
@@ -147,6 +151,21 @@ const char* kCGroups = "cgroups";
 const char* kRoot = "root";
 const char* kSlice = "slice";
 const char* kSubsystems = "subsystems";
+// Physical resource configuration
+const char* kPhysicalResources = "physical_resources";
+// The unit names are all singular, since each entry just maps a physical
+// unit to a logical unit.
+const char* kRamMB = "ram_mb";
+const char* kCPUCore = "cpu_core";
+const char* kGPUCard = "gpu_card";
+// Keys of physical resource configs
+const char* kLogicalResource = "logical_resource";
+const char* kMultiplyLogicalBy = "multiply_logical_by";
+const char* kEnforcement = "enforcement";
+// Enforcement options
+const char* kNone = "none";
+const char* kSoft = "soft";
+const char* kHard = "hard";
 }  // anonymous namespace
 
 }}  // namespace facebook::bistro

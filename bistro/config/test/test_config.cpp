@@ -9,11 +9,15 @@
  */
 #include <gtest/gtest.h>
 
-#include "bistro/bistro/config/Config.h"
-#include "bistro/bistro/config/SchedulerType.h"
 #include <folly/Conv.h>
 #include <folly/dynamic.h>
+#include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
+#include "bistro/bistro/config/Config.h"
+#include "bistro/bistro/config/SchedulerType.h"
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
+
+using apache::thrift::debugString;
 using namespace facebook::bistro;
 using namespace folly;
 using namespace std;
@@ -70,8 +74,6 @@ TEST(TestConfig, HandleConstruction) {
   EXPECT_EQ(chrono::milliseconds(500), c.workingWait);
   EXPECT_EQ(chrono::milliseconds(5500), c.idleWait);
   EXPECT_EQ(SchedulerType::RankedPriority, c.schedulerType);
-  EXPECT_EQ(RemoteWorkerSelectorType::RoundRobin, c.remoteWorkerSelectorType);
-  EXPECT_EQ(NodeOrderType::Random, c.nodeOrderType);
 
   ASSERT_EQ(3, c.nodeConfigs.size());
   EXPECT_EQ("range_label", c.nodeConfigs[0].source);
@@ -86,18 +88,19 @@ TEST(TestConfig, HandleConstruction) {
 
   EXPECT_FALSE(c.killOrphanTasksAfter.hasValue());
 
-  cpp2::TaskSubprocessOptions task_opts;
-  EXPECT_EQ(task_opts, c.taskSubprocessOptions);
-
-  // Check non-default enums
+  // Check default and non-default enums
+  EXPECT_EQ(RemoteWorkerSelectorType::RoundRobin, c.remoteWorkerSelectorType);
   d["remote_worker_selector"] = "busiest";
   EXPECT_EQ(
     RemoteWorkerSelectorType::Busiest, Config(d).remoteWorkerSelectorType
   );
+  EXPECT_EQ(NodeOrderType::Random, c.nodeOrderType);
   d["nodes"][kNodeOrder] = "original";
   EXPECT_EQ(NodeOrderType::Original, Config(d).nodeOrderType);
 
-  // Check non-default task options
+  // Check default and non-default task options
+  cpp2::TaskSubprocessOptions task_opts;
+  EXPECT_EQ(task_opts, c.taskSubprocessOptions);
   d[kTaskSubprocess] = folly::dynamic::object
     (kPollMs, 111)
     (kMaxLogLinesPerPollInterval, 222)
@@ -118,6 +121,57 @@ TEST(TestConfig, HandleConstruction) {
   task_opts.cgroupOptions.slice = "slice";
   task_opts.cgroupOptions.subsystems = {"sys1", "sys2"};
   EXPECT_EQ(task_opts, Config(d).taskSubprocessOptions);
+
+  // Check non-default physical resource configs
+  cpp2::PhysicalResourceConfigs prcs;
+  EXPECT_EQ(prcs, c.physicalResourceConfigs);
+  d[kPhysicalResources] = folly::dynamic::object
+    (kRamMB, folly::dynamic::object
+      (kLogicalResource, "my_ram_gb")
+      (kMultiplyLogicalBy, 1024)
+      (kEnforcement, kHard)
+    )
+    (kCPUCore, folly::dynamic::object
+      (kLogicalResource, "my_cpu_centicore")
+      (kMultiplyLogicalBy, 0.001)
+      (kEnforcement, kSoft)
+    )
+    (kGPUCard, folly::dynamic::object
+      (kLogicalResource, "my_gpu_card")
+      (kMultiplyLogicalBy, 1)
+      (kEnforcement, kNone)
+    );
+  auto prc_it = prcs.configs.emplace(
+    cpp2::PhysicalResource::RAM_MBYTES, cpp2::PhysicalResourceConfig()
+  ).first;
+  prc_it->second.physical = cpp2::PhysicalResource::RAM_MBYTES;
+  prc_it->second.logical = "my_ram_gb";
+  prc_it->second.multiplyLogicalBy = 1024;
+  prc_it->second.enforcement = cpp2::PhysicalResourceEnforcement::HARD;
+  prc_it = prcs.configs.emplace(
+    cpp2::PhysicalResource::CPU_CORES, cpp2::PhysicalResourceConfig()
+  ).first;
+  prc_it->second.physical = cpp2::PhysicalResource::CPU_CORES;
+  prc_it->second.logical = "my_cpu_centicore";
+  prc_it->second.multiplyLogicalBy = 0.001;
+  prc_it->second.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
+  prc_it = prcs.configs.emplace(
+    cpp2::PhysicalResource::GPU_CORES, cpp2::PhysicalResourceConfig()
+  ).first;
+  prc_it->second.physical = cpp2::PhysicalResource::GPU_CORES;
+  prc_it->second.logical = "my_gpu_card";
+  prc_it->second.multiplyLogicalBy = 1;
+  prc_it->second.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
+  {
+    Config config(d);
+    const auto& p = config.physicalResourceConfigs;
+    EXPECT_EQ(prcs, p) << debugString(prcs) << " != " << debugString(p);
+    EXPECT_EQ(((decltype(config.logicalToPhysical)){
+      {"my_ram_gb", &p.configs.at(cpp2::PhysicalResource::RAM_MBYTES)},
+      {"my_cpu_centicore", &p.configs.at(cpp2::PhysicalResource::CPU_CORES)},
+      {"my_gpu_card", &p.configs.at(cpp2::PhysicalResource::GPU_CORES)},
+    }), config.logicalToPhysical);
+  }
 
   cpp2::KillRequest kill_req;
   EXPECT_EQ(kill_req, c.killRequest);

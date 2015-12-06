@@ -103,12 +103,20 @@ TEST(TestConfig, HandleConstruction) {
     (kMaxLogLinesPerPollInterval, 222)
     (kParentDeathSignal, 333)
     (kProcessGroupLeader, true)
-    (kUseCanaryPipe, false);
+    (kUseCanaryPipe, false)
+    (kCGroups, folly::dynamic::object
+      (kRoot, "root")
+      (kSlice, "slice")
+      (kSubsystems, {"sys1", "sys2"})
+    );
   task_opts.pollMs = 111;
   task_opts.maxLogLinesPerPollInterval = 222;
   task_opts.parentDeathSignal = 333;
   task_opts.processGroupLeader = true;
   task_opts.useCanaryPipe = false;
+  task_opts.cgroupOptions.root = "root";
+  task_opts.cgroupOptions.slice = "slice";
+  task_opts.cgroupOptions.subsystems = {"sys1", "sys2"};
   EXPECT_EQ(task_opts, Config(d).taskSubprocessOptions);
 
   cpp2::KillRequest kill_req;

@@ -142,6 +142,11 @@ const char* kTermWaitKill = "term_wait_kill";
 const char* kTerm = "term";
 const char* kKill = "kill";
 const char* kKillWaitMs = "kill_wait_ms";
+// CGroups
+const char* kCGroups = "cgroups";
+const char* kRoot = "root";
+const char* kSlice = "slice";
+const char* kSubsystems = "subsystems";
 }  // anonymous namespace
 
 }}  // namespace facebook::bistro

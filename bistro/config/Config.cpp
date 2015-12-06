@@ -94,15 +94,47 @@ void parseTaskSubprocessOptions(
     }
     if (const auto* p = tso->get_ptr(kProcessGroupLeader)) {
       if (!p->isBool()) {
-        throw BistroException("process_group_leader must be an boolean");
+        throw BistroException("process_group_leader must be a boolean");
       }
       opts->processGroupLeader = p->asBool();
     }
     if (const auto* p = tso->get_ptr(kUseCanaryPipe)) {
       if (!p->isBool()) {
-        throw BistroException("use_canary_pipe must be an boolean");
+        throw BistroException("use_canary_pipe must be a boolean");
       }
       opts->useCanaryPipe = p->asBool();
+    }
+    if (const auto* cgp = tso->get_ptr(kCGroups)) {
+      if (!cgp->isObject()) {
+        throw BistroException("cgroups must be a boolean");
+      }
+      auto& cgopts = opts->cgroupOptions;
+      if (const auto* p = cgp->get_ptr(kRoot)) {
+        if (!p->isString()) {
+          throw BistroException("cgroups root must be a string");
+        }
+        cgopts.root = p->asString().toStdString();
+      }
+      if (const auto* p = cgp->get_ptr(kSlice)) {
+        if (!p->isString()) {
+          throw BistroException("cgroups root must be a string");
+        }
+        cgopts.slice = p->asString().toStdString();
+      }
+      if (const auto* p = cgp->get_ptr(kSubsystems)) {
+        if (!p->isArray()) {
+          throw BistroException("cgroups subsystems must be an array");
+        }
+        for (const auto& s : *p) {
+          if (!s.isString()) {
+            throw BistroException("cgroups subsystems entries must be strings");
+          }
+          cgopts.subsystems.emplace_back(s.asString().toStdString());
+        }
+      }
+      // cpuShares and and memoryLimitInBytes must be populated on a
+      // per-task basis, based on their worker resources.
+      // unitTestCreateFiles is obviously not parsed.
     }
   }
 }
@@ -133,7 +165,7 @@ void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req) {
     }
     if (const auto* p = kr->get_ptr(kMethod)) {
       if (!p->isString()) {
-        throw BistroException("method must be an string");
+        throw BistroException("method must be a string");
       }
       if (*p == kTermWaitKill) {
         req->method = cpp2::KillMethod::TERM_WAIT_KILL;

@@ -177,6 +177,7 @@ void parseTaskSubprocessOptions(
   }
 }
 
+// You must also update RemoteWorkerRunner.cpp with the implementation.
 const std::map<
   cpp2::PhysicalResource, std::set<cpp2::PhysicalResourceEnforcement>
 > kResourceToSupportedEnforcements = {

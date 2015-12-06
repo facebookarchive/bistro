@@ -9,6 +9,7 @@
  */
 #include "bistro/bistro/runners/RemoteWorkerRunner.h"
 
+#include <cmath>
 #include <folly/experimental/AutoTimer.h>
 
 #include "bistro/bistro/config/Config.h"
@@ -382,6 +383,22 @@ void RemoteWorkerRunner::remoteUpdateStatus(
   }
 }
 
+namespace {
+template <typename T>
+T logicalToPhysicalResource(
+    const cpp2::PhysicalResourceConfig& p,
+    const cpp2::Resource& r) {
+  double phys = ::round(p.multiplyLogicalBy * r.amount);
+  // Clamp to the range of the physical output.
+  if (phys < 0) {  // Resources are unsigned, even if Thrift won't let us.
+    return 0;
+  } else if (phys > std::numeric_limits<T>::max()) {
+    return std::numeric_limits<T>::max();
+  }
+  return phys;
+}
+}  // anonymous namespace
+
 TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   const std::shared_ptr<const Job>& job,
   const Node& node,
@@ -397,6 +414,9 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   cpp2::BistroWorker worker;
   // unused initialization to hush a Clang warning:
   int64_t did_not_run_sequence_num = 0;
+  // These will modify the task's cgroupOptions if we find a worker.
+  int16_t cgroup_cpu_shares = 0;
+  int64_t cgroup_memory_limit_in_bytes = 0;
   // Always lock workerResources_ first, then workers_
   SYNCHRONIZED(workerResources_) {
     SYNCHRONIZED(workers_) {
@@ -429,13 +449,14 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       job_args["worker_host"] = worker.machineLock.hostname;
 
       // Add worker resources to rt **before** recording this task as running.
+      // Future: support this in LocalRunner mode as well.
       auto& resources_by_node = job_args["resources_by_node"];
       CHECK(resources_by_node.find(rt.workerShard)
             == resources_by_node.items().end())
         << "Cannot have both a node and a worker named: " << rt.workerShard
         << " -- if you are running a worker and the central scheduler on the "
         << "same host, you should specify --instance_node_name global.";
-      addNodeResourcesToRunningTask(
+      if (const auto* nr = addNodeResourcesToRunningTask(
         &rt,
         &resources_by_node,
         // This config is stale, but it's consistent with workerResources_.
@@ -443,7 +464,28 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         rt.workerShard,
         workerLevel_,
         job->resources()
-      );
+      )) {
+        for (const auto& r : nr->resources) {
+          auto phys_it = config_->logicalToPhysical.find(r.name);
+          if (phys_it != config_->logicalToPhysical.end()) {
+            const auto& p = *phys_it->second;
+            if (
+              p.physical == cpp2::PhysicalResource::RAM_MBYTES
+              && p.enforcement == cpp2::PhysicalResourceEnforcement::HARD
+            ) {
+              cgroup_memory_limit_in_bytes = logicalToPhysicalResource<
+                decltype(cgroup_memory_limit_in_bytes)
+              >(p, r);
+            } else if (
+              p.physical == cpp2::PhysicalResource::CPU_CORES
+              && p.enforcement == cpp2::PhysicalResourceEnforcement::SOFT
+            ) {
+              cgroup_cpu_shares =
+                logicalToPhysicalResource<decltype(cgroup_cpu_shares)>(p, r);
+            }
+          }
+        }
+      }
 
       // Mark the task 'running' before we unlock workerResources_, because
       // otherwise an intervening updateConfig() could free the resources we
@@ -467,16 +509,20 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   // get marked unhealthy or even lost, since workers_ is now unlocked, but
   // we just have to try our luck.
   eventBase_->runInEventBaseThread([
-      cb, this, job, rt, job_args, worker, did_not_run_sequence_num
+      cb, this, job, rt, job_args, worker, did_not_run_sequence_num,
+      cgroup_cpu_shares, cgroup_memory_limit_in_bytes
     ]() noexcept {
     try {
       shared_ptr<cpp2::BistroWorkerAsyncClient>
         client{getWorkerClient(worker)};
+      auto task_subproc_opts = job->taskSubprocessOptions();
+      task_subproc_opts.cgroupOptions.cpuShares = cgroup_cpu_shares;
+      task_subproc_opts.cgroupOptions.memoryLimitInBytes =
+        cgroup_memory_limit_in_bytes;
       client->runTask(
         unique_ptr<RequestCallback>(new FunctionReplyCallback(
           [this, cb, client, rt, worker, did_not_run_sequence_num](
               ClientReceiveState&& state) noexcept {
-
             // TODO(#5025478): Convert this, and the other recv_* calls in
             // this file to use recv_wrapped_*.
             try {
@@ -516,7 +562,7 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         // The real sequence number may have been incremented after we found
         // the worker, but this is okay, the worker simply rejects the task.
         did_not_run_sequence_num,
-        job->taskSubprocessOptions()
+        std::move(task_subproc_opts)
       );
     } catch (const exception& e) {
       // We can get here if client creation failed (e.g. TAsyncSocket could

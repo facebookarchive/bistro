@@ -189,6 +189,75 @@ TEST_F(TestRemoteRunner, HandleResources) {
   ASSERT_EQ(TaskRunnerResponse::DidNotRunTask, res);
 }
 
+TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
+  // Create the worker first for the same reasons as in HandleResources.
+  folly::Promise<folly::Unit> tso_cob_ran;
+  FakeBistroWorkerThread worker(
+    "test_worker", randInstanceID(),
+    [&](const cpp2::RunningTask& rt, const cpp2::TaskSubprocessOptions& tso) {
+      if (rt.job == kHealthcheckTaskJob) {
+        return;
+      }
+      EXPECT_EQ(3, tso.cgroupOptions.cpuShares);  // Tests rounding
+      EXPECT_EQ(3072, tso.cgroupOptions.memoryLimitInBytes);
+      tso_cob_ran.setValue();
+    }
+  );
+
+  const auto kConfig = make_shared<Config>(dynamic::object
+    ("enabled", true)
+    ("nodes", dynamic::object("levels", {}))
+    ("resources", dynamic::object
+      ("worker", dynamic::object
+        ("my_ram_gb", dynamic::object("default", 3)("limit", 48))
+        ("my_cpu_centicore", dynamic::object("default", 270)("limit", 2000))
+      )
+    )
+    (kPhysicalResources, dynamic::object
+      (kRamMB, dynamic::object
+        (kLogicalResource, "my_ram_gb")
+        (kMultiplyLogicalBy, 1024)
+        (kEnforcement, kHard)
+      )
+      (kCPUCore, dynamic::object
+        (kLogicalResource, "my_cpu_centicore")
+         // Don't downscale CPU in practice! That loses resolution, whereas
+         // cgroups cpu.shares actually works with *relative* values anyhow.
+        (kMultiplyLogicalBy, 0.01)
+        (kEnforcement, kSoft)
+      )
+    )
+  );
+
+  auto task_statuses =
+    std::make_shared<TaskStatuses>(std::make_shared<NoOpTaskStore>());
+  RemoteWorkerRunner runner(task_statuses, std::shared_ptr<Monitor>());
+
+  auto job = std::make_shared<Job>(*kConfig, "job", kJob);
+  Node node("node");
+
+  cpp2::WorkerSetID wsid;
+  wsid.schedulerID = runner.getSchedulerID();
+  addFakeWorker(&runner, kConfig, worker, wsid);
+
+  folly::Promise<folly::Unit> status_cob_ran;
+  ASSERT_EQ(TaskRunnerResponse::RanTask, runner.runTask(
+    *kConfig,
+    job,
+    node,
+    nullptr,  // no previous status
+    [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
+      ASSERT_EQ("job", rt.job);
+      ASSERT_EQ("node", rt.node);
+      ASSERT_TRUE(status.isRunning());
+      status_cob_ran.setValue();
+    }
+  ));
+  // Check that both our cobs got executed.
+  status_cob_ran.getFuture().get();
+  tso_cob_ran.getFuture().get();
+}
+
 TEST_F(TestRemoteRunner, TestBusiestSelector) {
   const auto kConfig = make_shared<Config>(dynamic::object
     ("enabled", true)

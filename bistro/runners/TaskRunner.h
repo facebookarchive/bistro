@@ -143,7 +143,9 @@ public:
  protected:
 
   // Used by RemoteWorkerRunner to record worker resources
-  static void addNodeResourcesToRunningTask(
+  // Returns a pointer to the just-added RunningTask::nodeResources entry,
+  // or nullptr if no resources exist for this node.
+  static cpp2::NodeResources* addNodeResourcesToRunningTask(
     cpp2::RunningTask* out_rt,
     folly::dynamic* out_resources_by_node,
     const Config& config,

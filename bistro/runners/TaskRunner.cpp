@@ -89,7 +89,7 @@ TaskRunnerResponse TaskRunner::runTask(
   return runTaskImpl(job, node, rt, job_args, cb);
 }
 
-void TaskRunner::addNodeResourcesToRunningTask(
+cpp2::NodeResources* TaskRunner::addNodeResourcesToRunningTask(
     cpp2::RunningTask* out_rt,
     folly::dynamic* out_resources_by_node,
     const Config& config,
@@ -100,7 +100,7 @@ void TaskRunner::addNodeResourcesToRunningTask(
   const auto& resource_ids = config.levelIDToResourceID[node_level];
   // Keep the RunningTask compact by not sending nodes with empty resources
   if (resource_ids.empty()) {
-    return;
+    return nullptr;
   }
 
   out_rt->nodeResources.emplace_back();
@@ -116,6 +116,8 @@ void TaskRunner::addNodeResourcesToRunningTask(
     nr.resources.emplace_back(apache::thrift::FRAGILE, rsrc_name, rsrc_val);
     node_resources[rsrc_name] = rsrc_val;
   }
+
+  return &out_rt->nodeResources.back();
 }
 
 }}

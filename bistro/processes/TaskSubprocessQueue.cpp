@@ -15,6 +15,7 @@
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
+#include "bistro/bistro/processes/AsyncCGroupReaper.h"
 #include "bistro/bistro/processes/AsyncSubprocess.h"
 #include "bistro/bistro/processes/CGroupSetup.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
@@ -209,6 +210,29 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
         google::INFO, rt, state.get(), "process_exited",
         folly::dynamic::object("message", rc.str())
       );  // noexcept
+      // Now that the child has exited, optionally use cgroups to kill,
+      // and/or wait for, its left-over descendant processes.
+      if (state->opts().cgroupOptions.subsystems.empty()) {
+        // No cgroups exist: shortcut early to avoid logging "cgroups_reaped".
+        return folly::Future<folly::Unit>();
+      }
+      // Usually, well-behaved descendants will have exited by this point.
+      // This reaper will write logspam, and wait until all processes in
+      // each of the task's cgroups have exited.  If the `freezer` subsystem
+      // is available, the reaper will also repeatedly send them SIGKILL.
+      //
+      // This future fires only when the task cgroups lose all their tasks.
+      return asyncCGroupReaper(
+        evb,
+        state->opts().cgroupOptions,
+        state->cgroupName(),
+        pollMs(state->opts())
+      ).then(
+        [this, rt, state](folly::Try<folly::Unit> t) noexcept {
+          t.throwIfFailed();  // The reaper never thows, crash if it does.
+          logEvent(google::INFO, rt, state.get(), "cgroups_reaped");
+        }
+      );
     }),
     // 2) Wait for the child to close all pipes
     collectAll(pipe_closed_futures).then([this, rt, state](

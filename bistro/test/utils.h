@@ -9,74 +9,34 @@
  */
 #pragma once
 
-#include "bistro/bistro/Bistro.h"
-#include "bistro/bistro/config/InMemoryConfigLoader.h"
-#include "bistro/bistro/monitor/Monitor.h"
-#include "bistro/bistro/nodes/NodesLoader.h"
-#include "bistro/bistro/statuses/TaskStore.h"
-#include "bistro/bistro/statuses/TaskStatuses.h"
-#include "bistro/bistro/runners/TaskRunner.h"
+#include <chrono>
+#include <folly/experimental/TestUtil.h>
 
 namespace facebook { namespace bistro {
+
+// Callback for CaptureFD to improve debuggability
+void printString(folly::StringPiece s);
+
+/**
+ * Incrementally reads from fd until the entire text consumed thus far
+ * matches the regex.  CAREFUL: You are not guaranteed to stop consuming
+ * exactly when the regex matches, so it's easy to over-consume and cause
+ * the next such wait to fail.
+ */
+void waitForRegexOnFd(folly::test::CaptureFD* fd, std::string regex);
+
+
+// Timing utilities
 
 using TestClock = std::chrono::high_resolution_clock;
 using TestTimePoint = std::chrono::time_point<TestClock>;
 
-double timeDiff(TestTimePoint a, TestTimePoint b) {
+inline double timeDiff(TestTimePoint a, TestTimePoint b) {
   return
     std::chrono::duration_cast<std::chrono::duration<double>>(a - b).count();
 }
-double timeSince(TestTimePoint t) { return timeDiff(TestClock::now(), t); }
-
-struct BitBucketTaskStore : public TaskStore {
-  void fetchJobTasks(const std::vector<std::string>& job_ids, Callback cb) {}
-  void store(const std::string& j, const std::string& n, TaskResult r) {}
-};
-
-struct MockRunner : public TaskRunner {
-  enum class EventType { RUN, KILL_TASK };
-  using Event = std::tuple<EventType, std::string, std::string>;
-
-  bool canKill() override { return true; }
-
-  void killTask(
-    const cpp2::RunningTask& rt, const cpp2::KillRequest&
-  ) override {
-    events_.emplace_back(EventType::KILL_TASK, rt.job, rt.node);
-  }
-
-  virtual TaskRunnerResponse runTaskImpl(
-    const std::shared_ptr<const Job>& job,
-    const Node& node,
-    cpp2::RunningTask& rt,
-    folly::dynamic& job_args,
-    std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
-  ) noexcept override {
-    cb(rt, TaskStatus::running());  // Otherwise the scheduler won't know.
-    events_.emplace_back(EventType::RUN, job->name(), node.name());
-    return RanTask;
-  }
-
-  std::vector<Event> events_;
-};
-
-struct MockBistro {
-  explicit MockBistro(const Config& config)
-    : configLoader_(new InMemoryConfigLoader{config}),
-      nodesLoader_(new NodesLoader{
-        configLoader_, std::chrono::seconds(3600), std::chrono::seconds(3600)
-      }),
-      statuses_(new TaskStatuses{std::make_shared<BitBucketTaskStore>()}),
-      monitor_(new Monitor{configLoader_, nodesLoader_, statuses_}),
-      runner_(new MockRunner),
-      bistro_(configLoader_, nodesLoader_, statuses_, runner_, monitor_) {}
-
-  std::shared_ptr<InMemoryConfigLoader> configLoader_;
-  std::shared_ptr<NodesLoader> nodesLoader_;
-  std::shared_ptr<TaskStatuses> statuses_;
-  std::shared_ptr<Monitor> monitor_;
-  std::shared_ptr<MockRunner> runner_;
-  Bistro bistro_;
-};
+inline double timeSince(TestTimePoint t) {
+  return timeDiff(TestClock::now(), t);
+}
 
 }}  // namespace facebook::bistro

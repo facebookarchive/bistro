@@ -27,6 +27,7 @@ cpp_unittest(
     srcs = ['test_task_subprocess_queue.cpp'],
     deps = [
         '@/bistro/bistro/processes:processes',
+        '@/bistro/bistro/test:test',
         '@/folly/experimental:test_util',
     ],
 )

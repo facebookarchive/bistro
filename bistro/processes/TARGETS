@@ -1,6 +1,7 @@
 cpp_library(
     name = 'processes',
     srcs = [
+        'AsyncCGroupReaper.cpp',
         'AsyncReadPipeRateLimiter.cpp',
         'CGroupSetup.cpp',
         'TaskSubprocessQueue.cpp',

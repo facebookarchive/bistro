@@ -15,7 +15,7 @@
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/server/HTTPMonitor.h"
-#include "bistro/bistro/test/utils.h"
+#include "bistro/bistro/test/MockBistro.h"
 
 DECLARE_string(instance_node_name);
 DECLARE_int32(http_server_port);

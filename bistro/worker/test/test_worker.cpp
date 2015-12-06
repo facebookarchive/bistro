@@ -21,8 +21,8 @@
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/server/test/ThriftMonitorTestThread.h"
+#include "bistro/bistro/test/utils.h"
 #include "bistro/bistro/worker/test/BistroWorkerTestThread.h"
-#include "bistro/bistro/worker/test/utils.h"
 #include "bistro/bistro/utils/LogLines.h"
 #include "bistro/bistro/utils/hostname.h"
 

@@ -1,0 +1,9 @@
+cpp_library(
+    name = 'test',
+    srcs = [
+        'utils.cpp',
+    ],
+    deps = [
+        '@/folly/experimental:test_util',
+    ],
+)

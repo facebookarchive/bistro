@@ -32,6 +32,6 @@ cpp_unittest(
     deps = [
         '@/bistro/bistro:bistro_lib',
         '@/bistro/bistro/runners:runners_lib',
-        '@/bistro/bistro/worker/test:bistro_worker_test_lib',
+        '@/bistro/bistro/test:test',
     ],
 )

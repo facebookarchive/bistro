@@ -487,7 +487,7 @@ TEST_F(TestTaskSubprocessQueue, KillFailsToReachChild) {
   // never killed.  We must wait for it to close the status pipe FD.
   cpp2::TaskSubprocessOptions opts;
   opts.processGroupLeader = false;
-  // A simple "sleep 1" gets `exec`ed by some `sh`s
+  // A simple "sleep 1" gets `exec()`ed by some `sh`s
   runAndKill("sleep 1 ; sleep 3600", opts);
   EXPECT_LE(1.0, timeSince(startTime_));
 }
@@ -496,7 +496,7 @@ TEST_F(TestTaskSubprocessQueue, ProcGroupKillsChild) {
   // Making a process group lets us kill both `sh` and `sleep` quickly.
   cpp2::TaskSubprocessOptions opts;
   opts.processGroupLeader = true;
-  // A simple "sleep 1" gets `exec`ed by some `sh`s
+  // A simple "sleep 1" gets `exec()`ed by some `sh`s
   runAndKill("sleep 3600 ; sleep 3600", opts);
   EXPECT_GT(1.0, timeSince(startTime_));
 }
@@ -651,6 +651,12 @@ TEST_F(TestTaskSubprocessQueue, RateLimitLog) {
   EXPECT_GT(1.5, runtime);  // Shouldn't take too long to print 3k lines.
 }
 
+std::string cgDir(std::string subsystem) {
+  return folly::to<std::string>(  // startTime & rand are 0 (The Epoch) & 0
+    "root/", subsystem, "/slice/shard:19700101000000:0:", getpid()
+  );
+};
+
 // Basic integration test -- test_cgroup_setup.cpp has deeper coverage
 TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   folly::test::ChangeToTempDir td;
@@ -679,8 +685,6 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   }
 
   // Once we make the slice directory, everything works.
-  auto cg_dir =  // startTime & rand are 0 (The Epoch) & 0
-    folly::to<std::string>("root/sys/slice/shard:19700101000000:0:", getpid());
   EXPECT_TRUE(boost::filesystem::create_directories("root/sys/slice"));
   {
     folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
@@ -696,13 +700,195 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
     // Validate the contents of the cgroup directory.
     auto check_file_fn = [&](std::string filename, std::string expected) {
       std::string s;
-      auto path = cg_dir + "/" + filename;
+      auto path = cgDir("sys") + "/" + filename;
       EXPECT_TRUE(folly::readFile(path.c_str(), s));
       EXPECT_EQ(expected, s) << " in " << path;
       EXPECT_TRUE(boost::filesystem::remove(path));  // For is_empty(directory)
     };
     check_file_fn("cgroup.procs", "0");  // "0" means "add my PID".
     check_file_fn("notify_on_release", "1");
-    EXPECT_TRUE(boost::filesystem::is_empty(cg_dir));   // No other files
+    EXPECT_TRUE(boost::filesystem::is_empty(cgDir("sys")));  // No other files
   }
+}
+
+void waitForEvent(
+    folly::Synchronized<TestLogWriter::TaskLogMap>& task_to_logs,
+    std::string awaited_event) {
+  while (true) {
+    SYNCHRONIZED(task_to_logs) {
+      for (const auto& event
+           : task_to_logs[std::make_pair("job", "node")].events_) {
+        if (event["event"].asString() == awaited_event) {
+          return;
+        }
+      }
+    }
+    /* sleep override */
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+}
+
+// Without "freezer", we will just wait for the unkillable 'sleep'.
+TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperNoFreezer) {
+ folly::test::ChangeToTempDir td;
+
+  // Without "freezer", we will just wait for the unkillable 'sleep'.
+  cpp2::TaskSubprocessOptions opts;
+  opts.processGroupLeader = false;  // Or `sleep`'d be killed without cgroups
+  opts.cgroupOptions.unitTestCreateFiles = true;
+  opts.cgroupOptions.root = "root";
+  opts.cgroupOptions.slice = "slice";
+  opts.cgroupOptions.subsystems = {"cpu"};
+  EXPECT_TRUE(boost::filesystem::create_directories("root/cpu/slice"));
+  {
+    folly::test::CaptureFD stderr(2, printString);
+    // This scope uses `tsq`'s destructor to await task exit.
+    folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
+    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    // We can kill the shell, but not the `sleep`. The trailing `echo`
+    // ensures that `sh` does not just `exec()` the `sleep`.
+    runTask(&tsq, "/bin/sleep 1 ; /bin/echo DONE", opts, &expectKilled);
+
+    // fork + exec + kill should take << 1 sec
+    tsq.kill(runningTask(), requestSigkill());
+    waitForEvent(task_to_logs, "process_exited");
+    EXPECT_GT(1.0, timeSince(startTime_));
+
+    // Now we are waiting for "sleep" to exit, which must take >= 1 sec.
+    waitForEvent(task_to_logs, "task_pipes_closed");
+    EXPECT_LE(1.0, timeSince(startTime_));
+
+    // Confirm that the reaper is following an exponential backoff schedule.
+    auto trying_to_reap_re_fn = [](int ms) { return folly::to<std::string>(
+      "W[^\n]*] ",  // glog warning boilerplate
+      "Trying to reap intransigent task with cgroup shard:19700101000000:0:",
+      getpid(), " for over ", ms, " ms\n"
+    ); };
+    auto not_sending_re = folly::to<std::string>(
+      "W[^\n]*] ",  // glog warning boilerplate
+      "Not sending SIGKILL to tasks in the shard:19700101000000:0:", getpid(),
+      " cgroups, since the `freezer` subsystem is not enabled, which would ",
+      "make it easy to kill the wrong processes.\n"
+    );
+    std::string lines_re = "(.*\n)*";  // Match 0 or more whole lines.
+    waitForRegexOnFd(
+      &stderr,
+      ".*\n" + not_sending_re + lines_re  // tries to signal in constructor
+        + trying_to_reap_re_fn(10) + not_sending_re + lines_re
+        + trying_to_reap_re_fn(50) + not_sending_re + lines_re
+        + trying_to_reap_re_fn(210) + not_sending_re + lines_re
+        + trying_to_reap_re_fn(850) + not_sending_re + ".*"
+    );
+    stderr.release();
+
+    // At this point, the task is blocked only on the cgroup reaper,
+    // so change the cgroup to look like all PIDs have exited.
+    auto cpu_procs_path = cgDir("cpu") + "/cgroup.procs";
+    EXPECT_TRUE(folly::writeFile(std::string(), cpu_procs_path.c_str()));
+
+    // Thanks to exponential backoff, this wait is ~4x longer than the last.
+    waitForEvent(task_to_logs, "cgroups_reaped");
+    EXPECT_LE(3.41, timeSince(startTime_));
+    EXPECT_GT(13, timeSince(startTime_));  // But we didn't wait **too** long.
+  }
+}
+
+// Unlike AsyncCGroupReaperNoFreezer, enabling "freezer" lets us actually
+// kill the "sleep" descendant instead of waiting for the cgroup.
+TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperWithFreezer) {
+ folly::test::ChangeToTempDir td;
+
+  cpp2::TaskSubprocessOptions opts;
+  opts.processGroupLeader = false;  // Or `sleep`'d be killed without cgroups
+  opts.cgroupOptions.unitTestCreateFiles = true;
+  opts.cgroupOptions.root = "root";
+  opts.cgroupOptions.slice = "slice";
+  opts.cgroupOptions.subsystems = {"cpu", "freezer"};
+  EXPECT_TRUE(boost::filesystem::create_directories("root/cpu/slice"));
+  EXPECT_TRUE(boost::filesystem::create_directories("root/freezer/slice"));
+  {
+    // This scope uses `tsq`'s destructor to await task exit.
+    folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
+    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    // We can kill the outer shell, but not the `sleep`. The inner shell is
+    // an easy way to find the sleep's PID.  The trailing `echo` ensures
+    // that `sh` does not just `exec()` the `sleep`.
+    runTask(
+      &tsq, "/bin/sh -c '/bin/echo $$ ; exec /bin/sleep 9999' ; /bin/echo",
+      opts, &expectKilled
+    );
+
+    // Add the `sleep`'s PID to the cgroup **before** initiating the kill,
+    // otherwise we'll be signaling a PID of 0.
+    auto pid_str = [&task_to_logs]() -> std::string {
+      while (true) {  // Wait for the inner shell to start.
+        SYNCHRONIZED(task_to_logs) {
+          auto stdout = task_to_logs[std::make_pair("job", "node")].stdout_;
+          if (!stdout.empty()) {
+            return stdout.back();  // Newline and all
+          }
+        }
+        /* sleep override */
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      return "not a pid";  // Never reached
+    }();
+    auto freezer_procs_path = cgDir("freezer") + "/cgroup.procs";
+    ASSERT_TRUE(folly::writeFile(pid_str, freezer_procs_path.c_str()));
+
+    // Also have to initialize freezer.state, as a real cgroup would.
+    auto freezer_state_path = cgDir("freezer") + "/freezer.state";
+    auto freezer_state = std::string("THAWED\n");
+    EXPECT_TRUE(folly::writeFile(freezer_state, freezer_state_path.c_str()));
+
+    // fork + exec + kill should take << 1 sec
+    tsq.kill(runningTask(), requestSigkill());
+    waitForEvent(task_to_logs, "process_exited");
+    EXPECT_GT(1.0, timeSince(startTime_));
+
+    // Wait for the reaper to append FROZEN to the freezer state, and react.
+    while (true) {
+      EXPECT_TRUE(folly::readFile(freezer_state_path.c_str(), freezer_state));
+      if (freezer_state == "THAWED\nFROZEN") {
+        break;
+      }
+      /* sleep override */
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    freezer_state = "FROZEN\n";
+    EXPECT_TRUE(folly::writeFile(freezer_state, freezer_state_path.c_str()));
+    // We need no more freezer.state updates to kill `sleep`, so leave it be.
+
+    folly::test::CaptureFD stderr(2, printString);
+
+    // Once the reaper kills `sleep`, update the `freezer` cgroup.
+    waitForEvent(task_to_logs, "task_pipes_closed");
+    EXPECT_GT(1.0, timeSince(startTime_));  // Still need << 1 sec
+    EXPECT_TRUE(folly::writeFile(std::string(), freezer_procs_path.c_str()));
+
+    // "cgroups_reaped" cannot have arrived yet, since "cpu"'s procs are
+    // nonempty. Check this.
+    SYNCHRONIZED(task_to_logs) {
+      for (const auto& ev
+           : task_to_logs[std::make_pair("job", "node")].events_) {
+        EXPECT_NE("cgroups_reaped", ev.at("event").asString().toStdString());
+      }
+    }
+
+    // Now, empty the "cpu" cgroup, and
+    auto cpu_procs_path = cgDir("cpu") + "/cgroup.procs";
+    ASSERT_TRUE(folly::writeFile(std::string(), cpu_procs_path.c_str()));
+    waitForEvent(task_to_logs, "cgroups_reaped");
+    EXPECT_GT(1, timeSince(startTime_));  // Still need << 1 sec
+
+    // Since these aren't real cgroups, the directories cannot be removed,
+    // but the logs show evidence that we tried.
+    EXPECT_PCRE_MATCH(folly::to<std::string>(
+      ".*\nW[^\n]*] Failed to remove empty cgroup: ", cgDir("cpu"),
+      ": Directory not empty",
+      "\nW[^\n]*] Failed to remove empty cgroup: ", cgDir("freezer"),
+      ": Directory not empty\n.*"
+    ), stderr.readIncremental());
+  }
+  EXPECT_GT(1, timeSince(startTime_));  // start-to-finish < 1 sec
 }

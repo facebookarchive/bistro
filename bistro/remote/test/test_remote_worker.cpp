@@ -318,7 +318,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     EXPECT_TRUE(worker.processHeartbeat(
       &update, bw_new, initialSetID(), /*permit_becoming_healthy =*/ true
     ).hasValue());
-    EXPECT_PCRE_MATCH("E[^\\n]* different rands:.*", stderr.readIncremental());
+    EXPECT_PCRE_MATCH("E[^\n]* different rands:.*", stderr.readIncremental());
     EXPECT_FALSE(worker.hasBeenHealthy());
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_EQ(bw_new, worker.getBistroWorker());  // The bad one wins

@@ -10,7 +10,7 @@
 #include <gtest/gtest.h>
 
 #include "bistro/bistro/config/Config.h"
-#include "bistro/bistro/test/utils.h"
+#include "bistro/bistro/test/MockBistro.h"
 
 DECLARE_bool(log_performance);
 DECLARE_int32(incremental_sleep_ms);

@@ -7,7 +7,7 @@
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
-#include "utils.h"
+#include "bistro/bistro/test/utils.h"
 
 #include <boost/regex.hpp>
 #include <iostream>

@@ -18,8 +18,8 @@
 #include "bistro/bistro/statuses/TaskStore.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/server/HTTPMonitor.h"
+#include "bistro/bistro/test/utils.h"
 #include "bistro/bistro/worker/test/FakeBistroWorkerThread.h"
-#include "bistro/bistro/worker/test/utils.h"
 
 DECLARE_int32(CAUTION_startup_wait_for_workers);
 DECLARE_int32(incremental_sleep_ms);

@@ -12,8 +12,8 @@
 #include <folly/experimental/TestUtil.h>
 #include <folly/json.h>
 
+#include "bistro/bistro/physical/test/utils.h"
 #include "bistro/bistro/processes/TaskSubprocessQueue.h"
-#include "bistro/bistro/stats/test/utils.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/test/utils.h"
 #include "bistro/bistro/utils/LogWriter.h"
@@ -58,6 +58,7 @@
  */
 
 DECLARE_int32(task_thread_pool_size);
+DECLARE_int32(incremental_sleep_ms);
 
 using namespace facebook::bistro;
 
@@ -74,7 +75,11 @@ struct TestLogWriter : public BaseLogWriter {
 
   explicit TestLogWriter(
     folly::Synchronized<TaskLogMap>* tlm = nullptr, bool print_logs = true
-  ) : taskToLogs_(tlm), printLogs_(print_logs) {}
+  ) : taskToLogs_(tlm), printLogs_(print_logs) {
+    // This test relies on timing, so the resource background thread had
+    // better not block.
+    FLAGS_incremental_sleep_ms = 5;
+  }
 
   void write(
     LogTable table,
@@ -206,10 +211,9 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
       "json_arg",
       ".",
       status_cob,
-      [this](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
         EXPECT_EQ("job", rt.job);
         EXPECT_EQ("node", rt.node);
-        checkUsageLimits(usage);
       },
       std::move(opts)
     );
@@ -266,10 +270,9 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
         EXPECT_EQ("node", rt.node);
         EXPECT_TRUE(status.isDone());
       },
-      [this](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
         EXPECT_EQ("job", rt.job);
         EXPECT_EQ("node", rt.node);
-        checkUsageLimits(usage);
       },
       opts
     );
@@ -277,14 +280,9 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
     EXPECT_GT(1.0, timeSince(startTime_));  // Start & kill take < 1 sec
   }
 
-  void checkUsageLimits(const SubprocessUsage& usage) {
-    statsChecker_.checkLimits(usage);
-  }
-
   folly::test::ChangeToTempDir td_;
   TestTimePoint startTime_;
   cpp2::TaskSubprocessOptions taskOpts_;
-  SubprocessStatsChecker statsChecker_;
 };
 
 void checkNormalTaskLogs(
@@ -356,10 +354,9 @@ TEST_F(TestTaskSubprocessQueue, NormalRun) {
         EXPECT_EQ("node", rt.node);
         EXPECT_TRUE(status.isDone());
       },
-      [this](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
         EXPECT_EQ("job", rt.job);
         EXPECT_EQ("node", rt.node);
-        checkUsageLimits(usage);
       },
       cpp2::TaskSubprocessOptions()  // defaults should be ok
     );
@@ -409,10 +406,11 @@ TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
           EXPECT_EQ(node, rt.node);
           EXPECT_TRUE(status.isDone());
         },
-        [node, this](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+        [node, this](
+          const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&
+        ) {
           EXPECT_EQ("job", rt.job);
           EXPECT_EQ(node, rt.node);
-          checkUsageLimits(usage);
         },
         cpp2::TaskSubprocessOptions()  // defaults should be ok
       );
@@ -463,10 +461,9 @@ TEST_F(TestTaskSubprocessQueue, NoStatus) {
           (*status.data()).at("exception").asString()
         );
       },
-      [this](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
         EXPECT_EQ("job", rt.job);
         EXPECT_EQ("node", rt.node);
-        checkUsageLimits(usage);
       },
       cpp2::TaskSubprocessOptions()  // defaults should be ok
     );
@@ -520,9 +517,7 @@ TEST_F(TestTaskSubprocessQueue, FailsToStart) {
           (*status.data()).at("exception").asString()
         );
       },
-      [this](const cpp2::RunningTask&, SubprocessUsage&& usage){
-        checkUsageLimits(usage);
-      },
+      [this](const cpp2::RunningTask&, cpp2::TaskPhysicalResources&&) {},
       cpp2::TaskSubprocessOptions()  // defaults should be ok
     );
   }
@@ -636,10 +631,9 @@ TEST_F(TestTaskSubprocessQueue, RateLimitLog) {
         EXPECT_EQ("node", rt.node);
         EXPECT_TRUE(status.isDone());
       },
-      [this](const cpp2::RunningTask& rt, SubprocessUsage&& usage){
+      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
         EXPECT_EQ("job", rt.job);
         EXPECT_EQ("node", rt.node);
-        checkUsageLimits(usage);
       },
       opts
     );

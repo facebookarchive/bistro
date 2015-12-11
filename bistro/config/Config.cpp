@@ -189,7 +189,7 @@ const std::map<
     cpp2::PhysicalResourceEnforcement::NONE,
     cpp2::PhysicalResourceEnforcement::HARD,
   }},
-  {cpp2::PhysicalResource::GPU_CORES, {
+  {cpp2::PhysicalResource::GPU_CARDS, {
     cpp2::PhysicalResourceEnforcement::NONE,
   }},
 };
@@ -205,7 +205,7 @@ void parsePhysicalResourceConfigs(
         } else if (name == kCPUCore) {
           return cpp2::PhysicalResource::CPU_CORES;
         } else if (name == kGPUCard) {
-          return cpp2::PhysicalResource::GPU_CORES;
+          return cpp2::PhysicalResource::GPU_CARDS;
         } else {
           // NB: Not supporting GPU_MBYTES since we don't have a usable
           // story for it at the moment.

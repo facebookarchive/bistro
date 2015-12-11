@@ -57,7 +57,7 @@ TaskRunnerResponse LocalRunner::runTaskImpl(
     folly::toJson(job_args).toStdString(),  // Job config argument
     jobsDir_ / running_task.job,  // Working directory for the task
     cb,
-    [](const cpp2::RunningTask&, SubprocessUsage&&){},
+    [](const cpp2::RunningTask&, cpp2::TaskPhysicalResources&&){},
     job->taskSubprocessOptions()
   );
   return RanTask;

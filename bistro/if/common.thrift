@@ -20,16 +20,32 @@ const i64 kNotALineID = -1;
 //      by the worker with the next processHeartbeat.
 const i16 kProtocolVersion = 1;
 
-// Physical resources names - enum
-enum PhysicalResource {
-  // Enforcement: NONE and HARD. SOFT can be added, either via cgroups
-  // OOM-notifier, or (more flaky) by monitoring & killing tasks.
-  RAM_MBYTES = 1,
-  // Enforcement: NONE and SOFT. A form of HARD could use cpuset.
-  // Fractional cores can be supported.
-  CPU_CORES = 2,
-  GPU_MBYTES = 3,
-  GPU_CORES = 4,
+// NB: As implemented, GPUInfo in both the 'usable' and 'task' context is
+// always more stale than the msSinceEpoch in the containing
+// *PhysicalResources structs.  If you need timestamps on the GPUInfo, query
+// them on the nvidia-smi command-lines, and add them to this struct.
+struct GPUInfo {
+  1: string name  // E.g. model name
+  2: string pciBusID
+  3: double memoryMB
+  4: double compute  // 1 is available, and 15% utilization == 0.15
+}
+
+struct UsablePhysicalResources {
+  1: i64 msSinceEpoch = 0
+  2: double cpuCores = 0  // Fractional cores __could__ be supported
+  3: double memoryMB = 0
+  4: list<GPUInfo> gpus
+}
+
+struct TaskPhysicalResources {
+  1: i64 msSinceEpoch
+  // The scheduler can figure CPU cores by dividing CPU time by wall time.
+  // CAVEAT: The kernel tracks nanoseconds, so if your 40-core box stays hot
+  // for 14 years, this will wrap around.  You have been warned.
+  2: optional i64 cpuTimeMs
+  3: optional double memoryMB
+  4: list<GPUInfo> gpus
 }
 
 // Both members are required because we keep hundreds of millions of these
@@ -95,7 +111,12 @@ struct RunningTask {
   // Disinguish different invocations of the same task.
   5: BistroInstanceID invocationID,
   6: BackoffDuration nextBackoffDuration,  // How long to back off on error
-  7: map<PhysicalResource, double> physicalResources,
+  // This field is returned by the worker to the scheduler on
+  // getRunningTasks, letting the scheduler poll for task resource usage.
+  //
+  // The __isset bit here lets us distinguish whether resources were never
+  // queried (not set), or if they aren't available (set to default).
+  7: optional TaskPhysicalResources physicalResources,
 }
 
 // This structure isn't for incoming connections, use ServiceAddress for
@@ -194,7 +215,18 @@ struct BistroWorker {
   // Make it unnecessary to manually set this config for the scheduler.
   5: i32 heartbeatPeriodSec,  // The scheduler adds a grace period
   6: i16 protocolVersion = 0,  // Default must stay at 0
-  7: map<PhysicalResource, double> totalResources, // machine resources
+  // Installed system resources, or Bistro's cgroup share thereof.
+  7: UsablePhysicalResources usableResources,
+}
+
+enum PhysicalResource {
+  // Enforcement: NONE and HARD. SOFT can be added, either via cgroups
+  // OOM-notifier, or (more flaky) by monitoring & killing tasks.
+  RAM_MBYTES = 1,
+  // Enforcement: NONE and SOFT. A form of HARD could use cpuset.
+  // Fractional cores can be supported.
+  CPU_CORES = 2,
+  GPU_CARDS = 4,
 }
 
 // Not all enforcement options are available for all physical resources.

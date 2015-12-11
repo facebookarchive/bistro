@@ -29,6 +29,7 @@ namespace facebook { namespace bistro {
 namespace cpp2 {
   class BistroSchedulerAsyncClient;
 }
+class UsablePhysicalResourceMonitor;
 
 class BistroWorkerHandler : public cpp2::BistroWorkerSvIf,
                             public fb303::FacebookBase2,
@@ -219,8 +220,16 @@ private:
   // tasks from running.
   std::atomic_bool committingSuicide_{false};
 
-  // Physical resources monitoring
-  std::unique_ptr<SubprocessStatsGetter> systemStatsGetter_;
+  // This monitor is created and updated from `runTask()`, but is accessed
+  // from the heartbeat thread, so it should be synchronized.
+  struct UsablePhysicalResources {
+    // null until the first healtcheck is received.
+    std::unique_ptr<UsablePhysicalResourceMonitor> monitor_;
+    // These options describe the current monitor. They should change
+    // rarely.  When they do, we update the monitor.
+    cpp2::CGroupOptions cgroupOpts_;
+  };
+  folly::Synchronized<UsablePhysicalResources> usablePhysicalResources_;
 };
 
 }}

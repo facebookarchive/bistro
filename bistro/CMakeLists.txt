@@ -31,6 +31,7 @@ bistro_link_libraries(
   lib_bistro_if
   lib_bistro_monitor
   lib_bistro_nodes
+  lib_bistro_physical
   lib_bistro_processes
   lib_bistro_runners
   lib_bistro_scheduler

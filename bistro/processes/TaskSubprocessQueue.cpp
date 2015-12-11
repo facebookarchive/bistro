@@ -31,6 +31,20 @@ DEFINE_int32(
   "Bistro processes task subprocess events."
 );
 
+DEFINE_int32(
+  refresh_all_tasks_physical_resources_sec, 60,
+  "Some resources (like GPUs) cannot be efficiently queried per task, and "
+  "are much better served via batch queries to populate an in-memory cache. "
+  "How often should these resources be refreshed?"
+);
+
+DEFINE_int32(
+  physical_resources_subprocess_timeout_ms, 1000,
+  "For some resources, we poll external an program (e.g. 'nvidia-smi'). How "
+  "long should we wait before killing it and assuming resources are "
+  "unavailable?"
+);
+
 namespace facebook { namespace bistro {
 
 namespace {
@@ -189,11 +203,6 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
     std::move(pipes)
   ));
 
-  // Sets subprocess stats monitoring
-  state->stats_.reset(
-      new SubprocessStats(SubprocessStatsGetterFactory::get(proc.pid()),
-                          state->opts().refreshResourcesSec)
-  );
   // Add callbacks to wait for the subprocess and pipes on the same EventBase.
   collectAll(
     // 1) The moral equivalent of waitpid(), followed by wait for cgroup.
@@ -296,6 +305,12 @@ TaskSubprocessQueue::TaskSubprocessQueue(
 ) : logWriter_(std::move(log_writer)),
     childStatusPipePlaceholder_(makePlaceholderFd(), /*owns_fd=*/ true),
     childCanaryPipePlaceholder_(makePlaceholderFd(), /*owns_fd=*/ true),
+    tasksResourceMonitor_(
+      std::max(10, FLAGS_physical_resources_subprocess_timeout_ms),
+      std::chrono::seconds(
+        std::max(1, FLAGS_refresh_all_tasks_physical_resources_sec)
+      )
+    ),
     // See the header for the reasons this should be the *last* thing this
     // constructor does.
     threadPool_(FLAGS_task_thread_pool_size) {}
@@ -330,6 +345,7 @@ void TaskSubprocessQueue::runTask(
   auto state = std::make_shared<detail::TaskSubprocessState>(
     rt,
     std::move(opts),
+    &tasksResourceMonitor_,  // Outlives task states
     std::move(resource_cob)
   );
   SYNCHRONIZED(tasks_) {
@@ -487,11 +503,16 @@ std::string makeCGroupName(
 TaskSubprocessState::TaskSubprocessState(
   const cpp2::RunningTask& rt,
   cpp2::TaskSubprocessOptions opts,
+  AllTasksPhysicalResourceMonitor* all_tasks_mon,
   TaskSubprocessQueue::ResourceCob&& resource_cb
 ) : opts_(std::move(opts)),
     queue_(10),
     resourceCallback_(std::move(resource_cb)),
-    cgroupName_(makeCGroupName(opts_.cgroupOptions, rt)) {
+    cgroupName_(makeCGroupName(opts_.cgroupOptions, rt)),
+    physicalResourceFetcher_(
+      CGroupPaths(opts_.cgroupOptions, boost::filesystem::path(cgroupName_)),
+      all_tasks_mon
+    ) {
 }
 
 void TaskSubprocessState::asyncSubprocessCallback(
@@ -556,8 +577,13 @@ void TaskSubprocessState::asyncSubprocessCallback(
       << "Failed to kill " << pid << " with " << signal;
     wasKilled_ = true;  // Alters "no status" handling, see above.
   } else if (--numPolls_ <= 0) {
-    numPolls_ = getNumPolls(); // reset number rounds
-    resourceCallback_(rt, std::move(stats_->getUsage()));
+    numPolls_ = getNumPolls();  // Reset the number of iterations to wait.
+    try {
+      resourceCallback_(rt, physicalResourceFetcher_.fetch());
+    } catch (const std::exception& ex) {
+      LOG(WARNING) << "Failed to fetch resources for task "
+        << apache::thrift::debugString(rt) << ": " << ex.what();
+    }
   }
 }
 

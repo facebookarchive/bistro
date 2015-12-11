@@ -20,8 +20,9 @@
 #include <wangle/concurrent/IOThreadPoolExecutor.h>
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
+#include "bistro/bistro/physical/AllTasksPhysicalResourceMonitor.h"
+#include "bistro/bistro/physical/TaskPhysicalResourceFetcher.h"
 #include "bistro/bistro/processes/AsyncReadPipeRateLimiter.h"
-#include "bistro/bistro/stats/SubprocessStats.h"
 
 namespace folly { class dynamic; }
 
@@ -52,9 +53,9 @@ private:
 public:
   using StatusCob =
     std::function<void(const cpp2::RunningTask&, TaskStatus&&)>;
-  using ResourceCob =
-    std::function<void(const cpp2::RunningTask&, SubprocessUsage&&)>;
-
+  using ResourceCob = std::function<
+    void(const cpp2::RunningTask&, cpp2::TaskPhysicalResources&&)
+  >;
 
   explicit TaskSubprocessQueue(std::unique_ptr<BaseLogWriter>);
   ~TaskSubprocessQueue();  // Sleeps until all tasks exit.
@@ -76,8 +77,11 @@ public:
     const std::vector<std::string>& cmd,  // Executable plus leading arguments
     const std::string& job_arg,  // The final, JSON argument for the task
     const boost::filesystem::path& working_dir,  // Start the task here
-    // MUST be noexcept and thread-safe; called from some EventBase thread.
+    // MUST be noexcept and thread-safe; called from an EventBase thread.
     StatusCob status_cob,
+    // MUST be noexcept and thread-safe; called from an EventBase thread.
+    // Runs periodically, only while the process is running.  Might never
+    // get called for short tasks.
     ResourceCob resource_cob,
     cpp2::TaskSubprocessOptions opts
   );
@@ -118,6 +122,8 @@ private:
   folly::Synchronized<std::map<
     InvocationID, std::shared_ptr<detail::TaskSubprocessState>
   >> tasks_;
+  // Task states keep a pointer to this monitor, so declare it after.
+  AllTasksPhysicalResourceMonitor tasksResourceMonitor_;
   // Owns the threads that actually use the tasks. Declared and constructed
   // last to avoid several common threading issues:
   //  - constructor threw after spawning threads => abort() or leak threads
@@ -145,9 +151,10 @@ public:
   //
 
   TaskSubprocessState(
-    const cpp2::RunningTask& rt,
-    cpp2::TaskSubprocessOptions opts,
-    TaskSubprocessQueue::ResourceCob&& resource_cb
+    const cpp2::RunningTask&,
+    cpp2::TaskSubprocessOptions,
+    AllTasksPhysicalResourceMonitor*,
+    TaskSubprocessQueue::ResourceCob&&
   );
   void asyncSubprocessCallback(const cpp2::RunningTask& rt,
                                folly::Subprocess& proc) noexcept;
@@ -157,7 +164,6 @@ public:
 
   // These are used only by TaskSubprocessQueue, stored here for convenience.
   std::unique_ptr<AsyncReadPipeRateLimiter> pipeRateLimiter_;  // Created late
-  std::unique_ptr<SubprocessStats> stats_; // Create late, need subprocess pid
   std::string rawStatus_;
 
   /**
@@ -178,18 +184,15 @@ public:
 
 private:
   int64_t getNumPolls() const {
-    // For resource callback invocation asyncSubprocessCallback callback
-    // in event base thread will be used, which got called every opts_.pollMs.
-    // To calculate the number of asyncSubprocessCallback invocations per one
-    // resource callback invocation, we round up the ratio of time intervals,
-    // i.e opts_.refreshResourcesSec and opts_.pollMs.
-    // Protect intervals from zero values, just in case
-
+    // resourceCallback_ will be called from asyncSubprocessCallback(),
+    // which is executed every opts_.pollMs on the EventBase thread.  To
+    // This computes the number of asyncSubprocessCallback() invocations per
+    // one resourceCallback_ invocation.
     // Convert resource callback invocation interval to milliseconds
     const double resInterval = std::max(1, opts_.refreshResourcesSec) * 1000.;
     const double pollInterval = std::max(1, opts_.pollMs);
-    // Round up ratio to make sure resource callback invocation happens no
-    // frequently then requested
+    // Round up the ratio to make sure resource callback invocation happens
+    // no more frequently than requested.
     return std::ceil(resInterval / pollInterval);
   }
 
@@ -200,6 +203,7 @@ private:
   TaskSubprocessQueue::ResourceCob resourceCallback_;
   int64_t numPolls_{0};
   std::string cgroupName_;  // The last, per-task, part of the cgroup path.
+  TaskPhysicalResourceFetcher physicalResourceFetcher_;
 };
 }  // namespace detail
 

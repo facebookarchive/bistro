@@ -49,10 +49,14 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
           if (!s.empty()) {
             switch (childFd) {
               case STDOUT_FILENO:
-                stdOutLines->emplace_back(s.data(), s.size());
+                if (stdOutLines) {
+                  stdOutLines->emplace_back(s.data(), s.size());
+                }
                 break;
               case STDERR_FILENO:
-                stdErrLines->emplace_back(s.data(), s.size());
+                if (stdErrLines) {
+                  stdErrLines->emplace_back(s.data(), s.size());
+                }
                 break;
               default:
                 LOG(FATAL) << "Unexpected pipe descriptor: " << childFd;

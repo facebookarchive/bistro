@@ -28,7 +28,7 @@ class TaskStatus;
  */
 class NoOpRunner : boost::noncopyable, public TaskRunner {
 public:
-  explicit NoOpRunner(TaskStatus last_status)
+  explicit NoOpRunner(TaskStatus last_status = TaskStatus::done())
     : lastStatus_(std::move(last_status)) {}
 protected:
   TaskRunnerResponse runTaskImpl(

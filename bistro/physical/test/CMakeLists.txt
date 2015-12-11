@@ -1,0 +1,4 @@
+add_gtest(test_all_tasks lib_bistro_physical)
+add_gtest(test_utils lib_bistro_physical)
+add_gtest(test_cgroup_resources lib_bistro_physical)
+add_gtest(test_usable_fetcher lib_bistro_physical)

@@ -156,9 +156,9 @@ TEST(TestConfig, HandleConstruction) {
   prc_it->second.multiplyLogicalBy = 0.001;
   prc_it->second.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
   prc_it = prcs.configs.emplace(
-    cpp2::PhysicalResource::GPU_CORES, cpp2::PhysicalResourceConfig()
+    cpp2::PhysicalResource::GPU_CARDS, cpp2::PhysicalResourceConfig()
   ).first;
-  prc_it->second.physical = cpp2::PhysicalResource::GPU_CORES;
+  prc_it->second.physical = cpp2::PhysicalResource::GPU_CARDS;
   prc_it->second.logical = "my_gpu_card";
   prc_it->second.multiplyLogicalBy = 1;
   prc_it->second.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
@@ -169,7 +169,7 @@ TEST(TestConfig, HandleConstruction) {
     EXPECT_EQ(((decltype(config.logicalToPhysical)){
       {"my_ram_gb", &p.configs.at(cpp2::PhysicalResource::RAM_MBYTES)},
       {"my_cpu_centicore", &p.configs.at(cpp2::PhysicalResource::CPU_CORES)},
-      {"my_gpu_card", &p.configs.at(cpp2::PhysicalResource::GPU_CORES)},
+      {"my_gpu_card", &p.configs.at(cpp2::PhysicalResource::GPU_CARDS)},
     }), config.logicalToPhysical);
   }
 

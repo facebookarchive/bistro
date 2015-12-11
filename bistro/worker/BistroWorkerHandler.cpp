@@ -22,6 +22,7 @@
 #include "bistro/bistro/if/gen-cpp2/common_constants.h"
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
+#include "bistro/bistro/physical/UsablePhysicalResourceMonitor.h"
 #include "bistro/bistro/remote/RemoteWorker.h"
 #include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/utils/hostname.h"
@@ -55,6 +56,14 @@ DEFINE_int32(
   "partition, or a scheduler request), it TERM-wait-KILLs its tasks. This "
   "is how long it waits."
 );
+DEFINE_int32(
+  refresh_usable_physical_resources_sec, 60,
+  "CGroups settings can change at runtime, altering our CPU or RAM "
+  "allocation. nVidia GPUs can become lost. For both of these reasons, "
+  "system resources are not static, but rather are polled periodically. "
+  "This controls the refresh frequency."
+);
+DECLARE_int32(physical_resources_subprocess_timeout_ms);
 
 namespace facebook { namespace bistro {
 
@@ -123,8 +132,7 @@ BistroWorkerHandler::BistroWorkerHandler(
     worker_(makeWorker(addr, locked_port, logStateTransitionFn_)),
     state_(RemoteWorkerState(worker_.id.startTime)),
     gotNewSchedulerInstance_(true),
-    canConnectToMyself_(false),
-    systemStatsGetter_(SubprocessStatsGetterFactory::get()) {
+    canConnectToMyself_(false) {
 
   // No scheduler associated yet, so use a dummy instance ID and timeouts
   schedulerState_->id.startTime = 0;
@@ -163,6 +171,11 @@ void BistroWorkerHandler::throwIfSuicidal() {
   }
 }
 
+// Design/protocol note:  If this is the first getRunningTasks(),
+// state_->state_ will be changed from NEW by the scheduler's response to
+// our next heartbeat.  This method does not mutate worker state, both
+// because that is cleaner, and because that lets the scheduler query
+// running tasks after worker intialization e.g. to poll resource usage.
 void BistroWorkerHandler::getRunningTasks(
     std::vector<cpp2::RunningTask>& out_running_tasks,
     const cpp2::BistroInstanceID& worker) {
@@ -184,9 +197,6 @@ void BistroWorkerHandler::getRunningTasks(
       }
     }
   }
-  // state_->state_ will be changed from NEW by the scheduler's response to
-  // our next heartbeat.  Arguably, we could also preemptively set it to
-  // UNHEALTHY here.
 }
 
 // CONTRACT: Must only throw BistroWorkerException if the task will never
@@ -245,6 +255,35 @@ void BistroWorkerHandler::runTask(
   }
 
   if (isHealthcheck) {
+    // This means that a worker will not know its usable physical resources
+    // until it receives the first healthcheck, and that any cgroup config
+    // changes (which should be extremely rare) will only propagate to
+    // workers during healthchecks.  On the bright side, this means that
+    // cgroup configs *can* be changed at runtime, and that the lock on
+    // systemCGroupOpts_ causes a minimal amount of contention, since
+    // healthchecks should not be too frequent.
+    SYNCHRONIZED(usablePhysicalResources_) {
+      // Future: Ideally, the refresh interval could also be changed at
+      // run-time, and it would be possible to add a "log" callback to
+      // display the new system resources whenever the cgroups change.
+      // However, both are too much hassle with the current PeriodicPoller,
+      // and it's too much hassle to roll a custom poller.
+      if (!usablePhysicalResources_.monitor_) {
+        usablePhysicalResources_.monitor_ =
+          folly::make_unique<UsablePhysicalResourceMonitor>(
+            CGroupPaths(opts.cgroupOptions, folly::none),
+            FLAGS_physical_resources_subprocess_timeout_ms,
+            std::chrono::seconds(FLAGS_refresh_usable_physical_resources_sec)
+          );
+        usablePhysicalResources_.cgroupOpts_ = opts.cgroupOptions;
+      } else if (opts.cgroupOptions != usablePhysicalResources_.cgroupOpts_) {
+        LOG(WARNING) << "CGroups changed: " << debugString(opts.cgroupOptions);
+        usablePhysicalResources_.monitor_->updateCGroupPaths(
+          CGroupPaths(opts.cgroupOptions, folly::none)
+        );
+        usablePhysicalResources_.cgroupOpts_ = opts.cgroupOptions;
+      }
+    }
     LOG(INFO) << "Queueing healthcheck started at "
       << rt.invocationID.startTime;
   } else {
@@ -300,13 +339,14 @@ void BistroWorkerHandler::runTask(
       ));
       logStateTransitionFn_("completed_task", worker_, &rt);
     },
-    [this](const cpp2::RunningTask& rt, SubprocessUsage&& usage) {
+    [this](
+      const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&& res
+    ) noexcept {
       SYNCHRONIZED(runningTasks_) {
         auto it = runningTasks_.find({rt.job, rt.node});
-        CHECK (it != runningTasks_.end()) << "Not found running task"
-                                          << ", job: " << rt.job
-                                          << ", node: " << rt.node;
-        it->second.physicalResources = SubprocessStats::convert(usage);
+        CHECK (it != runningTasks_.end()) << "Bad task: " << debugString(rt);
+        it->second.physicalResources = std::move(res);
+        it->second.__isset.physicalResources = true;
       }
     },
     opts
@@ -618,10 +658,16 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
     cpp2::SchedulerHeartbeatResponse res;
     // Create a copy of worker and update system resources
     cpp2::BistroWorker worker(worker_);
-    if (systemStatsGetter_) {
-      SubprocessSystem installed;
-      if (0 == systemStatsGetter_->getSystem(&installed)) {
-        worker.totalResources = SubprocessStats::convert(installed);
+    SYNCHRONIZED(usablePhysicalResources_) {
+      // The monitor is created during the first healthcheck.
+      if (usablePhysicalResources_.monitor_) {
+        try {
+          worker.usableResources =
+            *usablePhysicalResources_.monitor_->getDataOrThrow();
+        } catch (const std::exception& ex) {
+          LOG(WARNING) << "Failed to refresh worker's usable physical "
+            << "resources: " << ex.what();
+        }
       }
     }
     auto scheduler_state = schedulerState_.copy();  // Take the lock only once

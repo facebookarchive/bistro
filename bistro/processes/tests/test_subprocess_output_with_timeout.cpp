@@ -40,6 +40,13 @@ TEST(TestSubprocessOutputWithTimeout, HelpOutput) {
   EXPECT_EQ(stdErr.size(), 0);
 }
 
+TEST(TestSubprocessOutputWithTimeout, HelpOutputNullBuffers) {
+  std::vector<std::string> cmd{"/bin/sleep", "--help"};
+  auto retCode = subprocessOutputWithTimeout(cmd, nullptr, nullptr, 1000);
+  EXPECT_TRUE(retCode.exited());
+  EXPECT_EQ(retCode.exitStatus(), 0);
+}
+
 TEST(TestSubprocessOutputWithTimeout, WrongBinary) {
   std::vector<std::string> cmd{"/bin/sleepNotExists"}, stdOut, stdErr;
   auto retCode = subprocessOutputWithTimeout(cmd, &stdOut, &stdErr, 1000);

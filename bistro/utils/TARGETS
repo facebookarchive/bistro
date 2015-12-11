@@ -18,7 +18,6 @@ cpp_library(
         '@/folly/experimental:autotimer',
         '@/bistro/bistro/if:if-cpp2',
         '@/bistro/bistro/sqlite:sqlite_lib',
-        '@/bistro/bistro/stats:subprocess_stats_lib',
     ],
     external_deps=[
         ('boost', None, 'boost_regex'),

@@ -615,6 +615,7 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
       rt.invocationID.startTime = time(nullptr);
       // .rand is ignored for healthchecks
       rt.workerShard = w.shard;
+      // .nextBackoffDuration is not applicable
       client->runTask(
         unique_ptr<RequestCallback>(new FunctionReplyCallback(
           [client, w](ClientReceiveState&& state) {
@@ -645,7 +646,10 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
         schedulerID_,
         w.id,
         0,  // healtchecks don't use "notifyIfTasksNotRunning"
-        // Don't let the user's custom subprocess options mess us up
+        // Don't let the user's custom subprocess options mess us up.  Do
+        // not enable cgroup monitoring or isolation for health-checks.
+        // Future: it might be a good idea to make `healthcheck` a proper
+        // job, so that this can be configured specially.
         cpp2::TaskSubprocessOptions()
       );
     } catch (const exception& e) {

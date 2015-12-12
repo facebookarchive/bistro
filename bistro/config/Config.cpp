@@ -170,6 +170,9 @@ void parseTaskSubprocessOptions(
           cgopts.subsystems.emplace_back(s.asString().toStdString());
         }
       }
+      if (const auto p = dynGetBool(*cgp, kKillWithoutFreezer)) {
+        cgopts.killWithoutFreezer = *p;
+      }
       // cpuShares and and memoryLimitInBytes will be populated on a
       // per-task basis, based on their worker resources using
       // PhysicalResourceConfigs (below).  unitTestCreateFiles is for tests.

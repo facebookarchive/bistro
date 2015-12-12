@@ -284,6 +284,19 @@ struct CGroupOptions {
   5: i16 cpuShares = 0,
   // If nonzero, sets a hard limit on the amount of memory used.
   6: i64 memoryLimitInBytes = 0,
+  // CAUTION: Enabling this will expose you to the possibility of signaling
+  // the wrong process due to the race of "we read a cgroup, a process
+  // exits, its PID is reused, we send the signal".  If your PIDs are
+  // 16-bit, this is definitely a BAD idea.  Don't do it.  With 32-bit PIDs,
+  // you will usually be OK, but not immune, especially with long-running
+  // tasks.
+  //
+  // By default, cgroup-based kill is disabled unless the `freezer`
+  // subsystem is enabled for the task.  Since there are some concerns about
+  // the reliability / stability of `freezer`, this flag provides an "out",
+  // enabling cgroup-based kill even if `freezer` is missing.  If `freezer`
+  // is enabled, it will be used regardless of this flag.
+  7: bool killWithoutFreezer = 0,
   // Future: one could easily allow writing values to specific files in
   // specific subsystems, but this flexibility seems more error-prone and
   // unnecessary as of now.

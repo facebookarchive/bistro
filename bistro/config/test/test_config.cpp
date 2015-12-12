@@ -111,6 +111,7 @@ TEST(TestConfig, HandleConstruction) {
       (kRoot, "root")
       (kSlice, "slice")
       (kSubsystems, {"sys1", "sys2"})
+      (kKillWithoutFreezer, true)
     );
   task_opts.pollMs = 111;
   task_opts.maxLogLinesPerPollInterval = 222;
@@ -120,6 +121,7 @@ TEST(TestConfig, HandleConstruction) {
   task_opts.cgroupOptions.root = "root";
   task_opts.cgroupOptions.slice = "slice";
   task_opts.cgroupOptions.subsystems = {"sys1", "sys2"};
+  task_opts.cgroupOptions.killWithoutFreezer = true;
   EXPECT_EQ(task_opts, Config(d).taskSubprocessOptions);
 
   // Check non-default physical resource configs

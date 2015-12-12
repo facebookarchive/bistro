@@ -151,6 +151,7 @@ const char* kCGroups = "cgroups";
 const char* kRoot = "root";
 const char* kSlice = "slice";
 const char* kSubsystems = "subsystems";
+const char* kKillWithoutFreezer = "kill_without_freezer";
 // Physical resource configuration
 const char* kPhysicalResources = "physical_resources";
 // The unit names are all singular, since each entry just maps a physical

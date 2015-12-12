@@ -228,7 +228,8 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
       // Usually, well-behaved descendants will have exited by this point.
       // This reaper will write logspam, and wait until all processes in
       // each of the task's cgroups have exited.  If the `freezer` subsystem
-      // is available, the reaper will also repeatedly send them SIGKILL.
+      // is available, or if `killWithoutFreezer` is set, the reaper will
+      // also repeatedly send them SIGKILL.
       //
       // This future fires only when the task cgroups lose all their tasks.
       return asyncCGroupReaper(

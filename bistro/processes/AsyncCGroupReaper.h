@@ -27,7 +27,8 @@ namespace facebook { namespace bistro {
  *  - Tries to `rmdir` any cgroups that become empty, in case the system
  *    `release_agent` is not enabled.
  *  - Logs about the intransigent task to raise awareness of leaky tasks.
- *  - If a `freezer` cgroup is available, SIGKILLs processes in that cgroup.
+ *  - If a `freezer` cgroup is available or if `killWithoutFreezer` is set,
+ *    SIGKILLs processes in that cgroup.
  *
  * All of these functions are executed on an exponential backoff schedule,
  * since we expect that tasks stuck in D state (e.g.  due to buggy kernel

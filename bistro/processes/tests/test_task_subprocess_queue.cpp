@@ -724,7 +724,7 @@ void waitForEvent(
 
 // Without "freezer", we will just wait for the unkillable 'sleep'.
 TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperNoFreezer) {
- folly::test::ChangeToTempDir td;
+  folly::test::ChangeToTempDir td;
 
   // Without "freezer", we will just wait for the unkillable 'sleep'.
   cpp2::TaskSubprocessOptions opts;
@@ -787,10 +787,25 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperNoFreezer) {
   }
 }
 
+std::string waitForFirstStdout(
+    folly::Synchronized<TestLogWriter::TaskLogMap>* task_to_logs) {
+  while (true) {
+    SYNCHRONIZED(task_to_logs, *task_to_logs) {
+      auto stdout = task_to_logs[std::make_pair("job", "node")].stdout_;
+      if (!stdout.empty()) {
+        return stdout.back();  // Newline and all
+      }
+    }
+    /* sleep override */
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  return "not a pid";  // Never reached
+}
+
 // Unlike AsyncCGroupReaperNoFreezer, enabling "freezer" lets us actually
 // kill the "sleep" descendant instead of waiting for the cgroup.
 TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperWithFreezer) {
- folly::test::ChangeToTempDir td;
+  folly::test::ChangeToTempDir td;
 
   cpp2::TaskSubprocessOptions opts;
   opts.processGroupLeader = false;  // Or `sleep`'d be killed without cgroups
@@ -804,29 +819,18 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperWithFreezer) {
     // This scope uses `tsq`'s destructor to await task exit.
     folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
     TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
-    // We can kill the outer shell, but not the `sleep`. The inner shell is
-    // an easy way to find the sleep's PID.  The trailing `echo` ensures
-    // that `sh` does not just `exec()` the `sleep`.
+    // Since processGroupLeader is off, the initial kill only affect the
+    // outer shell, but not the `sleep`.  The inner shell is an easy way to
+    // find the sleep's PID.  The trailing `echo` ensures that `sh` does not
+    // just `exec()` the `sleep`.
     runTask(
       &tsq, "/bin/sh -c '/bin/echo $$ ; exec /bin/sleep 9999' ; /bin/echo",
       opts, &expectKilled
     );
 
     // Add the `sleep`'s PID to the cgroup **before** initiating the kill,
-    // otherwise we'll be signaling a PID of 0.
-    auto pid_str = [&task_to_logs]() -> std::string {
-      while (true) {  // Wait for the inner shell to start.
-        SYNCHRONIZED(task_to_logs) {
-          auto stdout = task_to_logs[std::make_pair("job", "node")].stdout_;
-          if (!stdout.empty()) {
-            return stdout.back();  // Newline and all
-          }
-        }
-        /* sleep override */
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      }
-      return "not a pid";  // Never reached
-    }();
+    // otherwise we'll be signaling a PID of 0, i.e. ourselves.
+    auto pid_str = waitForFirstStdout(&task_to_logs);
     auto freezer_procs_path = cgDir("freezer") + "/cgroup.procs";
     ASSERT_TRUE(folly::writeFile(pid_str, freezer_procs_path.c_str()));
 
@@ -883,6 +887,63 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperWithFreezer) {
       "\nW[^\n]*] Failed to remove empty cgroup: ", cgDir("freezer"),
       ": Directory not empty\n.*"
     ), stderr.readIncremental());
+  }
+  EXPECT_GT(1, timeSince(startTime_));  // start-to-finish < 1 sec
+}
+
+// Signal without freezer, incurring the risk of killing the wrong process.
+TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperKillWithoutFreezer) {
+  folly::test::ChangeToTempDir td;
+
+  cpp2::TaskSubprocessOptions opts;
+  opts.processGroupLeader = false;  // Or `sleep`'d be killed without cgroups
+  opts.cgroupOptions.unitTestCreateFiles = true;
+  opts.cgroupOptions.root = "root";
+  opts.cgroupOptions.slice = "slice";
+  opts.cgroupOptions.subsystems = {"cpu"};
+  opts.cgroupOptions.killWithoutFreezer = true;
+  EXPECT_TRUE(boost::filesystem::create_directories("root/cpu/slice"));
+  {
+    // This scope uses `tsq`'s destructor to await task exit.
+    folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
+    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    // Since processGroupLeader is off, the initial kill only affect the
+    // outer shell, but not the `sleep`.  The inner shell is an easy way to
+    // find the sleep's PID.  The trailing `echo` ensures that `sh` does not
+    // just `exec()` the `sleep`.
+    runTask(
+      &tsq, "/bin/sh -c '/bin/echo $$ ; exec /bin/sleep 9999' ; /bin/echo",
+      opts, &expectKilled
+    );
+
+    // Add the `sleep`'s PID to our only cgroup **before** initiating the
+    // kill, otherwise we'll be signaling a PID of 0, i.e. ourselves.
+    auto pid_str = waitForFirstStdout(&task_to_logs);
+    auto cpu_procs_path = cgDir("cpu") + "/cgroup.procs";
+    ASSERT_TRUE(folly::writeFile(pid_str, cpu_procs_path.c_str()));
+
+    // fork + exec + kill should take << 1 sec
+    tsq.kill(runningTask(), requestSigkill());
+    waitForEvent(task_to_logs, "process_exited");
+    EXPECT_GT(1.0, timeSince(startTime_));
+
+    // Wait for the reaper to kill `sleep`.
+    waitForEvent(task_to_logs, "task_pipes_closed");
+    EXPECT_GT(1.0, timeSince(startTime_));  // Still need << 1 sec
+
+    // "cgroups_reaped" cannot have arrived yet, since "cpu"'s procs are
+    // nonempty. Check this.
+    SYNCHRONIZED(task_to_logs) {
+      for (const auto& ev
+           : task_to_logs[std::make_pair("job", "node")].events_) {
+        EXPECT_NE("cgroups_reaped", ev.at("event").asString().toStdString());
+      }
+    }
+
+    // Update the `cpu` cgroup so that the reaper can exit.
+    EXPECT_TRUE(folly::writeFile(std::string(), cpu_procs_path.c_str()));
+    waitForEvent(task_to_logs, "cgroups_reaped");
+    EXPECT_GT(1, timeSince(startTime_));  // Still need << 1 sec
   }
   EXPECT_GT(1, timeSince(startTime_));  // start-to-finish < 1 sec
 }

@@ -52,20 +52,21 @@ public:
     // DO NOT use objects with non-empty destructors here, we `delete this`.
     *empty_cgroups = emptyCGroups_.getFuture();
     // Reduce latency: check eagerly if there are no groups to wait for.
-    if (areCGroupsEmpty()) {
-      emptyCGroups_.setValue();
-      delete this;
-      return;  // Better do **nothing** else, `this` is gone.
+    if (auto nonempty_subsystem = findNonEmptySubsystem()) {
+      // Make one kill attempt immediately, since it takes at least 2 calls
+      // to actually signal the cgroup (1 to freeze, and 1 to signal).  In
+      // the common case of "no D state tasks", this should cut down cgroup
+      // kill latency to 1-5 minWaitMs_ intervals.
+      workOnKillingCGroupTasks(*nonempty_subsystem);  // noexcept
+      // The first delay is exempt from exponential backoff.
+      myScheduleTimeout(minWaitMs_);
+      // If AsyncCGroupReaper were created outside the EventBase thread, the
+      // class could already be destroyed by timeoutExpired() by this point.
+      return;  // Do not self-destruct.
     }
-    // Make one kill attempt immediately, since it takes at least 2 calls
-    // to actually signal the cgroup (1 to freeze, and 1 to signal).  In
-    // the common case of "no D state tasks", this should cut down cgroup
-    // kill latency to 1-5 minWaitMs_ intervals.
-    workOnKillingCGroupTasks();  // noexcept
-    // The first delay is exempt from exponential backoff.
-    myScheduleTimeout(minWaitMs_);
-    // If AsyncCGroupReaper were created outside the EventBase thread, the
-    // class could already be destroyed by timeoutExpired() by this point.
+    emptyCGroups_.setValue();
+    delete this;
+    // Better do **nothing** else, `this` is gone.
   }
 
   virtual void timeoutExpired() noexcept override {
@@ -74,17 +75,18 @@ public:
     // Check before trying to kill. The other order is less efficient -- a
     // successful kill is not instant, so an immediate areCGroupEmpty()
     // check would usually fail anyway.
-    if (areCGroupsEmpty()) {
-      LOG(WARNING) << "Intransigent task with cgroup " << cgroupName_
-        << " exited after " << totalWaitMs_ << " ms";
-      emptyCGroups_.setValue();
-      delete this;
-      return;  // Better do **nothing** else, `this` is gone.
+    if (auto nonempty_subsystem = findNonEmptySubsystem()) {
+      LOG(WARNING) << "Trying to reap intransigent task with cgroup "
+        << cgroupName_ << " for over " << totalWaitMs_ << " ms";
+      workOnKillingCGroupTasks(*nonempty_subsystem);
+      myScheduleTimeout(maxWaitMs_);  // Timeout exponentially grows to max.
+      return;  // Not done yet, don't self-destruct.
     }
-    LOG(WARNING) << "Trying to reap intransigent task with cgroup "
-      << cgroupName_ << " for over " << totalWaitMs_ << " ms";
-    workOnKillingCGroupTasks();
-    myScheduleTimeout(maxWaitMs_);  // Timeout exponentially grows to max.
+    LOG(WARNING) << "Intransigent task with cgroup " << cgroupName_
+      << " exited after " << totalWaitMs_ << " ms";
+    emptyCGroups_.setValue();
+    delete this;
+    // Better do **nothing** else, `this` is gone.
   }
 
 private:
@@ -105,7 +107,7 @@ private:
    * Removes empty cgroup directories, which is important when the system
    * `release_agent` reaper is not configured.
    */
-  bool areCGroupsEmpty() noexcept {
+  folly::Optional<std::string> findNonEmptySubsystem() noexcept {
     // While checking /cgroup.procs files, keep in mind that the kernel
     // `release_agent` can remove a cgroup from under us at any time.
     for (const auto& subsystem : cgroupOpts_.subsystems) {
@@ -123,7 +125,7 @@ private:
           if (c < '0' || c > '9') {
             LOG(WARNING) << dir << "/cgroup.procs starts with bad char: " << c;
           }
-          return false;  // At least one cgroup contains data.
+          return subsystem;  // At least one cgroup contains data.
         } else if (bytes_read == -1) {
           PLOG(WARNING) << dir << "/cgroup.procs is unreadable";
         } else if (bytes_read == 0) {
@@ -143,7 +145,7 @@ private:
       }
       // Either the cgroup is empty, or a read error made us assume it's gone.
     }
-    return true;
+    return folly::none;
   }
 
   // Helper for workOnKillingCGroupTasks.
@@ -167,16 +169,42 @@ private:
     }
   }
 
+  // Helper for workOnKillingCGroupTasks(), do NOT call directly.
+  void killCGroupTasks(const std::string& subsystem) noexcept {
+    // Uses /cgroup.procs instead of /tasks since it seems awkward and
+    // unnecessary to signal each thread of a running process individually.
+    std::unordered_set<uint64_t> pids;  // cgroup.procs need not be unique
+    try {
+      pids = folly::gen::byLine(
+        folly::File(cgroupDir(subsystem) + "/cgroup.procs")
+      ) | folly::gen::eachTo<uint64_t>()
+        | folly::gen::as<decltype(pids)>();
+    } catch (const std::exception& ex) {
+      // Can happen if the system `release_agent` reaped the cgroup since
+      // e.g. all processes quit after our last findNonEmptySubsystem().
+      LOG(WARNING) << "Killing cgroup " << cgroupName_ << ": " << ex.what();
+    }
+    for (auto pid : pids) {
+      // FATAL since none of the POSIX error conditions can occur, unless
+      // we have a serious bug like signaling the wrong PID.
+      PLOG_IF(FATAL, ::kill(pid, SIGKILL) == -1)
+        << "Failed to kill " << pid << " from cgroup " << cgroupName_;
+    }
+  }
+
   /**
-   * Sends no signals if the `freezer` subsystem is not available.
+   * Only sends signals if the `freezer` subsystem is available, or if the
+   * (dangerous) flag `killWithoutFreezer` is set.
    *
-   * Signaling a cgroup is racy: between the time we read `/cgroup.procs`
-   * and the time we send the signal, a process could exit, and its PID
-   * could be recycled -- killing the wrong process.  This mitigates the
-   * race by freezing the cgroup, sending SIGKILL, and thawing the cgroup.
-   * Since freezing the cgroup takes considerable time, the work is spread
-   * over multiple calls to workOnKillingCGroupTasks() -- this is not a
-   * standalone synchronous operation.
+   * == How is `freezer` used? ==
+   *
+   * Signaling a cgroup is racy: between the time we read
+   * `/cgroup.procs` and the time we send the signal, a process could exit,
+   * and its PID could be recycled -- killing the wrong process.  This
+   * mitigates the race by freezing the cgroup, sending SIGKILL, and thawing
+   * the cgroup.  Since freezing the cgroup takes considerable time, the
+   * work is spread over multiple calls to workOnKillingCGroupTasks() --
+   * this is not a standalone synchronous operation.
    *
    * This gets called repeatedly, every curWaitMs_.  Each iteration focuses
    * on doing one state transition in this list:
@@ -186,13 +214,18 @@ private:
    * Some of these take time, so it makes sense not to do them synchronously,
    * and instead to spread them out over multiple iterations.
    */
-  void workOnKillingCGroupTasks() noexcept {
+  void workOnKillingCGroupTasks(const std::string& nonempty_subsys) noexcept {
     // Signaling cgroups without `freezer` is racy and dangerous, see the
     // docstring in AsyncCGroupReaper.h.
     if (std::find(
       cgroupOpts_.subsystems.begin(), cgroupOpts_.subsystems.end(), "freezer"
     ) == cgroupOpts_.subsystems.end()) {
-      badFreezer(" is not enabled");
+      // The client wants a racy, un-frozen kill, so go for it.
+      if (cgroupOpts_.killWithoutFreezer) {
+        killCGroupTasks(nonempty_subsys);
+      } else {
+        badFreezer(" is not enabled");
+      }
       return;
     }
 
@@ -224,31 +257,10 @@ private:
         // The next workOnKillingCGroupTasks() normally tries to freeze again.
       }
     } else if (freezer_state == "FROZEN\n") {
+      // We are now as sure as possible that signaling these PIDs is safe.
       // We can only kill `freezer` tasks -- if another subsystem has other
       // PIDs, it's not safe to signal them anyhow.
-      //
-      // Uses /cgroup.procs instead of /tasks since it seems awkward and
-      // unnecessary to signal each thread of a running process individually.
-      std::unordered_set<uint64_t> pids;  // cgroup.procs need not be unique
-      try {
-        pids = folly::gen::byLine(
-          folly::File(cgroupDir("freezer") + "/cgroup.procs")
-        ) | folly::gen::eachTo<uint64_t>()
-          | folly::gen::as<decltype(pids)>();
-      } catch (const std::exception& ex) {
-        // Can happen if all processes quit since our last areCGroupsEmpty(),
-        // and the system `release_agent` reaped the cgroup.
-        LOG(WARNING) << "Killing cgroup " << cgroupName_ << ": " << ex.what();
-      }
-
-      // We are now as sure as possible that signaling these PIDs is safe.
-      for (auto pid : pids) {
-        // FATAL since none of the POSIX error conditions can occur, unless
-        // we have a serious bug like signaling the wrong PID.
-        PLOG_IF(FATAL, ::kill(pid, SIGKILL) == -1)
-          << "Failed to kill " << pid << " from cgroup " << cgroupName_;
-      }
-
+      killCGroupTasks("freezer");
       // Non-D-state processes will receive the SIGKILL and exit shortly after.
       freezerWrite(freezer_state_path, "THAWED");
     } else {

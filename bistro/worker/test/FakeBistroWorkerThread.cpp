@@ -10,6 +10,7 @@
 #include "bistro/bistro/worker/test/FakeBistroWorkerThread.h"
 
 #include "bistro/bistro/if/gen-cpp2/common_constants.h"
+#include "bistro/bistro/utils/hostname.h"
 
 using namespace std;
 
@@ -41,14 +42,12 @@ void FakeBistroWorker::async_tm_getRunningTasks(
 cpp2::BistroWorker FakeBistroWorkerThread::getBistroWorker() const {
   cpp2::BistroWorker worker;
   worker.shard = shard_;
-  auto name = getLocalHostName();
-  int port = ssit_.getPort();
-  worker.machineLock.hostname = name;
-  worker.machineLock.port = port;
+  worker.machineLock.hostname = getLocalHostName();
+  worker.machineLock.port = ssit_.getPort();
   worker.addr.ip_or_host = ssit_.getAddress().getAddressStr();
-  worker.addr.port = port;
+  worker.addr.port = worker.machineLock.port;
   worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
-  worker.id = id_;
+  customizeWorkerCob_(&worker);
   return worker;
 }
 

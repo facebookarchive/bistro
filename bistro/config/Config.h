@@ -100,10 +100,9 @@ public:
   JobBackoffSettings defaultBackoffSettings;
   cpp2::TaskSubprocessOptions taskSubprocessOptions;
   cpp2::KillRequest killRequest;
-  cpp2::PhysicalResourceConfigs physicalResourceConfigs;
-  // Inverted index: contains pointers into physicalResourceConfigs.
-  std::unordered_map<std::string, cpp2::PhysicalResourceConfig const*>
-    logicalToPhysical;
+  std::vector<cpp2::PhysicalResourceConfig> physicalResourceConfigs;
+  // Inverted index: contains indexes into physicalResourceConfigs.
+  std::unordered_map<std::string, size_t> logicalToPhysical;
 
   // A DANGEROUS manual toggle allowing the scheduler's administrator to
   // immediately exit initial wait.  It remains in effect only until the
@@ -117,7 +116,10 @@ public:
 
   // Optional override for worker resources, to indicate that some workers have
   // more resources available.
-  std::unordered_map<std::string, ResourceVector> workerResourcesOverride;
+  std::unordered_map<
+    // shard => resource IDs & amounts
+    std::string, std::vector<std::pair<int, int>>
+  > workerResourcesOverride;
 };
 
 // Helper functions used by Config & Job
@@ -175,6 +177,7 @@ const char* kGPUCard = "gpu_card";
 // Keys of physical resource configs
 const char* kLogicalResource = "logical_resource";
 const char* kMultiplyLogicalBy = "multiply_logical_by";
+const char* kPhysicalReserveAmount = "physical_reserve_amount";
 const char* kEnforcement = "enforcement";
 // Enforcement options
 const char* kNone = "none";

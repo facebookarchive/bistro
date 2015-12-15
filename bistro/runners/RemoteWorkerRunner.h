@@ -96,7 +96,7 @@ public:
     return workerResources_.copy();
   }
 
-  bool inInitialWaitForUnitTest() { return inInitialWait_.load(); }
+  bool inInitialWaitForUnitTest() const { return inInitialWait_.load(); }
 
 // TODO: Make this private once we don't have an FB-specific class
 // inheriting from this.

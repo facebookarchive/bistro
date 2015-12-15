@@ -57,6 +57,11 @@ TEST(TestConfig, HandleConstruction) {
           ("limit", 6)
           ("weight", 3)
         )
+        // These are required for the logical-physical mapping.  They also
+        // lack overrides and so must not be in workerResourcesOverride.
+        ("my_ram_gb", dynamic::object("default", 2)("limit", 30))
+        ("my_cpu_centicore", dynamic::object("default", 100)("limit", 700))
+        ("my_gpu_card", dynamic::object("default", 1)("limit", 5))
       )
     )
     ("worker_resources_override", dynamic::object
@@ -126,14 +131,17 @@ TEST(TestConfig, HandleConstruction) {
   task_opts.cgroupOptions.killWithoutFreezer = true;
   EXPECT_EQ(task_opts, Config(d).taskSubprocessOptions);
 
-  // Check non-default physical resource configs
-  cpp2::PhysicalResourceConfigs prcs;
-  EXPECT_EQ(prcs, c.physicalResourceConfigs);
+  // Check default & non-default physical resource configs
+  EXPECT_EQ(
+    std::vector<cpp2::PhysicalResourceConfig>{},
+    c.physicalResourceConfigs
+  );
   d[kPhysicalResources] = folly::dynamic::object
     (kRamMB, folly::dynamic::object
       (kLogicalResource, "my_ram_gb")
       (kMultiplyLogicalBy, 1024)
       (kEnforcement, kHard)
+      (kPhysicalReserveAmount, 1536)  // MB
     )
     (kCPUCore, folly::dynamic::object
       (kLogicalResource, "my_cpu_centicore")
@@ -145,36 +153,40 @@ TEST(TestConfig, HandleConstruction) {
       (kMultiplyLogicalBy, 1)
       (kEnforcement, kNone)
     );
-  auto prc_it = prcs.configs.emplace(
-    cpp2::PhysicalResource::RAM_MBYTES, cpp2::PhysicalResourceConfig()
-  ).first;
-  prc_it->second.physical = cpp2::PhysicalResource::RAM_MBYTES;
-  prc_it->second.logical = "my_ram_gb";
-  prc_it->second.multiplyLogicalBy = 1024;
-  prc_it->second.enforcement = cpp2::PhysicalResourceEnforcement::HARD;
-  prc_it = prcs.configs.emplace(
-    cpp2::PhysicalResource::CPU_CORES, cpp2::PhysicalResourceConfig()
-  ).first;
-  prc_it->second.physical = cpp2::PhysicalResource::CPU_CORES;
-  prc_it->second.logical = "my_cpu_centicore";
-  prc_it->second.multiplyLogicalBy = 0.001;
-  prc_it->second.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
-  prc_it = prcs.configs.emplace(
-    cpp2::PhysicalResource::GPU_CARDS, cpp2::PhysicalResourceConfig()
-  ).first;
-  prc_it->second.physical = cpp2::PhysicalResource::GPU_CARDS;
-  prc_it->second.logical = "my_gpu_card";
-  prc_it->second.multiplyLogicalBy = 1;
-  prc_it->second.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
   {
     Config config(d);
-    const auto& p = config.physicalResourceConfigs;
-    EXPECT_EQ(prcs, p) << debugString(prcs) << " != " << debugString(p);
-    EXPECT_EQ(((decltype(config.logicalToPhysical)){
-      {"my_ram_gb", &p.configs.at(cpp2::PhysicalResource::RAM_MBYTES)},
-      {"my_cpu_centicore", &p.configs.at(cpp2::PhysicalResource::CPU_CORES)},
-      {"my_gpu_card", &p.configs.at(cpp2::PhysicalResource::GPU_CARDS)},
-    }), config.logicalToPhysical);
+
+    cpp2::PhysicalResourceConfig ram_prc;
+    ram_prc.physical = cpp2::PhysicalResource::RAM_MBYTES;
+    ram_prc.logical = "my_ram_gb";
+    ram_prc.logicalResourceID = config.resourceNames.lookup("my_ram_gb");
+    ram_prc.multiplyLogicalBy = 1024;
+    ram_prc.enforcement = cpp2::PhysicalResourceEnforcement::HARD;
+    ram_prc.physicalReserveAmount = 1536;  // MB
+
+    cpp2::PhysicalResourceConfig cpu_prc;
+    cpu_prc.physical = cpp2::PhysicalResource::CPU_CORES;
+    cpu_prc.logical = "my_cpu_centicore";
+    cpu_prc.logicalResourceID =
+      config.resourceNames.lookup("my_cpu_centicore");
+    cpu_prc.multiplyLogicalBy = 0.001;
+    cpu_prc.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
+
+    cpp2::PhysicalResourceConfig gpu_prc;
+    gpu_prc.physical = cpp2::PhysicalResource::GPU_CARDS;
+    gpu_prc.logical = "my_gpu_card";
+    gpu_prc.logicalResourceID = config.resourceNames.lookup("my_gpu_card");
+    gpu_prc.multiplyLogicalBy = 1;
+    gpu_prc.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
+
+    // We don't know what order physicalResourceConfigs will have.
+    ASSERT_EQ(3, config.physicalResourceConfigs.size());
+    ASSERT_EQ(3, config.logicalToPhysical.size());
+    const auto& prcs = config.physicalResourceConfigs;
+    const auto l2p = config.logicalToPhysical;
+    EXPECT_EQ(ram_prc, prcs.at(l2p.at("my_ram_gb")));
+    EXPECT_EQ(cpu_prc, prcs.at(l2p.at("my_cpu_centicore")));
+    EXPECT_EQ(gpu_prc, prcs.at(l2p.at("my_gpu_card")));
   }
 
   cpp2::KillRequest kill_req;
@@ -208,8 +220,14 @@ TEST(TestConfig, HandleConstruction) {
 
   {
     const int idx = c.resourceNames.lookup("worker_resource_name");
-    EXPECT_EQ(55, c.workerResourcesOverride["worker1:17"][idx]);
-    EXPECT_EQ(66, c.workerResourcesOverride["worker2:19"][idx]);
+    EXPECT_EQ(
+      (decltype(c.workerResourcesOverride)::mapped_type{{idx, 55}}),
+      c.workerResourcesOverride["worker1:17"]
+    );
+    EXPECT_EQ(
+      (decltype(c.workerResourcesOverride)::mapped_type{{idx, 66}}),
+      c.workerResourcesOverride["worker2:19"]
+    );
     EXPECT_EQ(6, c.resourcesByLevel[c.levels.lookup("worker")][idx]);
     EXPECT_EQ(5, c.defaultJobResources[idx]);
     EXPECT_EQ(3, c.resourceIDToWeight[idx]);

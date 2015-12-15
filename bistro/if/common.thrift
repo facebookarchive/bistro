@@ -239,15 +239,19 @@ enum PhysicalResourceEnforcement {
   HARD = 3
 }
 
+// This is in Thrift only because it provides pretty-printing and comparators.
 struct PhysicalResourceConfig {
   1: PhysicalResource physical
-  2: string logical  // Any user-specified worker resource name
-  3: double multiplyLogicalBy = 1  // 1024 takes logical GB to physical MB
-  4: PhysicalResourceEnforcement enforcement = NONE
-}
-
-struct PhysicalResourceConfigs {
-  1: map<PhysicalResource, PhysicalResourceConfig> configs
+  // Any user-specified worker resource name, and its numeric ID.
+  2: string logical
+  3: i64 logicalResourceID
+  4: double multiplyLogicalBy = 1  // 1024 takes logical GB to physical MB
+  // What to do if tasks exceed their allocation in this resource?
+  5: PhysicalResourceEnforcement enforcement = NONE
+  // When mapping physical resources onto worker logical resources, mark
+  // some portion of resources as off-limits -- a simple way of reserving
+  // e.g. CPU or RAM for Bistro and/or OS needs.
+  6: double physicalReserveAmount = 0
 }
 
 struct CGroupOptions {

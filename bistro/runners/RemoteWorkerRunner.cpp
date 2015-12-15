@@ -98,6 +98,35 @@ RemoteWorkerRunner::~RemoteWorkerRunner() {
   eventBaseThread_.join();
 }
 
+namespace {
+template <typename T>
+void logicalToIntPhysicalResource(
+    T* phys,
+    const cpp2::PhysicalResourceConfig& p,
+    const cpp2::Resource& r) {
+  *phys = ::round(p.multiplyLogicalBy * r.amount);
+  // Clamp to the range of the physical output.
+  if (*phys < 0) {  // Resources are unsigned, even if Thrift won't let us.
+    *phys = 0;
+  } else if (*phys > std::numeric_limits<T>::max()) {
+    *phys = std::numeric_limits<T>::max();
+  }
+}
+
+folly::Optional<int> physicalToLogicalResource(
+    const cpp2::PhysicalResourceConfig& c,
+    double physical) {
+  // At present, physical resources set to 0 are "not available", so let
+  // them go as defaults.
+  if (physical == 0) {
+    return folly::none;
+  }
+  auto r = ::trunc(physical / c.multiplyLogicalBy) - c.physicalReserveAmount;
+  return r < 0 ? 0 : r;
+}
+}  // anonymous namespace
+
+
 void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
   folly::AutoTimer<> timer;
   DEFINE_MONITOR_ERROR(monitor_, error, "RemoteWorkerRunner resource update");
@@ -109,7 +138,7 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
     config_ = config;
   }
 
-  const auto& resources = config->resourcesByLevel[workerLevel_];
+  const auto& def_resources = config->resourcesByLevel[workerLevel_];
   // Always lock workerResources_ first, then workers_
   SYNCHRONIZED(workerResources_) { SYNCHRONIZED_CONST(workers_) {
     workerResources_.clear();
@@ -120,6 +149,55 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
     // would be no savings by releasing the lock before we are done here.
     for (const auto& wconn : workers_.workerPool()) {
       const auto& w = wconn.second->getBistroWorker();
+
+      auto& w_res = workerResources_[w.shard];
+      w_res = def_resources;  // Start with the defaults.
+
+      // Apply any known physical resources.
+      for (const auto& prc : config->physicalResourceConfigs) {
+        // Apply CPU, RAM, # of GPU cards.
+        if (const auto val = [&]() -> folly::Optional<int> {
+          switch (prc.physical) {
+            case cpp2::PhysicalResource::RAM_MBYTES:
+              return
+                physicalToLogicalResource(prc, w.usableResources.memoryMB);
+            case cpp2::PhysicalResource::CPU_CORES:
+              return
+                physicalToLogicalResource(prc, w.usableResources.cpuCores);
+            case cpp2::PhysicalResource::GPU_CARDS:
+              return
+                physicalToLogicalResource(prc, w.usableResources.gpus.size());
+            default:
+              return folly::none;
+          }
+        }()) {
+          CHECK_GE(prc.logicalResourceID, 0);
+          CHECK_LT(prc.logicalResourceID, w_res.size());
+          w_res[prc.logicalResourceID] = *val;
+        }
+        // If the user configured special resources for GPU card models,
+        // populate them too.
+        if (prc.physical == cpp2::PhysicalResource::GPU_CARDS) {
+          for (const auto& gpu : w.usableResources.gpus) {
+            auto r_name = "GPU: " + gpu.name;
+            auto rid = config->resourceNames.lookup(r_name);
+            if (rid != StringTable::NotFound) {
+              CHECK_GE(rid, 0);
+              if (rid >= w_res.size()
+                  || w_res[rid] == numeric_limits<int>::max()) {
+                // Ok to logspam, since it's probably a misconfiguration.
+                LOG(WARNING) << "Resource " << r_name << " exists, but is "
+                  << "not a worker resource. Ignoring.";
+              } else {
+                // Let's hope these resources have default limits of 0 :)
+                ++w_res[rid];
+              }
+            }
+          }
+        }
+      }
+
+      // Apply manual worker resource overrides.
       // Try for hostport, and fallback to hostname, then shard name
       auto it = config->workerResourcesOverride.find(
         folly::to<string>(w.machineLock.hostname, ':', w.machineLock.port)
@@ -132,10 +210,11 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
         // seems like a reasonable idea in general.
         it = config->workerResourcesOverride.find(w.shard);
       }
-      if (it == config->workerResourcesOverride.end()) {
-        workerResources_[w.shard] = resources;
-      } else {
-        workerResources_[w.shard] = it->second;
+
+      if (it != config->workerResourcesOverride.end()) {
+        for (const auto& p : it->second) {
+          w_res[p.first] = p.second;
+        }
       }
     }
 
@@ -405,22 +484,6 @@ void RemoteWorkerRunner::remoteUpdateStatus(
   }
 }
 
-namespace {
-template <typename T>
-T logicalToPhysicalResource(
-    const cpp2::PhysicalResourceConfig& p,
-    const cpp2::Resource& r) {
-  double phys = ::round(p.multiplyLogicalBy * r.amount);
-  // Clamp to the range of the physical output.
-  if (phys < 0) {  // Resources are unsigned, even if Thrift won't let us.
-    return 0;
-  } else if (phys > std::numeric_limits<T>::max()) {
-    return std::numeric_limits<T>::max();
-  }
-  return phys;
-}
-}  // anonymous namespace
-
 TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   const std::shared_ptr<const Job>& job,
   const Node& node,
@@ -492,20 +555,20 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         for (const auto& r : nr->resources) {
           auto phys_it = config->logicalToPhysical.find(r.name);
           if (phys_it != config->logicalToPhysical.end()) {
-            const auto& p = *phys_it->second;
+            const auto& p =  // at() is like CHECK, since this is `noexcept`
+              config->physicalResourceConfigs.at(phys_it->second);
             if (
               p.physical == cpp2::PhysicalResource::RAM_MBYTES
               && p.enforcement == cpp2::PhysicalResourceEnforcement::HARD
             ) {
-              cgroup_memory_limit_in_bytes = logicalToPhysicalResource<
-                decltype(cgroup_memory_limit_in_bytes)
-              >(p, r);
+              logicalToIntPhysicalResource(
+                &cgroup_memory_limit_in_bytes, p, r
+              );
             } else if (
               p.physical == cpp2::PhysicalResource::CPU_CORES
               && p.enforcement == cpp2::PhysicalResourceEnforcement::SOFT
             ) {
-              cgroup_cpu_shares =
-                logicalToPhysicalResource<decltype(cgroup_cpu_shares)>(p, r);
+              logicalToIntPhysicalResource(&cgroup_cpu_shares, p, r);
             }
           }
         }

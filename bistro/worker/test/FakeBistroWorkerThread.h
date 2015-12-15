@@ -11,7 +11,6 @@
 
 #include <thrift/lib/cpp2/util/ScopedServerInterfaceThread.h>
 #include "bistro/bistro/if/gen-cpp2/BistroWorker.h"
-#include "bistro/bistro/utils/hostname.h"
 
 namespace facebook { namespace bistro {
 
@@ -25,14 +24,14 @@ struct FakeBistroWorker : public virtual cpp2::BistroWorkerSvIf {
   ~FakeBistroWorker() override {}
 
   void async_tm_runTask(
-     std::unique_ptr<apache::thrift::HandlerCallback<void>> cb,
-     const cpp2::RunningTask& rt,
-     const std::string& config,
-     const std::vector<std::string>& command,
-     const cpp2::BistroInstanceID& scheduler,
-     const cpp2::BistroInstanceID& worker,
-     int64_t notify_if_tasks_not_running_sequence_num,
-     const cpp2::TaskSubprocessOptions&
+    std::unique_ptr<apache::thrift::HandlerCallback<void>> cb,
+    const cpp2::RunningTask& rt,
+    const std::string& config,
+    const std::vector<std::string>& command,
+    const cpp2::BistroInstanceID& scheduler,
+    const cpp2::BistroInstanceID& worker,
+    int64_t notify_if_tasks_not_running_sequence_num,
+    const cpp2::TaskSubprocessOptions&
   ) override;
 
   void async_tm_getRunningTasks(
@@ -54,13 +53,15 @@ struct NoOpTaskSubprocessOptsCob {
 
 class FakeBistroWorkerThread {
 public:
+  using CustomizeWorkerCob = std::function<void(cpp2::BistroWorker*)>;
+
   explicit FakeBistroWorkerThread(
-    std::string shard = getLocalHostName(),
-    cpp2::BistroInstanceID id = cpp2::BistroInstanceID(),
+    std::string shard,
+    CustomizeWorkerCob customize_worker_cob,
     FakeBistroWorker::TaskSubprocessOptsCob tso_cob =
       detail::NoOpTaskSubprocessOptsCob()
   ) : shard_(std::move(shard)),
-      id_(std::move(id)),
+      customizeWorkerCob_(std::move(customize_worker_cob)),
       ssit_(std::make_shared<FakeBistroWorker>(std::move(tso_cob))) {
   }
 
@@ -70,7 +71,7 @@ public:
 
 private:
   std::string shard_;
-  cpp2::BistroInstanceID id_;
+  CustomizeWorkerCob customizeWorkerCob_;
   apache::thrift::ScopedServerInterfaceThread ssit_;
 };
 

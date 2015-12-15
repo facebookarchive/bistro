@@ -98,6 +98,14 @@ const folly::Optional<double> dynGetDouble(
   }
   return folly::none;
 }
+
+const ResourceVector& workerLevelResourcesRef(const Config& config) {
+  const int worker_level_id = config.levels.lookup("worker");
+  CHECK(worker_level_id != StringTable::NotFound);
+  CHECK(worker_level_id > 0);
+  CHECK(worker_level_id < config.resourcesByLevel.size());
+  return config.resourcesByLevel[worker_level_id];
+}
 }  // anonymous namespace
 
 namespace detail {
@@ -175,7 +183,7 @@ void parseTaskSubprocessOptions(
       }
       // cpuShares and and memoryLimitInBytes will be populated on a
       // per-task basis, based on their worker resources using
-      // PhysicalResourceConfigs (below).  unitTestCreateFiles is for tests.
+      // PhysicalResourceConfig (below).  unitTestCreateFiles is for tests.
     }
   }
 }
@@ -198,11 +206,14 @@ const std::map<
 };
 
 void parsePhysicalResourceConfigs(
-    const folly::dynamic& d,
-    cpp2::PhysicalResourceConfigs* cfgs) {
-  if (const auto* prs = dynObjectPtr(d, kPhysicalResources)) {
-    for (const auto& name_cfg : prs->items()) {
-      auto rsrc = [](const folly::dynamic& name) {
+    const Config& config,  // Resources must be parsed already.
+    const folly::dynamic& d_parent,
+    std::vector<cpp2::PhysicalResourceConfig>* rcfgs) {
+  if (const auto* prs = dynObjectPtr(d_parent, kPhysicalResources)) {
+    for (const auto& name_and_d : prs->items()) {
+      rcfgs->emplace_back();
+      auto& rcfg = rcfgs->back();
+      rcfg.physical = [](const folly::dynamic& name) {
         if (name == kRamMB) {
           return cpp2::PhysicalResource::RAM_MBYTES;
         } else if (name == kCPUCore) {
@@ -214,40 +225,53 @@ void parsePhysicalResourceConfigs(
           // story for it at the moment.
           throw BistroException("Bad physical resource: ", name.asString());
         }
-      }(name_cfg.first);
-      auto& cfg = cfgs->configs[rsrc];
-      cfg.physical = rsrc;
-      if (!name_cfg.second.isObject()) {
+      }(name_and_d.first);
+      if (!name_and_d.second.isObject()) {
         throw BistroException("physical_resources entries must be objects");
       }
-      if (const auto p = dynGetString(name_cfg.second, kLogicalResource)) {
-        cfg.logical = p->toStdString();
+      if (const auto p = dynGetString(name_and_d.second, kLogicalResource)) {
+        rcfg.logical = p->toStdString();
+        rcfg.logicalResourceID = config.resourceNames.lookup(rcfg.logical);
+        auto num_worker_resources = workerLevelResourcesRef(config).size();
+        if (rcfg.logicalResourceID == StringTable::NotFound
+            || rcfg.logicalResourceID >= num_worker_resources) {
+          throw BistroException(
+            "Physical resource maps to unknown resource ", rcfg.logical
+          );
+        }
       } else {
         throw BistroException(
-          "logical_resource is required in physical_resources entries"
+          kLogicalResource, " is required in physical_resources entries"
         );
       }
-      if (const auto p = dynGetDouble(name_cfg.second, kMultiplyLogicalBy)) {
-        cfg.multiplyLogicalBy = *p;
+      if (const auto p = dynGetDouble(name_and_d.second, kMultiplyLogicalBy)) {
+        if (*p < 1e-12) {  // Stay well away from machine precision
+          throw BistroException(kMultiplyLogicalBy, " too small: ", *p);
+        }
+        rcfg.multiplyLogicalBy = *p;
       }
-      if (const auto p = dynGetString(name_cfg.second, kEnforcement)) {
+      if (const auto p = dynGetString(name_and_d.second, kEnforcement)) {
         if (*p == kNone) {
-          cfg.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
+          rcfg.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
         } else if (*p == kSoft) {
-          cfg.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
+          rcfg.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
         } else if (*p == kHard) {
-          cfg.enforcement = cpp2::PhysicalResourceEnforcement::HARD;
+          rcfg.enforcement = cpp2::PhysicalResourceEnforcement::HARD;
         } else {
           throw BistroException("Bad resource enforcement type: ", *p);
         }
-        auto it = kResourceToSupportedEnforcements.find(rsrc);
+        auto it = kResourceToSupportedEnforcements.find(rcfg.physical);
         if (it == kResourceToSupportedEnforcements.end()
-            || !it->second.count(cfg.enforcement)) {
+            || !it->second.count(rcfg.enforcement)) {
           throw BistroException(
-            "Resource ", name_cfg.first.asString(), " does not support ",
+            "Resource ", name_and_d.first.asString(), " does not support ",
             "enforcement type ", *p
           );
         }
+      }
+      if (auto p = dynGetDouble(name_and_d.second, kPhysicalReserveAmount)) {
+        // Allow negative values for now... maybe there is some use?
+        rcfg.physicalReserveAmount = *p;
       }
     }
   }
@@ -360,16 +384,6 @@ Config::Config(const dynamic& d)
 
   detail::parseKillRequest(d, &killRequest);
 
-  detail::parsePhysicalResourceConfigs(d, &physicalResourceConfigs);
-  for (const auto& p : physicalResourceConfigs.configs) {  // Inverted index
-    if (!logicalToPhysical.emplace(p.second.logical, &p.second).second) {
-      throw BistroException(
-        "logical resource ", p.second.logical, " used in more than one ",
-        "physical_resources entry"
-      );
-    }
-  }
-
   // This is a DANGEROUS setting, see the doc at the declaration site.
   if (const auto p = dynGetInt(d, kExitInitialWaitBeforeTimestamp)) {
     exitInitialWaitBeforeTimestamp = *p;
@@ -457,32 +471,41 @@ Config::Config(const dynamic& d)
   }
 
   if (const auto* ptr = dynObjectPtr(d, "worker_resources_override")) {
-    const int worker_level_id = levels.lookup("worker");
-    CHECK(worker_level_id != StringTable::NotFound);
-    CHECK(worker_level_id < resourcesByLevel.size());
-    const auto& defaultResources = resourcesByLevel[worker_level_id];
-
+    const auto& default_resources = workerLevelResourcesRef(*this);
     for (const auto& pair : ptr->items()) {
       const string& worker = pair.first.asString().toStdString();
-      auto& r = workerResourcesOverride[worker];
-      // Default to the worker level resources
-      r = defaultResources;
+      auto& worker_overrides = workerResourcesOverride[worker];
       for (const auto& item : pair.second.items()) {
         const string& resource_name = item.first.asString().toStdString();
         const int resource_id = resourceNames.lookup(resource_name);
         if ((resource_id == StringTable::NotFound)
-            || (resource_id >= r.size())) {
+            || (resource_id >= default_resources.size())) {
           throw BistroException("Overriding unknown resource ", resource_name);
         }
         // If a resource is set to max, then we haven't set it for this level.
-        if (r[resource_id] == numeric_limits<int>::max()) {
+        if (default_resources[resource_id] == numeric_limits<int>::max()) {
           throw BistroException(
             "Override resource for wrong level ",
             resource_name
           );
         }
-        r[resource_id] = item.second.asInt();
+        worker_overrides.emplace_back(std::make_pair(
+          resource_id, item.second.asInt()
+        ));
       }
+    }
+  }
+
+  detail::parsePhysicalResourceConfigs(*this, d, &physicalResourceConfigs);
+  // Make an inverted index by the string name of the logical resource,
+  // since that's what workers report.
+  for (size_t i = 0; i < physicalResourceConfigs.size(); ++i) {
+    const auto& logical_name = physicalResourceConfigs[i].logical;
+    if (!logicalToPhysical.emplace(logical_name, i).second) {
+      throw BistroException(
+        "logical resource ", logical_name, " used in more than one ",
+        "physical_resources entry"
+      );
     }
   }
 }

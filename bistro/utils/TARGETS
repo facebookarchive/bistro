@@ -11,6 +11,7 @@ cpp_library(
         # Collections of utility functions
         'hostname.cpp',
         'shell.cpp',
+        'signal.cpp',
         'Exception.cpp',
     ],
     deps=[

@@ -73,20 +73,20 @@ namespace {
 
 /**
  * Validates the requested jobs against the current jobs.  If no jobs are
- * requested, returns all jobs.
+ * requested, returns all jobs. Ignores unknown jobs.
  *
  * handleSingle() cannot call this eagerly, because the "task_logs" handler
  * requires different semantics for the "jobs" field, which would throw here.
  */
 vector<const Job*> getRequestedJobs(const Config& c, const dynamic& d) {
   vector<const Job*> jobs;
-  if (auto* p = d.get_ptr("jobs")) {
+  auto* p = d.get_ptr("jobs");
+  if (p && !p->empty()) {
     for (const auto& j : *p) {
       auto it = c.jobs.find(j.asString().toStdString());
-      if (it == c.jobs.end()) {
-        throw BistroException("Unknown job: ", j.asString());
+      if (it != c.jobs.end()) {
+        jobs.emplace_back(it->second.get());
       }
-      jobs.emplace_back(it->second.get());
     }
   } else {
     for (const auto& pair : c.jobs) {

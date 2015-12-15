@@ -48,8 +48,20 @@ RemoteWorkerRunner::RemoteWorkerRunner(
 
   // Monitor the workers: send healthchecks, mark them (un)healthy / lost, etc
   runInBackgroundLoop([this](){
+    auto config = config_.copy();
+    bool log_manually_exit_initial_wait = false;
     RemoteWorkerUpdate update;
-    workers_->updateState(&update);
+    SYNCHRONIZED(workers_) {
+      workers_.updateState(&update);
+      if (!update.initialWaitMessage().empty()
+          && config  // Can be nullptr before the first updateConfig
+          && config->exitInitialWaitBeforeTimestamp > update.curTime()) {
+        workers_.manuallyExitInitialWait();
+        update.setInitialWaitMessage(std::string());
+        // Log below to minimize the workers_ lock time.
+        log_manually_exit_initial_wait = true;
+      }
+    }
 
     // This cannot be in applyUpdate, since initial wait is only computed in
     // updateState() and not in processHeartbeat().
@@ -59,12 +71,20 @@ RemoteWorkerRunner::RemoteWorkerRunner(
     // if we think that all workers have connected, then the scheduler is also
     // aware of all their running tasks by this point.
     DEFINE_MONITOR_ERROR(monitor_, error, "RemoteWorkerRunner initial wait");
-    const auto& init_wait_msg = update.initialWaitMessage();
-    if (init_wait_msg.empty()) {
+    if (update.initialWaitMessage().empty()) {
+      if (log_manually_exit_initial_wait) {
+        LOG(WARNING) << "Exiting initial wait due to a MANUAL override via "
+          << "the config key '" << kExitInitialWaitBeforeTimestamp << "', "
+          << "which is set to " << config->exitInitialWaitBeforeTimestamp
+          << ", while the current time is " << update.curTime()
+          << ". DANGER: Do not overuse this, since accidentally exiting "
+          << "initial wait when there are tasks running on live workers "
+          << "***WILL*** cause you to double-start tasks.";
+      }
       inInitialWait_.store(false, std::memory_order_relaxed);
       // No call to 'error' clears the "intial wait" errors from the UI.
     } else {
-      LOG(WARNING) << error.report(init_wait_msg);
+      LOG(WARNING) << error.report(update.initialWaitMessage());
     }
 
     applyUpdate(&update);
@@ -85,7 +105,9 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
   // Memoize these two values to be used by the next runTask
   workerLevel_ = config->levels.lookup("worker");
   CHECK(workerLevel_ != config->levels.NotFound);
-  config_ = config;
+  SYNCHRONIZED(config_) {
+    config_ = config;
+  }
 
   const auto& resources = config->resourcesByLevel[workerLevel_];
   // Always lock workerResources_ first, then workers_
@@ -409,6 +431,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   if (inInitialWait_.load(std::memory_order_relaxed)) {
     return DoNotRunMoreTasks;
   }
+  auto config = config_.copy();
+  CHECK(config) << "Cannot runTask before updateConfig";
 
   // Make a copy so we don't have to lock workers_ while waiting for Thrift.
   cpp2::BistroWorker worker;
@@ -429,9 +453,9 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         // stale, but that's no big deal.  We need the stale config anyway,
         // since its worker level ID is the correct index into
         // workerResources_.
-        config_->remoteWorkerSelectorType
+        config->remoteWorkerSelectorType
       )->findWorker(
-        config_.get(),
+        config.get(),
         *job,
         node,
         workerLevel_,  // Needed for checking worker-level job filters.
@@ -460,14 +484,14 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         &rt,
         &resources_by_node,
         // This config is stale, but it's consistent with workerResources_.
-        *config_,
+        *config,
         rt.workerShard,
         workerLevel_,
         job->resources()
       )) {
         for (const auto& r : nr->resources) {
-          auto phys_it = config_->logicalToPhysical.find(r.name);
-          if (phys_it != config_->logicalToPhysical.end()) {
+          auto phys_it = config->logicalToPhysical.find(r.name);
+          if (phys_it != config->logicalToPhysical.end()) {
             const auto& p = *phys_it->second;
             if (
               p.physical == cpp2::PhysicalResource::RAM_MBYTES

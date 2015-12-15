@@ -142,7 +142,9 @@ private:
     workerResources_;
   // Memoized: the copy we got from the last updateConfig. For consistency,
   // we should never use any other Config together with workerResources_.
-  std::shared_ptr<const Config> config_;
+  //
+  // Must be synchronized since it is accessed from the worker-check thread.
+  folly::Synchronized<std::shared_ptr<const Config>> config_;
   // Micro-optimization: which config level has the worker resources & filters?
   // Memoized so that we don't pull it from Config for each task we run.
   int workerLevel_;

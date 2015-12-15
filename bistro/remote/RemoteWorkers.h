@@ -152,6 +152,8 @@ public:
     return mutableHostWorkerPool(hostname);
   }
 
+  void manuallyExitInitialWait() { inInitialWait_ = false; }
+
   // All of these are for unit tests ONLY.
   cpp2::WorkerSetID nonMustDieWorkerSetID() const {
     return nonMustDieWorkerSetID_;

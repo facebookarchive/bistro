@@ -105,6 +105,16 @@ public:
   std::unordered_map<std::string, cpp2::PhysicalResourceConfig const*>
     logicalToPhysical;
 
+  // A DANGEROUS manual toggle allowing the scheduler's administrator to
+  // immediately exit initial wait.  It remains in effect only until the
+  // specified timestamp passes.  The intended usage is: set the value for
+  // 1-2 minutes in the future to exit initial wait immediately.  Set it to
+  // a longer period ***only*** if you expect to be iterating on the
+  // scheduler settings in a debugging setting.  DANGER: If tasks are
+  // running on live workers, and you use this setting, you WILL
+  // double-start tasks.
+  int64_t exitInitialWaitBeforeTimestamp{0};  // 1970 is the same as "never"
+
   // Optional override for worker resources, to indicate that some workers have
   // more resources available.
   std::unordered_map<std::string, ResourceVector> workerResourcesOverride;
@@ -129,6 +139,9 @@ void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req);
 
 // Field names: better duplicated string constants than typo-prone literals.
 namespace {
+// Top-level config keys
+const char* kExitInitialWaitBeforeTimestamp =
+  "CAUTION_exit_initial_wait_before_timestamp";  // DANGEROUS, see doc above.
 // Nodes
 const char* kNodeOrder = "node_order";
 // Task subprocess

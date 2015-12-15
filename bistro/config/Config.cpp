@@ -370,6 +370,11 @@ Config::Config(const dynamic& d)
     }
   }
 
+  // This is a DANGEROUS setting, see the doc at the declaration site.
+  if (const auto p = dynGetInt(d, kExitInitialWaitBeforeTimestamp)) {
+    exitInitialWaitBeforeTimestamp = *p;
+  }
+
   // What is the node level that jobs will use to create tasks by default?
   // You probably don't want to specify "worker" because there are no nodes.
   // It's not forbidden in the spirit of laissez-faire.

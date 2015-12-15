@@ -67,6 +67,7 @@ TEST(TestConfig, HandleConstruction) {
         ("worker_resource_name", 66)
       )
     )
+    (kExitInitialWaitBeforeTimestamp, 123)
   ;
 
   Config c(d);
@@ -87,6 +88,7 @@ TEST(TestConfig, HandleConstruction) {
   EXPECT_EQ("val", c.nodeConfigs[2].prefs.convert<string>("key"));
 
   EXPECT_FALSE(c.killOrphanTasksAfter.hasValue());
+  EXPECT_EQ(123, c.exitInitialWaitBeforeTimestamp);
 
   // Check default and non-default enums
   EXPECT_EQ(RemoteWorkerSelectorType::RoundRobin, c.remoteWorkerSelectorType);

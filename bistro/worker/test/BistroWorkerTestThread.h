@@ -56,7 +56,7 @@ public:
   cpp2::BistroWorker getWorker() const;
   cpp2::BistroInstanceID getSchedulerID() const;
 
-  void requestSuicide();
+  std::shared_ptr<BistroWorkerHandler> handler() { return workerPtr_; }
 
 private:
   std::shared_ptr<BistroWorkerHandler> workerPtr_;

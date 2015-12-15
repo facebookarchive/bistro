@@ -88,10 +88,6 @@ cpp2::RunningTask BistroWorkerTestThread::runTask(
   return rt;
 }
 
-void BistroWorkerTestThread::requestSuicide() {
-  return workerPtr_->requestSuicide(getSchedulerID(), getWorker().id);
-}
-
 RemoteWorkerState::State BistroWorkerTestThread::getState() const {
   return workerPtr_->getState().state_;
 }

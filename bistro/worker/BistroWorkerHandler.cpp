@@ -415,7 +415,7 @@ void BistroWorkerHandler::notifyIfTasksNotRunning(
 }
 
 // WATCH OUT: Unlike most Thrift calls, this CAN be called from threads not
-// belonging to the ThriftServer (e.g. the signal handler).  This shouldn't
+// belonging to the ThriftServer (e.g. in test_worker).  This shouldn't
 // change much, since the server could also be multithreaded.
 void BistroWorkerHandler::requestSuicide(
     const cpp2::BistroInstanceID& scheduler,

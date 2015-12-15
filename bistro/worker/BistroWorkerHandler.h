@@ -112,6 +112,17 @@ public:
   ) override;
 
   /**
+   * The implementation of 'requestSuicide': worker stops accepting new
+   * tasks, kills existing tasks, and tells its Thrift server to stop
+   * serving.
+   *
+   * Rationale: It is exposed for the signal handler. Doing this seems
+   * better than the janky requestSuicide(getSchedulerID() getWorker().id),
+   * which would then generate "server requested suicide" logging.
+   */
+  void killTasksAndStop() noexcept;
+
+  /**
    * The functions below are used in unit tests only
    */
   RemoteWorkerState getState() const {
@@ -143,9 +154,6 @@ private:
     ) : taskID(std::move(task_id)), status(std::move(status)) {}
   };
 
-  // The implementation of 'suicide'. Worker stops accepting new tasks,
-  // kills existing tasks, and tells its Thrift server to stop serving.
-  void killTasksAndStop() noexcept;
   void throwIfSuicidal();  // Used to disable thrift calls when shutting down.
 
   // Don't run Thrift calls for another worker or from the wrong scheduler.

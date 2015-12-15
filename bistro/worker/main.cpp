@@ -17,6 +17,7 @@
 #include "bistro/bistro/utils/service_clients.h"
 #include "bistro/bistro/utils/server_socket.h"
 #include "bistro/bistro/worker/BistroWorkerHandler.h"
+#include "bistro/bistro/worker/StopWorkerOnSignal.h"
 
 // TODO: It would be useful to periodically re-read this host:port from a
 // file to ensure your scheduler can survive machine failures.
@@ -73,6 +74,11 @@ int main(int argc, char* argv[]) {
     FLAGS_worker_command,
     my_socket_and_addr.second,  // Could change in the presence of proxies
     my_socket_and_addr.second.port  // Actual local port the worker has locked
+  );
+  StopWorkerOnSignal signal_handler(
+    folly::EventBaseManager::get()->getEventBase(),
+    {SIGTERM, SIGINT, SIGQUIT, SIGHUP},
+    handler
   );
 
   server->useExistingSocket(std::move(my_socket_and_addr.first));

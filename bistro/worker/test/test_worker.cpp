@@ -23,6 +23,7 @@
 #include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/server/test/ThriftMonitorTestThread.h"
 #include "bistro/bistro/test/utils.h"
+#include "bistro/bistro/worker/StopWorkerOnSignal.h"
 #include "bistro/bistro/worker/test/BistroWorkerTestThread.h"
 #include "bistro/bistro/utils/LogLines.h"
 #include "bistro/bistro/utils/hostname.h"
@@ -169,17 +170,13 @@ bool findInLog(
   return false;
 }
 
-TEST_F(TestWorker, HandleSuicide) {
-  // The setup mostly follows HandleNormal
-  ThriftMonitorTestThread sched;
-  std::atomic_bool committed_suicide{false};
-  BistroWorkerTestThread worker(
-    bind(&ThriftMonitorTestThread::getClient, &sched, std::placeholders::_1),
-    [&committed_suicide](
-      BistroWorkerTestThread* worker, const char* message
-    ) noexcept {
-      if (!committed_suicide.load() && strcmp(message, "suicide") == 0) {
-        committed_suicide.store(true);
+// Shared harness for HandleSuicide and HandleSignal
+struct TestSuicide : public TestWorker {
+  TestSuicide() : TestWorker(), worker_(
+    bind(&ThriftMonitorTestThread::getClient, &sched_, std::placeholders::_1),
+    [this](BistroWorkerTestThread* worker, const char* message) noexcept {
+      if (!committedSuicide_.load() && strcmp(message, "suicide") == 0) {
+        committedSuicide_.store(true);
         // We should now have evidence of both tasks getting SIGTERM.  This
         // cannot run after `loopOnce()` below, since the server will have
         // stopped by then.
@@ -195,42 +192,86 @@ TEST_F(TestWorker, HandleSuicide) {
         }
       }
     }
-  );
+  ) {
+    // Faster heartbeat arrival => tests finish faster
+    FLAGS_heartbeat_period_sec = 0;
+    // Make BackgroundThreads exit a lot faster.
+    FLAGS_incremental_sleep_ms = 10;
+    // Speed up HandleSuicide
+    FLAGS_worker_suicide_task_kill_wait_ms = 1000;
+  }
+
+  void startTasks() {
+    // Start two tasks, and wait for them to set signal handlers.
+    for (size_t i = 0; i < 2; ++i) {
+      const auto node = folly::to<std::string>("n", i);
+      cpp2::TaskSubprocessOptions subproc_opts;
+      subproc_opts.processGroupLeader = true;  // So we kill the `sleep`
+      worker_.runTask("j", node, std::vector<std::string>{
+        // Use "" to break up the two strings we want to regex-match, so
+        // that we don't match the worker echoing the command.
+        "/bin/sh", "-c", folly::to<std::string>(
+          "trap 'echo TERM\"\"n", i, "; kill -9 $$' TERM; ",
+          "echo j_n", i, "_\"\"ok; sleep 10000"
+        )
+      }, std::move(subproc_opts));
+      // Wait for the task to start.
+      while (!findInLog(
+        worker_, "stdout", "j", node, folly::to<std::string>("j_n", i, "_ok\n")
+      )) {}
+      // It has not seen SIGTERM yet.
+      EXPECT_FALSE(findInLog(
+        worker_, "stdout", "j", node, folly::to<std::string>("TERMn", i, "\n")
+      ));
+    }
+  }
+
+  ThriftMonitorTestThread sched_;
+  // The setup mostly follows HandleNormal
+  std::atomic_bool committedSuicide_{false};
+  BistroWorkerTestThread worker_;
+};
+
+TEST_F(TestSuicide, ViaSchedulerRequest) {
   {
     folly::test::CaptureFD stderr(2, printString);
-    waitForWorkerHealthy(worker, &stderr);
+    waitForWorkerHealthy(worker_, &stderr);
   }
+  startTasks();
 
-  // Start two tasks, and wait for them to set signal handlers.
-  for (size_t i = 0; i < 2; ++i) {
-    const auto node = folly::to<std::string>("n", i);
-    cpp2::TaskSubprocessOptions subproc_opts;
-    subproc_opts.processGroupLeader = true;  // So we kill the `sleep`
-    worker.runTask("j", node, std::vector<std::string>{
-      // Use "" to break up the two strings we want to regex-match, so
-      // that we don't match the worker echoing the command.
-      "/bin/sh", "-c", folly::to<std::string>(
-        "trap 'echo TERM\"\"n", i, "; kill -9 $$' TERM; ",
-        "echo j_n", i, "_\"\"run; sleep 10000"
-      )
-    }, std::move(subproc_opts));
-    // Wait for the task to start.
-    while (!findInLog(
-      worker, "stdout", "j", node, folly::to<std::string>("j_n", i, "_run\n")
-    )) {}
-    // It has not seen SIGTERM yet.
-    EXPECT_FALSE(findInLog(
-      worker, "stdout", "j", node, folly::to<std::string>("TERMn", i, "\n")
-    ));
-  }
-
-  // TERM-WAIT-KILL all tasks, and stop the server.  This takes ~1 second
+  // TERM-wait-KILL all tasks, and stop the server.  This takes ~1 second
   // since it is not implemented very efficiently.
-  worker.requestSuicide();
+  worker_.handler()->requestSuicide(
+    worker_.getSchedulerID(), worker_.getWorker().id
+  );
+
   // Wait for the tasks to exit, and for the server to stop.
-  while (!committed_suicide.load()) {
+  while (!committedSuicide_.load()) {
     folly::EventBaseManager::get()->getEventBase()->loopOnce();
   }
+}
+
+TEST_F(TestSuicide, ViaSignal) {
+  folly::test::CaptureFD stderr(2, printString);
+  StopWorkerOnSignal signal_handler(
+    folly::EventBaseManager::get()->getEventBase(),
+    {SIGQUIT},
+    worker_.handler()
+  );
+  waitForWorkerHealthy(worker_, &stderr);
+  startTasks();
+
+  pid_t my_pid = getpid();
+  PCHECK(my_pid != -1);
+  ::kill(my_pid, SIGQUIT);
+
+  // Wait for the tasks to exit, and for the server to stop.
+  while (!committedSuicide_.load()) {
+    folly::EventBaseManager::get()->getEventBase()->loopOnce();
+  }
+  EXPECT_PCRE_MATCH(folly::to<std::string>(
+     ".* Got signal ", SIGQUIT, ", shutting down worker.*"
+  ), stderr.readIncremental());
 }
 
 TEST_F(TestWorker, HandleKillTask) {

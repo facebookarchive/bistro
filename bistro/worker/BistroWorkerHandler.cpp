@@ -54,7 +54,7 @@ DEFINE_int32(
   worker_suicide_task_kill_wait_ms, 5000,
   "When the worker is going down due to suicide (i.e. a too-long network "
   "partition, or a scheduler request), it TERM-wait-KILLs its tasks. This "
-  "is how long it waits."
+  "is how long it waits. A worker can easily take 10-100ms longer to exit."
 );
 DEFINE_int32(
   refresh_usable_physical_resources_sec, 60,
@@ -113,6 +113,7 @@ cpp2::BistroWorker makeWorker(
 }  // anonymous namespace
 
 BistroWorkerHandler::BistroWorkerHandler(
+    std::weak_ptr<apache::thrift::ThriftServer> server,
     const boost::filesystem::path& data_dir,
     LogStateTransitionFn log_state_transition_fn,
     SchedulerClientFn scheduler_client_fn,
@@ -132,7 +133,8 @@ BistroWorkerHandler::BistroWorkerHandler(
     worker_(makeWorker(addr, locked_port, logStateTransitionFn_)),
     state_(RemoteWorkerState(worker_.id.startTime)),
     gotNewSchedulerInstance_(true),
-    canConnectToMyself_(false) {
+    canConnectToMyself_(false),
+    server_(std::move(server)) {
 
   // No scheduler associated yet, so use a dummy instance ID and timeouts
   schedulerState_->id.startTime = 0;
@@ -141,7 +143,7 @@ BistroWorkerHandler::BistroWorkerHandler(
   schedulerState_->maxHealthcheckGap = 0;
   schedulerState_->heartbeatGracePeriod = 0;
   schedulerState_->workerCheckInterval = 0;
-  // But take 60 years to get lost, so we don't suicide on startup.
+  // Default to needing 60 years to get lost, so we don't suicide on startup.
   schedulerState_->loseUnhealthyWorkerAfter = numeric_limits<int32_t>::max();
   schedulerState_->workerState = static_cast<int>(
     RemoteWorkerState::State::NEW  // not used
@@ -158,7 +160,8 @@ BistroWorkerHandler::BistroWorkerHandler(
 }
 
 BistroWorkerHandler::~BistroWorkerHandler() {
-  prepareSuicide();  // Block new requests, kill tasks, wait for them to exit
+  // Block new requests, kill tasks, wait for them to exit, stop our server.
+  killTasksAndStop();
   stopBackgroundThreads();
 }
 
@@ -411,6 +414,9 @@ void BistroWorkerHandler::notifyIfTasksNotRunning(
   }
 }
 
+// WATCH OUT: Unlike most Thrift calls, this CAN be called from threads not
+// belonging to the ThriftServer (e.g. the signal handler).  This shouldn't
+// change much, since the server could also be multithreaded.
 void BistroWorkerHandler::requestSuicide(
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker) {
@@ -421,12 +427,11 @@ void BistroWorkerHandler::requestSuicide(
   logStateTransitionFn_("scheduler_requested_suicide", worker_, nullptr);
   // Block running tasks even before we return to the scheduler.
   committingSuicide_.store(true);
-  // This won't actually loop, but it's nicer not to block here, so that the
-  // scheduler's request will (usually) appear to succed.
-  runInBackgroundLoop([this]() {
-    suicide();
-    return std::chrono::seconds(1);  // Not reached.
-  });
+  // Don't wait until all tasks exit, so that the scheduler's request will
+  // appear to succed quickly.
+  folly::EventBaseManager::get()->getEventBase()->runInEventBaseThread(
+    [this]() { killTasksAndStop(); }
+  );
 }
 
 void BistroWorkerHandler::killTask(
@@ -444,23 +449,16 @@ void BistroWorkerHandler::killTask(
   logStateTransitionFn_("kill_task_sent_signal", worker_, &rt);
 }
 
-void BistroWorkerHandler::suicide() {
-  prepareSuicide();  // Kill tasks, block new run requests.
-  LOG(WARNING) << "Committing suicide";
-  logStateTransitionFn_("suicide", worker_, nullptr);
-  // Future: tell the server to exit gracefully instead :D
-  _exit(1);
-}
-
-void BistroWorkerHandler::prepareSuicide() {
+void BistroWorkerHandler::killTasksAndStop() noexcept {
   committingSuicide_.store(true);
-  logStateTransitionFn_("kill_all_tasks", worker_, nullptr);
+  LOG(WARNING) << "Trying to kill all tasks";
+  logStateTransitionFn_("kill_all_tasks", worker_, nullptr);  // noexcept
   // While there are tasks, TERM-wait-KILL, rinse, and repeat.
   cpp2::KillRequest req;
   req.method = cpp2::KillMethod::TERM_WAIT_KILL;
   req.killWaitMs = FLAGS_worker_suicide_task_kill_wait_ms;
+  std::chrono::milliseconds delay(req.killWaitMs);
   while (true) {
-    LOG(WARNING) << "Trying to kill all tasks";
     size_t num_running_tasks = 0;
     SYNCHRONIZED(runningTasks_) {
       for (const auto& p : runningTasks_) {
@@ -477,9 +475,21 @@ void BistroWorkerHandler::prepareSuicide() {
     if (num_running_tasks == 0) {
       break;
     }
-    /*sleep override*/ std::this_thread::sleep_for(std::chrono::milliseconds(
-      FLAGS_worker_suicide_task_kill_wait_ms
-    ));
+    /*sleep override*/ std::this_thread::sleep_for(delay);
+    // Barring 'D'-state tasks, our 'kill' implementation usually works in
+    // slightly more than the specified TERM-wait-KILL delay.  Minimize exit
+    // time by reducing the delay after the first try.
+    delay = std::chrono::milliseconds(10);  // Burn some CPU :D
+  }
+  LOG(WARNING) << "Committing suicide";
+  logStateTransitionFn_("suicide", worker_, nullptr);  // noexcept
+  if (auto server = server_.lock()) {
+    try {
+      server->stop();
+    } catch (const std::exception& ex) {
+      // Unlikely, but we'd better catch it since this runs in a destructor.
+      LOG(ERROR) << "ThriftServer::stop() threw: " << ex.what();
+    }
   }
 }
 
@@ -776,12 +786,12 @@ chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
     if (state_->state_ == RemoteWorkerState::State::MUST_DIE) {
       LOG(ERROR) << "Scheduler was about to lose this worker; quitting.";
       logStateTransitionFn_("suicide_unhealthy_too_long", worker_, nullptr);
-      suicide();
+      killTasksAndStop();
     }
   } catch (const exception& e) {  // This could have been a CHECK...
     LOG(ERROR) << "Failed to update worker health state: " << e.what();
     logStateTransitionFn_("health_checker_bug", worker_, nullptr);
-    suicide();
+    killTasksAndStop();
   }
   return chrono::seconds(1);  // This is cheap, so check often.
 }

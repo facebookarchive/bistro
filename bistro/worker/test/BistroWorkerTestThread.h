@@ -23,15 +23,27 @@ namespace cpp2 {
 
 class ThriftMonitorTestThread;
 class BistroWorkerHandler;
+class BistroWorkerTestThread;
+
+struct NoOpStateTransitionCob {
+  void operator()(BistroWorkerTestThread*, const char*) {}
+};
 
 /**
  * Running BistroWorker service on threads for testing
  */
 class BistroWorkerTestThread {
 public:
-  explicit BistroWorkerTestThread(BistroWorkerHandler::SchedulerClientFn);
+  using StateTransitionCob =
+    std::function<void(BistroWorkerTestThread*, const char*)>;
+  explicit BistroWorkerTestThread(
+    BistroWorkerHandler::SchedulerClientFn,
+    StateTransitionCob state_transition_cob = NoOpStateTransitionCob()
+  );
 
-  std::shared_ptr<cpp2::BistroWorkerAsyncClient> getClient();
+  std::shared_ptr<cpp2::BistroWorkerAsyncClient> getClient(
+    folly::EventBase* evb = nullptr  // Default to the current thread's evb
+  );
 
   cpp2::RunningTask runTask(
     const std::string& job,
@@ -44,7 +56,7 @@ public:
   cpp2::BistroWorker getWorker() const;
   cpp2::BistroInstanceID getSchedulerID() const;
 
-  void prepareSuicide();
+  void requestSuicide();
 
 private:
   std::shared_ptr<BistroWorkerHandler> workerPtr_;

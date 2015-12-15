@@ -24,37 +24,42 @@ using namespace std;
 using namespace apache::thrift;
 
 BistroWorkerTestThread::BistroWorkerTestThread(
-    BistroWorkerHandler::SchedulerClientFn scheduler_client_fn) {
+    BistroWorkerHandler::SchedulerClientFn scheduler_client_fn,
+    StateTransitionCob state_transition_cob) {
 
+  auto ts = make_shared<ThriftServer>();
   auto socket_and_addr = getServerSocketAndAddress();
   workerPtr_ = make_shared<BistroWorkerHandler>(
+    ts,
     dataDir_.getPath().native(),  // each worker runs in its own directory
-    [](const char* m, const cpp2::BistroWorker&, const cpp2::RunningTask* rt) {
-      // Makes it easy to wait for events using waitForRegexOnFd()
+    [this, state_transition_cob](
+      const char* m, const cpp2::BistroWorker& w, const cpp2::RunningTask* rt
+    ) {
+      // Make it easy to wait for events using waitForRegexOnFd()
       if (!rt) {
         LOG(INFO) << "worker state change: " << m;
       } else {
         LOG(INFO) << "worker task state change: " << m
           << " - " << rt->job << " / " << rt->node;
       }
+      state_transition_cob(this, m);
     },
     std::move(scheduler_client_fn),
     "",
     socket_and_addr.second,
     socket_and_addr.second.port
   );
-
-  auto ts = make_shared<ThriftServer>();
   ts->setInterface(workerPtr_);
   ts->useExistingSocket(std::move(socket_and_addr.first));
   sst_.start(std::move(ts));
 }
 
-shared_ptr<cpp2::BistroWorkerAsyncClient> BistroWorkerTestThread::getClient() {
+shared_ptr<cpp2::BistroWorkerAsyncClient> BistroWorkerTestThread::getClient(
+    folly::EventBase* evb) {
   return make_shared<cpp2::BistroWorkerAsyncClient>(
     HeaderClientChannel::newChannel(
       async::TAsyncSocket::newSocket(
-        EventBaseManager::get()->getEventBase(),
+        evb ? evb : EventBaseManager::get()->getEventBase(),
         *sst_.getAddress()
       )
     )
@@ -83,8 +88,8 @@ cpp2::RunningTask BistroWorkerTestThread::runTask(
   return rt;
 }
 
-void BistroWorkerTestThread::prepareSuicide() {
-  return workerPtr_->prepareSuicide();
+void BistroWorkerTestThread::requestSuicide() {
+  return workerPtr_->requestSuicide(getSchedulerID(), getWorker().id);
 }
 
 RemoteWorkerState::State BistroWorkerTestThread::getState() const {

@@ -9,6 +9,12 @@
  */
 #pragma once
 
+#include <boost/filesystem/path.hpp>
+#include <folly/MPMCQueue.h>
+#include <folly/Synchronized.h>
+#include <memory>
+#include <string>
+
 #include "bistro/bistro/if/gen-cpp2/BistroWorker.h"
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
@@ -17,12 +23,8 @@
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/BackgroundThreadMixin.h"
 #include "common/fb303/cpp/FacebookBase2.h"
-#include <folly/MPMCQueue.h>
-#include <folly/Synchronized.h>
 
-#include <boost/filesystem/path.hpp>
-#include <memory>
-#include <string>
+namespace apache { namespace thrift { class ThriftServer; }}
 
 namespace facebook { namespace bistro {
 
@@ -45,8 +47,9 @@ public:
   > LogStateTransitionFn;
 
   BistroWorkerHandler(
+    std::weak_ptr<apache::thrift::ThriftServer>,
     const boost::filesystem::path& data_dir,
-    LogStateTransitionFn,
+    LogStateTransitionFn,  // Must be thread-safe, noexcept, and fast
     SchedulerClientFn,
     const std::string& worker_command,
     // How can external clients connect to this worker?
@@ -83,6 +86,8 @@ public:
     int64_t notify_if_tasks_not_running_sequence_num
   ) override;
 
+  // Instead of blocking until the request succeeds, schedules the
+  // time-consuming work on the current thread's EventBase thread.
   void requestSuicide(
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker
@@ -107,7 +112,7 @@ public:
   ) override;
 
   /**
-   * Functions below are used in unit test only
+   * The functions below are used in unit tests only
    */
   RemoteWorkerState getState() const {
     return state_.copy();
@@ -118,10 +123,6 @@ public:
   cpp2::BistroInstanceID getSchedulerID() const {
     return schedulerState_->id;
   }
-
-  // DO NOT USE. Public only for the unit test.
-  // Worker stops to accept new tasks and kills existing tasks.
-  void prepareSuicide();
 
 private:
   // TODO: Replace this with a common Thrift struct throughout Bistro &
@@ -142,8 +143,10 @@ private:
     ) : taskID(std::move(task_id)), status(std::move(status)) {}
   };
 
-  void suicide();  // prepareSuicide(); log; _exit(1);
-  void throwIfSuicidal();  // Used by thrift calls
+  // The implementation of 'suicide'. Worker stops accepting new tasks,
+  // kills existing tasks, and tells its Thrift server to stop serving.
+  void killTasksAndStop() noexcept;
+  void throwIfSuicidal();  // Used to disable thrift calls when shutting down.
 
   // Don't run Thrift calls for another worker or from the wrong scheduler.
   void throwOnInstanceIDMismatch(
@@ -230,6 +233,10 @@ private:
     cpp2::CGroupOptions cgroupOpts_;
   };
   folly::Synchronized<UsablePhysicalResources> usablePhysicalResources_;
+
+  // To suicide gracefully, the handler needs to be able to stop its server.
+  // Must be a weak_ptr to avoid a circular server<->handler dependency.
+  std::weak_ptr<apache::thrift::ThriftServer> server_;
 };
 
 }}

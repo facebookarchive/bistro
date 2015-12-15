@@ -12,8 +12,9 @@
 
 #include <folly/dynamic.h>
 #include <folly/json.h>
-#include <thrift/lib/cpp2/util/ScopedServerInterfaceThread.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
+#include <thrift/lib/cpp2/server/ThriftServer.h>
+#include <thrift/lib/cpp2/util/ScopedServerInterfaceThread.h>
 
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
 #include "bistro/bistro/if/gen-cpp2/BistroWorker.h"
@@ -154,9 +155,10 @@ bool findInLog(
     std::string job,
     std::string node,
     std::string target,
-    int num_lines = 10) {
+    int num_lines = 10,
+    folly::EventBase* evb = nullptr) {
   cpp2::LogLines ll;
-  worker.getClient()->sync_getJobLogsByID(
+  worker.getClient(evb)->sync_getJobLogsByID(
     ll, logtype, {job}, {node}, 0, true, num_lines, ""
   );
   for (const auto& l : ll.lines) {
@@ -168,11 +170,32 @@ bool findInLog(
 }
 
 TEST_F(TestWorker, HandleSuicide) {
-  // The setup essentially follows HandleNormal
-  ThriftMonitorTestThread scheduler;
-  BistroWorkerTestThread worker(bind(
-    &ThriftMonitorTestThread::getClient, &scheduler, std::placeholders::_1
-  ));
+  // The setup mostly follows HandleNormal
+  ThriftMonitorTestThread sched;
+  std::atomic_bool committed_suicide{false};
+  BistroWorkerTestThread worker(
+    bind(&ThriftMonitorTestThread::getClient, &sched, std::placeholders::_1),
+    [&committed_suicide](
+      BistroWorkerTestThread* worker, const char* message
+    ) noexcept {
+      if (!committed_suicide.load() && strcmp(message, "suicide") == 0) {
+        committed_suicide.store(true);
+        // We should now have evidence of both tasks getting SIGTERM.  This
+        // cannot run after `loopOnce()` below, since the server will have
+        // stopped by then.
+        for (size_t i = 0; i < 2; ++i) {
+          // We cannot just use the current thread's evb, since
+          // sync_getJobLogsByID above expects to be able to drive it, but
+          // we are mid-evb-callback already.
+          folly::EventBase evb;
+          EXPECT_TRUE(findInLog(
+            *worker, "stdout", "j", folly::to<std::string>("n", i),
+            folly::to<std::string>("TERMn", i, "\n"), /*num_lines=*/ 10, &evb
+          ));
+        }
+      }
+    }
+  );
   {
     folly::test::CaptureFD stderr(2, printString);
     waitForWorkerHealthy(worker, &stderr);
@@ -201,16 +224,12 @@ TEST_F(TestWorker, HandleSuicide) {
     ));
   }
 
-  // TERM-WAIT-KILL all tasks.  This takes ~1 second since it is not
-  // implemented very efficiently.
-  worker.prepareSuicide();
-
-  // We should now have evidence of both tasks getting SIGTERM.
-  for (size_t i = 0; i < 2; ++i) {
-    while (!findInLog(
-      worker, "stdout", "j", folly::to<std::string>("n", i),
-      folly::to<std::string>("TERMn", i, "\n")
-    )) {}
+  // TERM-WAIT-KILL all tasks, and stop the server.  This takes ~1 second
+  // since it is not implemented very efficiently.
+  worker.requestSuicide();
+  // Wait for the tasks to exit, and for the server to stop.
+  while (!committed_suicide.load()) {
+    folly::EventBaseManager::get()->getEventBase()->loopOnce();
   }
 }
 

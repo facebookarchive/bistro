@@ -22,7 +22,7 @@ cpp_library(
 )
 
 cpp_binary(
-    name = 'bistro',
+    name = 'bistro_scheduler',
     srcs = [
         'main.cpp',
     ],

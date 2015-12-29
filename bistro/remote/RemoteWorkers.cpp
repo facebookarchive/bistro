@@ -258,7 +258,7 @@ RemoteWorkers::processHeartbeat(
     // WorkerSetID that contains this worker.
     response->workerSetID = nonMustDieWorkerSetID_;
   }
-  return std::move(response);
+  return response;
 }
 
 namespace {

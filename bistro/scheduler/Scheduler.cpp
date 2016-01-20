@@ -196,11 +196,29 @@ void processRunningTasks(
       orphan_tasks->emplace_back(*rt);
     }
   }
+  // HACK HACK HACK: Until workers become nodes, we cannot warn about
+  // unknown worker nodes.  Since we don't have a list of worker node names
+  // handy, identify these nodes by their resource names.
+  std::unordered_set<std::string> worker_resource_names;
+  auto worker_level = config.levels.lookup("worker");
+  CHECK_GE(worker_level, 0);
+  CHECK_LT(worker_level, config.levelIDToResourceID.size());
+  for (auto rid : config.levelIDToResourceID[worker_level]) {
+    worker_resource_names.emplace(config.resourceNames.lookup(rid));
+  }
   // Warn about nodes mentioned by running tasks, which we don't know about.
   for (const auto& p : node_used_resources) {
     std::string rs;
+    size_t num_worker_resources = 0;
     for (const cpp2::Resource* r : p.second) {
+      num_worker_resources += worker_resource_names.count(r->name);
       rs += debugString(*r) + "\n";
+    }
+    if (num_worker_resources != 0) {
+      if (num_worker_resources == p.second.size()) {
+        continue;  // We don't know about workers in this loop yet.
+      }
+      rs += "[ERROR: Not all node resources were worker resources]\n";  // WTF?
     }
     LOG(ERROR) << error.report(
       "Running task requires resources on unknown node ", p.first, ":\n", rs

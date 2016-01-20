@@ -28,7 +28,7 @@ std::vector<boost::filesystem::path> partialPaths(
 }
 }  // anonymous namespace
 
-// Scan cpuset subsystem (from slice up to the root) for cpuset.mem files.
+// Scan cpuset subsystem (from slice up to the root) for cpuset.mems files.
 // The first non-empty one found gives the memory limit.
 folly::Optional<double> usableNumaMemoryMB(const CGroupPaths& cgpaths) {
   if (!cgpaths.haveSubsystem(kSubSystemCpuSet)) {

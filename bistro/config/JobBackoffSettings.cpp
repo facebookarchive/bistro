@@ -87,6 +87,8 @@ dynamic JobBackoffSettings::toDynamic() const {
   dynamic d(values_.begin(), values_.end());
   if (repeat_) {
     d.push_back("repeat");
+  } else {
+    d.push_back("fail");  // ["fail"] should produce ["fail"], not ""
   }
   return d;
 }

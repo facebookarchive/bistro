@@ -33,7 +33,7 @@ struct TestCGroupResources : public ::testing::Test {
 TEST_F(TestCGroupResources, UsableNumaMemory) {
   // "sl" will define our NUMA nodes. Don't add a file to root, since we
   // should not be trying to read it.
-  writeFilesToHierarchy("cpuset/sl/ice", "cpuset.mem", {{""}, {"0-1"}});
+  writeFilesToHierarchy("cpuset/sl/ice", "cpuset.mems", {{""}, {"0-1"}});
 
   constexpr uint64_t kNode0MB = 9234;
   constexpr uint64_t kNode1MB = 542;
@@ -44,7 +44,7 @@ TEST_F(TestCGroupResources, UsableNumaMemory) {
 
   // No subsystem, no result.
   EXPECT_FALSE(usableNumaMemoryMB(slicePaths()).hasValue());
-  // Confirm we read cpuset.mem & nodes correctly.
+  // Confirm we read cpuset.mems & nodes correctly.
   cgopts.subsystems = {"cpuset"};
   EXPECT_EQ(kNode0MB + kNode1MB, *usableNumaMemoryMB(slicePaths()));
 }

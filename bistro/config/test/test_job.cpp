@@ -117,7 +117,14 @@ TEST(TestJob, HandleAll) {
       (kMaxLogLinesPerPollInterval, 444)
       (kParentDeathSignal, 333)
       (kProcessGroupLeader, true)
-      (kUseCanaryPipe, true)),
+      (kUseCanaryPipe, true)
+      (kCGroups, folly::dynamic::object
+        (kRoot, "")
+        (kSlice, "")
+        (kSubsystems, {})
+        (kKillWithoutFreezer, false)
+      )
+    ),
     Job(Config(cd1), "j", jd).toDynamic(c).at(kTaskSubprocess)
   );
 

@@ -131,6 +131,15 @@ TEST(TestConfig, HandleConstruction) {
   task_opts.cgroupOptions.killWithoutFreezer = true;
   EXPECT_EQ(task_opts, Config(d).taskSubprocessOptions);
 
+  // Check toDynamic here, since it's easy to forget to update test_job.cpp
+  {
+    auto d2 = d;
+    using facebook::bistro::detail::taskSubprocessOptionsToDynamic;
+    d2[kTaskSubprocess] =
+      taskSubprocessOptionsToDynamic(Config(d).taskSubprocessOptions);
+    EXPECT_EQ(task_opts, Config(d2).taskSubprocessOptions);
+  }
+
   // Check default & non-default physical resource configs
   EXPECT_EQ(
     std::vector<cpp2::PhysicalResourceConfig>{},

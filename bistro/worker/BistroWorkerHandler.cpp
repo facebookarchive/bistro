@@ -272,6 +272,7 @@ void BistroWorkerHandler::runTask(
       // However, both are too much hassle with the current PeriodicPoller,
       // and it's too much hassle to roll a custom poller.
       if (!usablePhysicalResources_.monitor_) {
+        LOG(WARNING) << "CGroups set: " << debugString(opts.cgroupOptions);
         usablePhysicalResources_.monitor_ =
           folly::make_unique<UsablePhysicalResourceMonitor>(
             CGroupPaths(opts.cgroupOptions, folly::none),
@@ -445,7 +446,8 @@ void BistroWorkerHandler::killTask(
   logStateTransitionFn_("kill_task_request", worker_, &rt);
   // Only sends the signal, does not wait -- if the task dies,
   // notifyFinished() will clean up.
-  taskQueue_.kill(rt, req);
+  taskQueue_.kill(rt, req);  // Throws if the signal cannot be sent.
+  LOG(INFO) << "Sent " << debugString(req) << " to " << debugString(rt);
   logStateTransitionFn_("kill_task_sent_signal", worker_, &rt);
 }
 
@@ -462,14 +464,14 @@ void BistroWorkerHandler::killTasksAndStop() noexcept {
     size_t num_running_tasks = 0;
     SYNCHRONIZED(runningTasks_) {
       for (const auto& p : runningTasks_) {
-        // This is slightly lame, but good enough. kill() only throws if the
-        // task invocation no longer exists, so that's how we count tasks.
+        if (taskQueue_.isRunning(p.second)) {
+          ++num_running_tasks;
+        }
+        // This can throw if the task had just exited, or if its
+        // signal-processing is backlogged.
         try {
           taskQueue_.kill(p.second, req);
-          ++num_running_tasks;
-        } catch (const std::exception&) {
-          // Not a running task any more
-        }
+        } catch (const std::exception&) {}
       }
     }
     if (num_running_tasks == 0) {

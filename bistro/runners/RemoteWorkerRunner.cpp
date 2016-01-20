@@ -121,7 +121,7 @@ folly::Optional<int> physicalToLogicalResource(
   if (physical == 0) {
     return folly::none;
   }
-  auto r = ::trunc(physical / c.multiplyLogicalBy) - c.physicalReserveAmount;
+  auto r = ::trunc((physical - c.physicalReserveAmount) / c.multiplyLogicalBy);
   return r < 0 ? 0 : r;
 }
 }  // anonymous namespace
@@ -691,6 +691,18 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
     const cpp2::BistroWorker& w, bool is_new_worker) noexcept {
 
   eventBase_->runInEventBaseThread([this, w, is_new_worker]() noexcept {
+    // Healthchecks distribute the latest cgroup configuration to the
+    // workers.  This has some mild side effects, but overall they are good,
+    // since health-checks will run in a similar setup to normal user jobs.
+    //
+    // Future: it might be a good idea to make `healthcheck` a proper
+    // job, so that this can be configured specially.
+    cpp2::TaskSubprocessOptions task_subprocess_opts;
+    SYNCHRONIZED(config_) {
+      if (config_) {
+        task_subprocess_opts = config_->taskSubprocessOptions;
+      }
+    }
     try {
       shared_ptr<cpp2::BistroWorkerAsyncClient> client{getWorkerClient(w)};
       // Make a barebones RunningTask; only job, startTime & shard are be used.
@@ -700,7 +712,7 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
       // worker healthchecks.
       rt.node = is_new_worker ? kHealthcheckTaskNewWorkerNode : "";
       rt.invocationID.startTime = time(nullptr);
-      // .rand is ignored for healthchecks
+      // Leaving .rand == 0 for healthchecks makes their cgroups easy to find.
       rt.workerShard = w.shard;
       // .nextBackoffDuration is not applicable
       client->runTask(
@@ -733,11 +745,7 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
         schedulerID_,
         w.id,
         0,  // healtchecks don't use "notifyIfTasksNotRunning"
-        // Don't let the user's custom subprocess options mess us up.  Do
-        // not enable cgroup monitoring or isolation for health-checks.
-        // Future: it might be a good idea to make `healthcheck` a proper
-        // job, so that this can be configured specially.
-        cpp2::TaskSubprocessOptions()
+        task_subprocess_opts
       );
     } catch (const exception& e) {
       LOG(ERROR) << "Error sending health-check to " << debugString(w)

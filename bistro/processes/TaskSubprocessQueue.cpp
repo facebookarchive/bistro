@@ -449,6 +449,15 @@ void TaskSubprocessQueue::runTask(
   });
 }
 
+bool TaskSubprocessQueue::isRunning(const cpp2::RunningTask& rt) const {
+  SYNCHRONIZED_CONST(tasks_) {
+    if (tasks_.find(makeInvocationID(rt)) == tasks_.end()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void TaskSubprocessQueue::kill(
     const cpp2::RunningTask& rt,
     cpp2::KillRequest req) {
@@ -464,7 +473,7 @@ void TaskSubprocessQueue::kill(
         " since no such task is running."
       );
     }
-    it->second->kill(std::move(req));
+    it->second->kill(std::move(req));  // Throws if the queue is full.
   }
 }
 
@@ -593,7 +602,9 @@ void TaskSubprocessState::kill(cpp2::KillRequest req) {
     case cpp2::KillMethod::TERM_WAIT_KILL:
     case cpp2::KillMethod::KILL:
     case cpp2::KillMethod::TERM:
-      queue_.blockingWrite(std::move(req));
+      if (!queue_.write(std::move(req))) {
+        throw std::runtime_error("Failed to signal task, its queue is full.");
+      }
       break;
     default:
       throw BistroException(

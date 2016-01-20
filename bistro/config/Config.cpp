@@ -133,6 +133,15 @@ void parseKillOrphanTasksAfter(
   }
 }
 
+folly::dynamic cgroupOptionsToDynamic(const cpp2::CGroupOptions& cgopts) {
+  return folly::dynamic::object
+    (kRoot, cgopts.root)
+    (kSlice, cgopts.slice)
+    (kSubsystems,
+     folly::dynamic(cgopts.subsystems.begin(), cgopts.subsystems.end()))
+    (kKillWithoutFreezer, cgopts.killWithoutFreezer);
+}
+
 folly::dynamic taskSubprocessOptionsToDynamic(
     const cpp2::TaskSubprocessOptions& opts) {
   return folly::dynamic::object
@@ -140,7 +149,8 @@ folly::dynamic taskSubprocessOptionsToDynamic(
     (kMaxLogLinesPerPollInterval, opts.maxLogLinesPerPollInterval)
     (kParentDeathSignal, opts.parentDeathSignal)
     (kProcessGroupLeader, opts.processGroupLeader)
-    (kUseCanaryPipe, opts.useCanaryPipe);
+    (kUseCanaryPipe, opts.useCanaryPipe)
+    (kCGroups, cgroupOptionsToDynamic(opts.cgroupOptions));
 }
 
 void parseTaskSubprocessOptions(
@@ -382,6 +392,8 @@ Config::Config(const dynamic& d)
 
   detail::parseTaskSubprocessOptions(d, &taskSubprocessOptions);
 
+  // This is outside of TaskSubprocessOptions, so that it can be changed
+  // even while the task is running.
   detail::parseKillRequest(d, &killRequest);
 
   // This is a DANGEROUS setting, see the doc at the declaration site.

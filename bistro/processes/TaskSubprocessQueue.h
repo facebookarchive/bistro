@@ -90,10 +90,19 @@ public:
    * Sends a signal to the task in the hopes of making it quit. Does not
    * wait for the task to exit.
    *
-   * Throws if no matching task exists -- note that the entire invocation ID
-   * must match (we won't accidentally kill a newer instance of a task).
+   * Throws if the signal could not be sent. This happens if such a task is
+   * not running -- note that the entire invocation ID must match (we won't
+   * accidentally kill a newer instance of a task), or if it got signals
+   * more rapidly than it can handle.
    */
   void kill(const cpp2::RunningTask&, cpp2::KillRequest);
+
+  /**
+   * Racy: A task can exit even as we return `true`. Useful only for
+   * confirming that task that was previously known to be runninig has
+   * exited (assuming invocation IDs are not recycled).
+   */
+  bool isRunning(const cpp2::RunningTask& rt) const;
 
   const BaseLogWriter* getLogWriter() const { return logWriter_.get(); }
 
@@ -176,6 +185,9 @@ public:
    * only KILL is sent.  Only one KILL signal can be scheduled at any time
    * -- with multiple requests, the earlier KILL wins.  An immediate KILL
    * cancels any future scheduled KILLs.
+   *
+   * Throws if the signal could not be sent. This happens if such a task is
+   * not running, or if it got signals more rapidly than it can handle.
    */
   void kill(cpp2::KillRequest r);
 

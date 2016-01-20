@@ -172,7 +172,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
       }
     }
   } catch (const exception& e) {
-    LOG(ERROR) << "Error creating job: " << e.what();
+    LOG(ERROR) << "Error creating job " << name << ": " << e.what();
     error_ = e.what();
     enabled_ = false;
   }

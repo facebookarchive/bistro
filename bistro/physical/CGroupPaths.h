@@ -75,7 +75,7 @@ namespace {
   const char* const kSubSystemMemory = "memory";
 
   const char* const kCpuSetFile = "cpuset.cpus";
-  const char* const kCpuMemFile = "cpuset.mem";
+  const char* const kCpuMemFile = "cpuset.mems";
   const char* const kCpuUsageFile = "cpuacct.usage";
   const char* const kMemoryLimitFile = "memory.limit_in_bytes";
   const char* const kMemoryUseHierarchyFile = "memory.use_hierarchy";

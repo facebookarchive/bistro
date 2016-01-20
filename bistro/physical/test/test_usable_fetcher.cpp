@@ -57,7 +57,7 @@ TEST_F(TestUsablePhysicalResourceFetcher, Memory) {
   uint64_t numa_mb = sys_mb - 1;  // Truncate the double
   cgopts.subsystems.emplace_back("cpuset");
   writeNumaMeminfo("node0", numa_mb);
-  writeFilesToHierarchy("cpuset/sl/ice", "cpuset.mem", {{""}, {""}, {"0"}});
+  writeFilesToHierarchy("cpuset/sl/ice", "cpuset.mems", {{""}, {""}, {"0"}});
   EXPECT_EQ(numa_mb, fetcher().memoryMB());
 
   // The memory limit restricts NUMA capacity, too.

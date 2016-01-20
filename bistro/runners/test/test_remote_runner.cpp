@@ -546,6 +546,7 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
     (kPhysicalResources, dynamic::object
       (kRamMB, dynamic::object
         (kLogicalResource, "ram")
+        (kMultiplyLogicalBy, 2)
         // After subtracting reserves, w3 will be too small to run anything.
         (kPhysicalReserveAmount, 1)
       )
@@ -560,7 +561,7 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
   const auto w1_id = randInstanceID();
   FakeBistroWorkerThread worker1("w1", [&w1_id](cpp2::BistroWorker* w) {
     w->id = w1_id;
-    w->usableResources.memoryMB = 5;
+    w->usableResources.memoryMB = 10;
     w->usableResources.cpuCores = 2;
     w->usableResources.gpus.emplace_back();
     w->usableResources.gpus.back().name = "a";
@@ -568,7 +569,7 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
   const auto w2_id = randInstanceID();
   FakeBistroWorkerThread worker2("w2", [&w2_id](cpp2::BistroWorker* w) {
     w->id = w2_id;
-    w->usableResources.memoryMB = 4;
+    w->usableResources.memoryMB = 8;
     w->usableResources.cpuCores = 2;
     w->usableResources.gpus.emplace_back();
     w->usableResources.gpus.back().name = "a";
@@ -576,7 +577,7 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
   const auto w3_id = randInstanceID();
   FakeBistroWorkerThread worker3("w3", [&w3_id](cpp2::BistroWorker* w) {
     w->id = w3_id;
-    w->usableResources.memoryMB = 3;
+    w->usableResources.memoryMB = 5;  // Minus 1 reserve, over 2 => 2 logical
     w->usableResources.cpuCores = 2;
     w->usableResources.gpus.emplace_back();
     // We have no model-specific resource "GPU: b", so it won't show up.

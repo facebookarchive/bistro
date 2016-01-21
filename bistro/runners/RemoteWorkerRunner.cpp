@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -405,8 +405,8 @@ LogLines RemoteWorkerRunner::getJobLogs(
     nodes,
     line_id,
     is_ascending,
-    // at least 10 lines per worker, but try to stay under 5000 lines total
-    max(5000 / (int)services.size(), 10),
+    // at least 100 lines per worker, but try to stay under 5000 lines total
+    max(5000 / (int)services.size(), 100),
     regex_filter
   );
 

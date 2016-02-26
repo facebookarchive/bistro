@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -149,6 +149,17 @@ TEST(TestJob, HandleAll) {
       (kMethod, kTermWaitKill)(kKillWaitMs, 987)),
     Job(Config(cd1), "j", jd).toDynamic(c).at(kKillSubprocess)
   );
+
+  // Check default, non-default, and toDynamic for non-default "command".
+  EXPECT_TRUE(j.command().empty());
+  std::vector<std::string> command{"a", "b", "c"};
+  auto d_command = folly::dynamic(command.begin(), command.end());
+  jd[kCommand] = d_command;
+  {
+    auto j_new = Job(Config(cd1), "j", jd);
+    EXPECT_EQ(command, j_new.command());
+    EXPECT_EQ(d_command, j_new.toDynamic(c).at(kCommand));
+  }
 
   // Check default, invalid, and valid level_for_host_placement.
   EXPECT_EQ(StringTable::NotFound, j.levelForHostPlacement());

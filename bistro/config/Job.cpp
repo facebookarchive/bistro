@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -171,6 +171,18 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
         )));
       }
     }
+
+    if (const auto* p = d.get_ptr(kCommand)) {
+      if (!p->isArray()) {
+        throw BistroException(kCommand, " must be an array");
+      }
+      for (const auto& v : *p) {
+        if (!v.isString()) {
+          throw BistroException(kCommand, " has a non-string element");
+        }
+        command_.emplace_back(v.asString().toStdString());
+      }
+    }
   } catch (const exception& e) {
     LOG(ERROR) << "Error creating job " << name << ": " << e.what();
     error_ = e.what();
@@ -263,6 +275,9 @@ dynamic Job::toDynamic(const Config& parent_config) const {
   }
   if (!error_.empty()) {
     config["error"] = error_;
+  }
+  if (!command_.empty()) {
+    config[kCommand] = folly::dynamic(command_.begin(), command_.end());
   }
   return config;
 }

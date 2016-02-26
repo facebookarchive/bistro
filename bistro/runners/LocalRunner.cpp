@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -53,7 +53,8 @@ TaskRunnerResponse LocalRunner::runTaskImpl(
   cb(running_task, TaskStatus::running());
   taskQueue_.runTask(
     running_task,
-    {cmd_.native()},
+    job->command().empty()
+      ? std::vector<std::string>{cmd_.native()} : job->command(),
     folly::toJson(job_args).toStdString(),  // Job config argument
     jobsDir_ / running_task.job,  // Working directory for the task
     cb,

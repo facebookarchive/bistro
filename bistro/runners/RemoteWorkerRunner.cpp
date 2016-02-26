@@ -643,7 +643,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         )),
         rt,
         folly::toJson(job_args).toStdString(),
-        vector<string>{},  // Use the default worker command
+        job->command().empty()
+          ? std::vector<std::string>{/*--worker_command*/} : job->command(),
         schedulerID_,
         worker.id,
         // The real sequence number may have been incremented after we found

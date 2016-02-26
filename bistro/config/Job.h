@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -83,6 +83,13 @@ public:
    */
   std::string requiredHostForTask(const Node& node) const;
 
+  /**
+   * For runners that execute shell commands, we allow the the job to either
+   * use the default --worker_command (LocalRunner & RemoteWorkerRunner), or
+   * to provide their own. This is executed when this is nonempty.
+   */
+  const std::vector<std::string>& command() const { return command_; }
+
   // shouldRunOn() returns this reason for whether this job can run on a given
   // node or not.
   enum ShouldRun {
@@ -120,6 +127,7 @@ private:
   folly::Optional<std::chrono::milliseconds> killOrphanTasksAfter_;
   cpp2::TaskSubprocessOptions taskSubprocessOptions_;
   cpp2::KillRequest killRequest_;
+  std::vector<std::string> command_;
 
   // ConfigLoaders can use this to implement compare-and-swap mutation in
   // saveJob, thereby preventing two racing saveJob() calls from silently

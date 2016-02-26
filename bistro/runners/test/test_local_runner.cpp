@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,6 +9,7 @@
  */
 #include <gtest/gtest.h>
 
+#include <folly/Synchronized.h>
 #include <thread>
 
 #include "bistro/bistro/config/Config.h"
@@ -17,7 +18,6 @@
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/hostname.h"
 #include "bistro/bistro/utils/TemporaryFile.h"
-#include <folly/Synchronized.h>
 
 using namespace facebook::bistro;
 using namespace folly;
@@ -42,26 +42,33 @@ const dynamic kJob = dynamic::object
   ("backoff", {"fail"})  // Test the weird "no backoff" default backoff.
 ;
 
-TEST(TestLocalRunner, HandleAll) {
-  FLAGS_log_prune_frequency = 0;
+struct TestLocalRunner : public ::testing::Test {
+  TestLocalRunner() : cmdFile_(tmpDir_.createFile()) {
+    FLAGS_log_prune_frequency = 0;
+  }
+  TemporaryDir tmpDir_;
+  TemporaryFile cmdFile_;
+};
 
-  TemporaryDir tmp_dir;
-  TemporaryFile cmdFile(tmp_dir.createFile());
-  cmdFile.writeString(
-    "#!/bin/sh\n"
-    "echo -n \"this is my stdout\"\n"
-    "echo -n \"this is my stderr\" 1>&2\n"
-    "echo \"done\" >$2"
-  );
-  PCHECK(chmod(cmdFile.getFilename().c_str(), 0700) == 0);
-  LocalRunner runner(cmdFile.getFilename(), tmp_dir.getPath());
+void checkLogsEq(const std::vector<std::string>& lines, const LogLines& log) {
+  ASSERT_EQ(lines.size(), log.lines.size());
+  for (size_t i = 0; i < lines.size(); ++i) {
+    ASSERT_EQ(lines[i], log.lines[i].line);
+  }
+}
 
-  auto job = make_shared<Job>(kConfig, "foo_job", kJob);
+void checkDoneTaskAndLogs(
+    LocalRunner* runner,
+    const folly::dynamic& d_job,
+    std::vector<std::string> stdout,
+    std::vector<std::string> stderr) {
+
+  auto job = make_shared<Job>(kConfig, "foo_job", d_job);
   Node node("test_node");
 
   auto start_time = time(nullptr);
   Synchronized<TaskStatus> status;
-  runner.runTask(
+  runner->runTask(
     kConfig,
     job,
     node,
@@ -80,7 +87,7 @@ TEST(TestLocalRunner, HandleAll) {
 
   for (const auto& logtype : vector<string>{"stdout", "stderr", "statuses"}) {
     // A very basic log test of log retrieval, does not check most features.
-    auto log = runner.getJobLogs(
+    auto log = runner->getJobLogs(
       logtype,
       vector<string>{job->name()},
       vector<string>{node.name()},
@@ -88,10 +95,11 @@ TEST(TestLocalRunner, HandleAll) {
       true,  // is_ascending
       ".*.*"  // a match-all regex filter
     );
-    if (logtype != "statuses") {
-      ASSERT_EQ(1, log.lines.size());
-      ASSERT_EQ("this is my " + logtype, log.lines.back().line);
-    } else {
+    if (logtype == "stdout") {
+      checkLogsEq(stdout, log);
+    } else if (logtype == "stderr") {
+      checkLogsEq(stderr, log);
+    } else if (logtype == "statuses") {
       ASSERT_EQ(4, log.lines.size());
       ASSERT_LE(start_time, log.lines[0].time);
       ASSERT_EQ(job->name(), log.lines[0].jobID);
@@ -113,6 +121,8 @@ TEST(TestLocalRunner, HandleAll) {
       auto j = folly::parseJson(log.lines[3].line);
       ASSERT_EQ("got_status", j["event"].asString());
       ASSERT_EQ("done", j["raw_status"].asString());
+    } else {
+      FAIL() << "Unknown log type: " << logtype;
     }
     ASSERT_LE(start_time, log.lines.back().time);
     ASSERT_EQ(job->name(), log.lines.back().jobID);
@@ -121,18 +131,42 @@ TEST(TestLocalRunner, HandleAll) {
   }
 }
 
-TEST(TestLocalRunner, HandleKill) {
-  FLAGS_log_prune_frequency = 0;
+TEST_F(TestLocalRunner, HandleDoneTaskAndLogs) {
+  cmdFile_.writeString(
+    "#!/bin/sh\n"
+    "echo -n \"this is my stdout\"\n"
+    "echo -n \"this is my stderr\" 1>&2\n"
+    "echo \"done\" > $2"
+  );
+  PCHECK(chmod(cmdFile_.getFilename().c_str(), 0700) == 0);
+  LocalRunner runner(cmdFile_.getFilename(), tmpDir_.getPath());
+  checkDoneTaskAndLogs(
+    &runner, kJob, {"this is my stdout"}, {"this is my stderr"}
+  );
+}
 
-  TemporaryDir tmp_dir;
-  TemporaryFile cmdFile(tmp_dir.createFile());
-  cmdFile.writeString(
+TEST_F(TestLocalRunner, CustomCommand) {
+  cmdFile_.writeString(
+    "#!/bin/sh\n"
+    "echo $1\n"
+    "echo $2 1>&2\n"
+    "echo \"done\" > $4"
+  );
+  PCHECK(chmod(cmdFile_.getFilename().c_str(), 0700) == 0);
+  LocalRunner runner("/bad/worker_command", tmpDir_.getPath());
+  auto d_job = kJob;
+  d_job[kCommand] = folly::dynamic{cmdFile_.getFilename().native(), "o", "e"};
+  checkDoneTaskAndLogs(&runner, d_job, {"o\n"}, {"e\n"});
+}
+
+TEST_F(TestLocalRunner, HandleKill) {
+  cmdFile_.writeString(
     "#!/bin/sh\n"
     "sleep 10000\n"
     "echo \"done\" >$2"
   );
-  PCHECK(chmod(cmdFile.getFilename().c_str(), 0700) == 0);
-  LocalRunner runner(cmdFile.getFilename(), tmp_dir.getPath());
+  PCHECK(chmod(cmdFile_.getFilename().c_str(), 0700) == 0);
+  LocalRunner runner(cmdFile_.getFilename(), tmpDir_.getPath());
 
   auto job = make_shared<Job>(kConfig, "job", kJob);
   const size_t kNumNodes = 5;

@@ -1,4 +1,17 @@
 cpp_library(
+    name='hostname_lib',
+    srcs=['hostname.cpp'],
+    external_deps=['boost', 'glog'],  # Future: Move startsWithAny elsewhere.
+)
+
+cpp_library(
+    name='shell_lib',
+    srcs=['shell.cpp'],
+    deps=['@/folly:string'],
+    external_deps=['boost'],
+)
+
+cpp_library(
     name='utils_lib',
     srcs=[
         # Classes
@@ -9,8 +22,6 @@ cpp_library(
         'SettingsMap.cpp',
         'TemporaryFile.cpp',
         # Collections of utility functions
-        'hostname.cpp',
-        'shell.cpp',
         'signal.cpp',
         'Exception.cpp',
     ],
@@ -19,6 +30,8 @@ cpp_library(
         '@/folly/experimental:autotimer',
         '@/bistro/bistro/if:if-cpp2',
         '@/bistro/bistro/sqlite:sqlite_lib',
+        '@/bistro/bistro/utils:hostname_lib',
+        '@/bistro/bistro/utils:shell_lib',
     ],
     external_deps=[
         ('boost', None, 'boost_regex'),

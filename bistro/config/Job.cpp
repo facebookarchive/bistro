@@ -261,7 +261,7 @@ dynamic Job::toDynamic(const Config& parent_config) const {
   // we emit it anyway, because ambiguity is much worse than redundancy.
   config["backoff"] = backoffSettings_.toDynamic();
   if (!dependsOn_.empty()) {
-    dynamic depends_on = {};
+    dynamic depends_on = dynamic::array;
     for (auto job_id : dependsOn_) {
       depends_on.push_back(JobNameTable->lookup(job_id));
     }

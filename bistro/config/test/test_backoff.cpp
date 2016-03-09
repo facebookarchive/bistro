@@ -32,12 +32,12 @@ JobBackoffSettings make(const dynamic& d) {
 }
 
 TEST(TestJobBackoffSettings, HandleNonPositiveInterval) {
-  dynamic d = { 0 };
+  dynamic d = dynamic::array(0);
   EXPECT_THROW(make(d), runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleInvalidType) {
-  dynamic d = { 1, 2, 3, "invalid" };
+  dynamic d = dynamic::array(1, 2, 3, "invalid");
   EXPECT_THROW(make(d), runtime_error);
 }
 
@@ -46,12 +46,12 @@ TEST(TestJobBackoffSettings, HandleNonArray) {
 }
 
 TEST(TestJobBackoffSettings, HandleNonInt) {
-  dynamic d = { 1, 2, dynamic::object };
+  dynamic d = dynamic::array(1, 2, dynamic::object());
   EXPECT_THROW(make(d), runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleDuplicate) {
-  dynamic d = { 1, 1, 2, "fail" };
+  dynamic d = dynamic::array(1, 1, 2, "fail");
   EXPECT_THROW(make(d), runtime_error);
 }
 
@@ -62,7 +62,7 @@ TEST(TestJobBackoffSettings, HandleNoValues) {
 }
 
 TEST(TestJobBackoffSettings, HandleInvalidRepeat) {
-  dynamic d = { "repeat" };
+  dynamic d = dynamic::array("repeat");
   EXPECT_THROW(make(d), runtime_error);
 }
 

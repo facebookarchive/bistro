@@ -256,7 +256,7 @@ dynamic HTTPMonitor::handleTaskLogs(const Config& c, const dynamic& d) {
   );
 
   // Compose the output JSON
-  dynamic lines = {};
+  dynamic lines = dynamic::array;
   for (const LogLine& l : log.lines) {
     lines.push_back({  // No emplace for dynamic???
       l.jobID,

@@ -16,6 +16,7 @@ cpp_library(
         '@/bistro/bistro/if:common-cpp2',
         '@/bistro/bistro/utils:utils_lib',
         '@/folly:folly',
+        '@/bistro:headers',
     ],
     external_deps = [
         ('boost', None, 'boost_filesystem'),

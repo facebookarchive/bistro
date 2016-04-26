@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -549,7 +549,7 @@ chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
       client->sync_updateStatus(
         rt,
         // The scheduler would ignore the timestamp anyway.
-        folly::toJson(nd->status.toDynamicNoTime()).toStdString(),
+        folly::toJson(nd->status.toDynamicNoTime()),
         scheduler_id,
         worker_.id
       );

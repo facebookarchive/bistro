@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -62,12 +62,12 @@ void ManualFetcher::fetch(
 
     if (pair.second.isString()) {  // A string is a single node name
       child_names.emplace_back(
-        pair.second.asString().toStdString()
+        pair.second.asString()
       );
     } else if (pair.second.isObject()) {
       if (auto* children = pair.second.get_ptr("children")) {
         for (const auto& kid_name : *children) {
-          child_names.emplace_back(kid_name.asString().toStdString());
+          child_names.emplace_back(kid_name.asString());
         }
       }
       if (pair.second.get_ptr("disabled")) {
@@ -75,7 +75,7 @@ void ManualFetcher::fetch(
       }
     } else {  // Otherwise it's a list of child names
       for (const auto& kid_name : pair.second) {
-        child_names.emplace_back(kid_name.asString().toStdString());
+        child_names.emplace_back(kid_name.asString());
       }
     }
     for (const auto& child : child_names) {

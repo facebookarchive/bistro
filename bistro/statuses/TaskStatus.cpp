@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -178,7 +178,7 @@ TaskStatus TaskStatus::fromString(const std::string& raw_status) noexcept {
     // which is what most tasks will report.
     if (auto result_ptr = d.get_ptr("result")) {
       // Throws if "result" is not a string
-      auto result = result_ptr->asString().toStdString();
+      auto result = result_ptr->asString();
       d.erase("result");  // Save RAM on the scheduler
       // Is the "result" field a valid label?
       if (auto maybe_status = fromSimpleLabel(result, d.get_ptr("data"))) {
@@ -247,7 +247,7 @@ dynamic TaskStatus::toDynamic() const {
 }
 
 std::string TaskStatus::toJson() const {
-  return folly::toJson(toDynamic()).toStdString();
+  return folly::toJson(toDynamic());
 }
 
 }}

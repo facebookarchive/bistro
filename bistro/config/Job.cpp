@@ -25,7 +25,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
   : id_(Job::JobNameTable->insert(name)),
     name_(name),
     enabled_(d.getDefault("enabled", true).asBool()),
-    owner_(d.getDefault("owner", "").asString().toStdString()),
+    owner_(d.getDefault("owner", "").asString()),
     levelForTasks_(config.levelForTasks),
     priority_(d.getDefault("priority", 1.0).asDouble()),
     resources_(config.defaultJobResources),
@@ -47,7 +47,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
         throw BistroException("'level_for_tasks' must be a string for ", name);
       }
       const auto& str_level_for_tasks =
-        level_for_tasks_ptr->asString().toStdString();
+        level_for_tasks_ptr->asString();
       int level_for_tasks = config.levels.lookup(str_level_for_tasks);
       if (level_for_tasks == StringTable::NotFound) {
         throw BistroException("Bad level_for_tasks: ", str_level_for_tasks);
@@ -61,7 +61,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
         throw BistroException("'resources' must be an object for ", name);
       }
       for (const auto& pair : it->second.items()) {
-        const auto& name = pair.first.asString().toStdString();
+        const auto& name = pair.first.asString();
         const int resource_id = config.resourceNames.lookup(name);
         if (resource_id == StringTable::NotFound) {
           throw BistroException("Invalid resource: ", name);
@@ -92,7 +92,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
         throw BistroException("'filters' must be an object for ", name);
       }
       for (const auto& pair : it->second.items()) {
-        const auto& level = pair.first.asString().toStdString();
+        const auto& level = pair.first.asString();
         const int level_id = config.levels.lookup(level);
         if (level_id == StringTable::NotFound) {
           throw BistroException("Invalid level in filters: ", level);
@@ -121,7 +121,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
         );
       }
       const auto& str_host_level =
-        host_level_ptr->asString().toStdString();
+        host_level_ptr->asString();
       int host_level = config.levels.lookup(str_host_level);
       if (host_level == StringTable::NotFound) {
         throw BistroException(
@@ -135,7 +135,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
       if (!host_ptr->isString()) {
         throw BistroException("'host_placement' must be a string for ", name);
       }
-      hostPlacement_ = host_ptr->asString().toStdString();
+      hostPlacement_ = host_ptr->asString();
       if (!hostPlacement_.empty()
           && levelForHostPlacement_ != StringTable::NotFound) {
         throw BistroException(
@@ -167,7 +167,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
       }
       for (const auto& job_name : it->second) {
         dependsOn_.push_back(static_cast<ID>(JobNameTable->insert(
-          job_name.asString().toStdString()
+          job_name.asString()
         )));
       }
     }
@@ -180,7 +180,7 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
         if (!v.isString()) {
           throw BistroException(kCommand, " has a non-string element");
         }
-        command_.emplace_back(v.asString().toStdString());
+        command_.emplace_back(v.asString());
       }
     }
   } catch (const exception& e) {

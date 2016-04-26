@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -83,7 +83,7 @@ vector<const Job*> getRequestedJobs(const Config& c, const dynamic& d) {
   auto* p = d.get_ptr("jobs");
   if (p && !p->empty()) {
     for (const auto& j : *p) {
-      auto it = c.jobs.find(j.asString().toStdString());
+      auto it = c.jobs.find(j.asString());
       if (it != c.jobs.end()) {
         jobs.emplace_back(it->second.get());
       }
@@ -135,17 +135,17 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
     return handleTaskLogs(c, d);
   }
   if (handler == "delete_job") {
-    configLoader_->deleteJob(d["job_id"].asString().toStdString());
+    configLoader_->deleteJob(d["job_id"].asString());
     return "deleted";
   }
   if (handler == "save_job") {
-    configLoader_->saveJob(d["job_id"].asString().toStdString(), d["job"]);
+    configLoader_->saveJob(d["job_id"].asString(), d["job"]);
     return "saved";
   }
   if (handler == "forgive_jobs") {
     if (auto* p = d.get_ptr("jobs")) {
       for (const auto& j : *p) {
-        taskStatuses_->forgiveJob(j.asString().toStdString());
+        taskStatuses_->forgiveJob(j.asString());
       }
     }
     return "forgiven";
@@ -155,8 +155,8 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
   }
   if (handler == "kill_task") {
     // Ignore d["status_filter"], since that option is now deprecated.
-    auto job = d["job_id"].asString().toStdString();
-    auto node = d["node_id"].asString().toStdString();
+    auto job = d["job_id"].asString();
+    auto node = d["node_id"].asString();
     // Look up the job
     auto jit = c.jobs.find(job);
     if (jit == c.jobs.end()) {
@@ -245,14 +245,14 @@ dynamic HTTPMonitor::handleTaskLogs(const Config& c, const dynamic& d) {
   }
 
   auto log = taskRunner_->getJobLogs(
-    d["log_type"].asString().toStdString(),
+    d["log_type"].asString(),
     job_ids,
     node_ids,
     line_id,
     is_ascending,
     // Server-side regex filtering of retrieved lines -- may cause 0 lines
     // to be returned, but nextLineID will still be correct.
-    d.getDefault("regex_filter", "").asString().toStdString()
+    d.getDefault("regex_filter", "").asString()
   );
 
   // Compose the output JSON
@@ -387,7 +387,7 @@ unordered_set<string> getJobNameSet(const dynamic& d) {
   unordered_set<string> job_names;
   if (auto* p = d.get_ptr("jobs")) {
     for (const auto& j : *p) {
-      job_names.emplace(j.asString().toStdString());
+      job_names.emplace(j.asString());
     }
   }
   return job_names;

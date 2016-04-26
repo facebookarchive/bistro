@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -89,7 +89,7 @@ TEST(TestTaskStatus, Error) {
   EXPECT_FALSE(s.isFailed());
   EXPECT_TRUE(s.isInBackoff(s.timestamp() - 1));
   EXPECT_FALSE(s.isInBackoff(s.timestamp() + 1000));
-  EXPECT_EQ(err, (*s.data())["exception"].asString().toStdString());
+  EXPECT_EQ(err, (*s.data())["exception"].asString());
 
   auto s2 = TaskStatus::errorBackoff(make_unique<dynamic>("cat"));
   EXPECT_FALSE(s2.isRunning());
@@ -103,7 +103,7 @@ TEST(TestTaskStatus, Error) {
 TEST(TestTaskStatus, NeverStarted) {
   std::string err = "my error";
   auto s = TaskStatus::neverStarted(err);
-  EXPECT_EQ(err, (*s.data())["exception"].asString().toStdString());
+  EXPECT_EQ(err, (*s.data())["exception"].asString());
   EXPECT_EQ(TaskStatusBits::Error, s.bits());
   EXPECT_FALSE(s.isOverwriteable());
   EXPECT_FALSE(s.isRunning());

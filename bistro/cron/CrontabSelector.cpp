@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -128,7 +128,7 @@ int64_t CrontabSelector::parseValue(
   if (d.isInt()) {
     res = d.asInt();
   } else if (d.isString()) {
-    auto s = d.asString().toStdString();
+    auto s = d.asString();
     if (str_to_value == nullptr) {
       throw runtime_error("Cannot parse string " + s);
     }

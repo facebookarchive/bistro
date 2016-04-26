@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -185,7 +185,7 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
     );
     EXPECT_EQ(
       "Task killed, no status returned",
-      (*status.data()).at("exception").asString().toStdString()
+      (*status.data()).at("exception").asString()
     );
   }
 
@@ -869,7 +869,7 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperWithFreezer) {
     SYNCHRONIZED(task_to_logs) {
       for (const auto& ev
            : task_to_logs[std::make_pair("job", "node")].events_) {
-        EXPECT_NE("cgroups_reaped", ev.at("event").asString().toStdString());
+        EXPECT_NE("cgroups_reaped", ev.at("event").asString());
       }
     }
 
@@ -936,7 +936,7 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperKillWithoutFreezer) {
     SYNCHRONIZED(task_to_logs) {
       for (const auto& ev
            : task_to_logs[std::make_pair("job", "node")].events_) {
-        EXPECT_NE("cgroups_reaped", ev.at("event").asString().toStdString());
+        EXPECT_NE("cgroups_reaped", ev.at("event").asString());
       }
     }
 

@@ -642,7 +642,7 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
           }
         )),
         rt,
-        folly::toJson(job_args).toStdString(),
+        folly::toJson(job_args),
         job->command().empty()
           ? std::vector<std::string>{/*--worker_command*/} : job->command(),
         schedulerID_,

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -215,7 +215,7 @@ private:
             throw BistroException("\"tags\" must be an array");
           }
           for (const auto &tag : p.second) {
-            tags_.insert(tag.asString().toStdString());
+            tags_.insert(tag.asString());
           }
         } else if (p.first == "cron") {
           boost::local_time::time_zone_ptr system_tz;  // null == system tz

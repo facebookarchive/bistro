@@ -55,7 +55,7 @@ TaskRunnerResponse LocalRunner::runTaskImpl(
     running_task,
     job->command().empty()
       ? std::vector<std::string>{cmd_.native()} : job->command(),
-    folly::toJson(job_args).toStdString(),  // Job config argument
+    folly::toJson(job_args),  // Job config argument
     jobsDir_ / running_task.job,  // Working directory for the task
     cb,
     [](const cpp2::RunningTask&, cpp2::TaskPhysicalResources&&){},

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -105,7 +105,7 @@ void TaskSubprocessQueue::logEvent(
   // even rt.nodeResources.
 
   // Contract: We always write a JSON message (serialization shouldn't fail).
-  std::string msg = folly::toJson(obj).toStdString();
+  std::string msg = folly::toJson(obj);
 
   try {
     // Suppress INFO messages about healthchecks to keep the logs cleaner

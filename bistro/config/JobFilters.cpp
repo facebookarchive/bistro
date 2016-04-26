@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -26,31 +26,31 @@ JobFilters::JobFilters(const folly::dynamic& d) {
   auto jt = d.find("whitelist");
   if (jt != d.items().end()) {
     for (const auto& item : jt->second) {
-      whitelist_.insert(item.asString().toStdString());
+      whitelist_.insert(item.asString());
     }
   }
 
   jt = d.find("whitelist_regex");
   if (jt != d.items().end()) {
-    whitelistRegex_ = boost::regex(jt->second.asString().toStdString());
+    whitelistRegex_ = boost::regex(jt->second.asString());
   }
 
   jt = d.find("blacklist");
   if (jt != d.items().end()) {
     for (const auto& item : jt->second) {
-      blacklist_.insert(item.asString().toStdString());
+      blacklist_.insert(item.asString());
     }
   }
 
   jt = d.find("blacklist_regex");
   if (jt != d.items().end()) {
-    blacklistRegex_ = boost::regex(jt->second.asString().toStdString());
+    blacklistRegex_ = boost::regex(jt->second.asString());
   }
 
   jt = d.find("tag_whitelist");
   if (jt != d.items().end()) {
     for (const auto& item : jt->second) {
-      tagWhitelist_.emplace_back(item.asString().toStdString());
+      tagWhitelist_.emplace_back(item.asString());
     }
   }
 

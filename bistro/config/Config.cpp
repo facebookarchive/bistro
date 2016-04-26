@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -58,7 +58,7 @@ const folly::Optional<std::string> dynGetString(
     if (!p->isString()) {
       throw BistroException(key.asString(), " must be a string");
     }
-    return p->asString().toStdString();
+    return p->asString();
   }
   return folly::none;
 }
@@ -185,7 +185,7 @@ void parseTaskSubprocessOptions(
           if (!s.isString()) {
             throw BistroException("cgroups subsystems entries must be strings");
           }
-          cgopts.subsystems.emplace_back(s.asString().toStdString());
+          cgopts.subsystems.emplace_back(s.asString());
         }
       }
       if (const auto p = dynGetBool(*cgp, kKillWithoutFreezer)) {
@@ -380,7 +380,7 @@ Config::Config(const dynamic& d)
     throw BistroException("Levels is required in the nodes config");
   }
   for (const dynamic& level : jt->second) {
-    levels.insert(level.asString().toStdString());
+    levels.insert(level.asString());
   }
   // Add a 'worker' level as the bottom level (for resources only -- no nodes)
   levels.insert("worker");
@@ -417,7 +417,7 @@ Config::Config(const dynamic& d)
   jt = node_settings.find("node_source");
   if (jt != node_settings.items().end()) {
     nodeConfigs.emplace_back(
-      jt->second.asString().toStdString(),
+      jt->second.asString(),
       node_settings.getDefault("node_source_prefs")
     );
   }
@@ -426,7 +426,7 @@ Config::Config(const dynamic& d)
   if (jt != node_settings.items().end()) {
     for (const auto& setting : jt->second) {
       nodeConfigs.emplace_back(
-        setting["source"].asString().toStdString(),
+        setting["source"].asString(),
         setting.getDefault("prefs", dynamic::object)
       );
     }
@@ -447,7 +447,7 @@ Config::Config(const dynamic& d)
   levelIDToResourceID.resize(levels.size());
   int resource_id = 0;
   for (const auto& by_level : it->second.items()) {
-    const auto& level = by_level.first.asString().toStdString();
+    const auto& level = by_level.first.asString();
     if (!by_level.second.isObject()) {
       throw BistroException(
         "Resources for level ", level, " must be an object"
@@ -458,7 +458,7 @@ Config::Config(const dynamic& d)
       if (level_id == StringTable::NotFound) {
         throw BistroException("Invalid level: ", level);
       }
-      const auto& name = pair.first.asString().toStdString();
+      const auto& name = pair.first.asString();
       const int resource_id = resourceNames.insert(name);
       defaultJobResources.resize(resource_id + 1, 0);
       defaultJobResources[resource_id] = pair.second["default"].asInt();
@@ -485,10 +485,10 @@ Config::Config(const dynamic& d)
   if (const auto* ptr = dynObjectPtr(d, "worker_resources_override")) {
     const auto& default_resources = workerLevelResourcesRef(*this);
     for (const auto& pair : ptr->items()) {
-      const string& worker = pair.first.asString().toStdString();
+      const string& worker = pair.first.asString();
       auto& worker_overrides = workerResourcesOverride[worker];
       for (const auto& item : pair.second.items()) {
-        const string& resource_name = item.first.asString().toStdString();
+        const string& resource_name = item.first.asString();
         const int resource_id = resourceNames.lookup(resource_name);
         if ((resource_id == StringTable::NotFound)
             || (resource_id >= default_resources.size())) {

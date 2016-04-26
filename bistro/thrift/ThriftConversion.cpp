@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -24,7 +24,7 @@ unordered_set<string> asSet(const dynamic* d) {
   unordered_set<string> s;
   if (d) {
     for (const auto& i : *d) {
-      s.insert(i.asString().toStdString());
+      s.insert(i.asString());
     }
   }
   return s;
@@ -59,9 +59,9 @@ cpp2::BistroJobConfigFilters toThrift(const dynamic& d) {
   return cpp2::BistroJobConfigFilters(
     apache::thrift::FRAGILE,
     asSet(d.get_ptr("whitelist")),
-    d.getDefault("whitelist_regex", "").asString().toStdString(),
+    d.getDefault("whitelist_regex", "").asString(),
     asSet(d.get_ptr("blacklist")),
-    d.getDefault("blacklist_regex", "").asString().toStdString(),
+    d.getDefault("blacklist_regex", "").asString(),
     d.getDefault("fraction_of_nodes", 1.0).asDouble(),
     asSet(d.get_ptr("tag_whitelist"))
   );
@@ -128,23 +128,23 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
   cpp2::BistroJobConfig config;
   config.name = name;
   config.enabled = d.getDefault("enabled", false).asBool();
-  config.owner = d.getDefault("owner", "").asString().toStdString();
+  config.owner = d.getDefault("owner", "").asString();
   config.priority = d.getDefault("priority", 1.0).asDouble();
-  config.config = folly::toJson(d.getDefault("config", "")).toStdString();
-  config.error = d.getDefault("error", "").asString().toStdString();
+  config.config = folly::toJson(d.getDefault("config", ""));
+  config.error = d.getDefault("error", "").asString();
   config.createTime = d.getDefault("create_time", 0).asInt();
   config.modifyTime = d.getDefault("modify_time", 0).asInt();
   config.levelForTasks =
-    d.getDefault("level_for_tasks", "").asString().toStdString();
+    d.getDefault("level_for_tasks", "").asString();
   if (auto* p = d.get_ptr("resources")) {
     for (const auto& pair : p->items()) {
-      config.resources[pair.first.asString().toStdString()] =
+      config.resources[pair.first.asString()] =
         pair.second.asInt();
     }
   }
   if (auto* p = d.get_ptr("filters")) {
     for (const auto& pair : p->items()) {
-      config.filters[pair.first.asString().toStdString()] =
+      config.filters[pair.first.asString()] =
         toThrift(pair.second);
     }
   }
@@ -170,9 +170,9 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
     config.versionID = p->asInt();
   }
   config.levelForHostPlacement =
-    d.getDefault("level_for_host_placement", "").asString().toStdString();
+    d.getDefault("level_for_host_placement", "").asString();
   config.hostPlacement =
-    d.getDefault("host_placement", "").asString().toStdString();
+    d.getDefault("host_placement", "").asString();
   if (auto* p = d.get_ptr("backoff")) {
     for (const auto& d : *p) {
       if (d.isInt()) {
@@ -184,7 +184,7 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
   }
   if (auto *p = d.get_ptr("depends_on")) {
     for (const auto& job_name : *p) {
-      config.dependsOn.push_back(job_name.asString().toStdString());
+      config.dependsOn.push_back(job_name.asString());
     }
   }
   return config;

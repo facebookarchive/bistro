@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -21,7 +21,7 @@ SettingsMap::SettingsMap(const dynamic& d) {
     throw BistroException("Can only create settings map from an object");
   }
   for (const auto& pair : d.items()) {
-    const string& name = pair.first.asString().toStdString();
+    const string& name = pair.first.asString();
     set(name, pair.second);
   }
 }

@@ -216,8 +216,7 @@ void BistroWorkerHandler::runTask(
 
   throwIfSuicidal();
 
-  AutoTimer<> timer("runTask was slow");
-  timer.setMinTimeToLog(0.1); // 100 ms per log => 10 tasks/sec
+  AutoTimer<> timer("runTask was slow", 0.1); // 100 ms per log => 10 tasks/sec
 
   bool isHealthcheck = rt.job == kHealthcheckTaskJob;
   // Tells the scheduler that we aren't even going to try running this.  Run
@@ -336,8 +335,8 @@ void BistroWorkerHandler::runTask(
     config,  // Job config argument -- DO: elide the extra copy?
     jobsDir_ / rt.job,  // Working directory for the task
     [this](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-      folly::AutoTimer<> timer("Task update queue was slow");
-      timer.setMinTimeToLog(0.1);  // 10 tasks / sec
+      // 10 tasks / sec
+      folly::AutoTimer<> timer("Task update queue was slow", 0.1);
       notifyFinishedQueue_.blockingWrite(folly::make_unique<NotifyData>(
         TaskID{rt.job, rt.node}, std::move(status)
       ));

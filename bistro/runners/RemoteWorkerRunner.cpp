@@ -795,7 +795,8 @@ void RemoteWorkerRunner::requestWorkerSuicide(
 void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
   // Suicide first, in case a worker also has a healthcheck.
   if (size_t num = update->suicideWorkers().size()) {
-    folly::AutoTimer<> timer("Requested suicide from ", num, " workers");
+    folly::AutoTimer<> timer(
+        folly::to<std::string>("Requested suicide from ", num, " workers"));
     for (const auto& shard_and_worker : update->suicideWorkers()) {
       requestWorkerSuicide(shard_and_worker.second);
       // We assume that RemoteWorker also issued 'lost tasks' for all of the
@@ -805,7 +806,8 @@ void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
 
   // Send out healthchecks
   if (size_t num = update->workersToHealthcheck().size()) {
-    folly::AutoTimer<> timer("Sent healthchecks to ", num, " workers");
+    folly::AutoTimer<> timer(
+        folly::to<std::string>("Sent healthchecks to ", num, " workers"));
     auto new_workers = update->newWorkers();
     for (const auto& shard_and_worker : update->workersToHealthcheck()) {
       sendWorkerHealthcheck(
@@ -825,7 +827,8 @@ void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
 
   // Process lost tasks before processing new ones, in case some are replaced.
   if (size_t num = update->lostRunningTasks().size()) {
-    folly::AutoTimer<> timer("Updated statuses for ", num, " lost tasks");
+    folly::AutoTimer<> timer(
+        folly::to<std::string>("Updated statuses for ", num, " lost tasks"));
     for (const auto& id_and_task : update->lostRunningTasks()) {
       // Note: This **will** decrease the retry count. This makes more sense
       // than neverStarted() since the worker might have crashed **because**

@@ -404,9 +404,8 @@ void BistroWorkerHandler::notifyIfTasksNotRunning(
 
   // Send out the status updates for the non-running tasks
   for (auto& rt : not_running_tasks) {
-    folly::AutoTimer<> timer(
-      "Queued 'was not running' update for ", debugString(rt)
-    );
+    folly::AutoTimer<> timer(folly::to<std::string>(
+        "Queued 'was not running' update for ", debugString(rt)));
     notifyNotRunningQueue_.blockingWrite(std::move(rt));
   }
   if (not_running_tasks.empty()) {

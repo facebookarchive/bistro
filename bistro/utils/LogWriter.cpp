@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -111,7 +111,8 @@ void LogWriter::prune() noexcept {
   int32_t cutoff_time = time(nullptr) - FLAGS_log_retention;
   auto cutoff =
     LogLine::makeLineID(cutoff_time, numeric_limits<int32_t>::max());
-  folly::AutoTimer<> timer("Pruned logs with cutoff ", cutoff_time);
+  folly::AutoTimer<> timer(
+      folly::to<std::string>("Pruned logs with cutoff ", cutoff_time));
   SYNCHRONIZED(pruneStmts_) {
     for (auto& s : pruneStmts_) {
       s->exec(cutoff);
@@ -188,7 +189,8 @@ LogLines LogWriter::getJobLogs(
   }
 
   // Run the query
-  folly::AutoTimer<>("Query: '", query, debug_where_args);
+  folly::AutoTimer<>(
+      folly::to<std::string>("Query: '", query, debug_where_args));
   LogLines res;
   // Assuming that micro-optimizing the "" case is pointless, but did not test.
   boost::regex re(regex_filter);

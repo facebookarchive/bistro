@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -82,7 +82,7 @@ TEST(TestAsyncReadPipeRateLimiter, RateLimits) {
     runtime += timer.logFormat(
       "Read {} fast, {} medium, {} slow.",
       fast.numRead_, medium.numRead_, slow.numRead_
-    );
+    ).count();
   }
 
   // Strictly faster than medium, 20KB/sec should not be too flaky in practice

@@ -164,8 +164,8 @@ public:
     const auto& prefs = node_config.prefs;
     const auto& format_str =
       prefs.convert<string>("format", "{parent}:{time}");
-    const auto time_to_tags_and_enabled =
-      makeTimestampsToTagsAndEnabled(prefs.get("schedule", {}));
+    const auto time_to_tags_and_enabled = makeTimestampsToTagsAndEnabled(
+      prefs.get("schedule", folly::dynamic::array()));
 
     // Use the "parent_level" pref to get my parents and my level ID.
     const auto my_level_and_parents =

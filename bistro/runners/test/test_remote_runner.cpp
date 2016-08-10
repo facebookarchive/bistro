@@ -11,6 +11,7 @@
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Job.h"
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/runners/RemoteWorkerRunner.h"
 #include "bistro/bistro/remote/RemoteWorker.h"
@@ -65,7 +66,8 @@ cpp2::WorkerSetID addFakeWorker(
     RemoteWorkerRunner* runner,
     std::shared_ptr<const Config> config,
     const FakeBistroWorkerThread& wt,
-    cpp2::WorkerSetID wsid) {  // The current set of workers
+    cpp2::WorkerSetID wsid,
+    int64_t cur_time = time(nullptr)) {  // The current set of workers
 
   folly::test::CaptureFD stderr(2, printString);
 
@@ -77,7 +79,8 @@ cpp2::WorkerSetID addFakeWorker(
     RemoteWorkerUpdate()
   );
   wsid = addToWorkerSetID(wsid, wt);
-  EXPECT_EQ(wsid, res.workerSetID);
+  EXPECT_EQ(wsid, res.workerSetID) << apache::thrift::debugString(wsid)
+    << " != " << apache::thrift::debugString(res.workerSetID);
 
   // Wait the Runner to get running tasks & to request a healthcheck, in
   // either order.
@@ -94,7 +97,7 @@ cpp2::WorkerSetID addFakeWorker(
   cpp2::RunningTask rt;
   rt.job = kHealthcheckTaskJob;
   rt.workerShard = wt.shard();
-  rt.invocationID.startTime = time(nullptr);  // For "time since healthcheck"
+  rt.invocationID.startTime = cur_time;  // For "time since healthcheck"
   runner->remoteUpdateStatus(
     rt,
     TaskStatus::done(),
@@ -199,6 +202,188 @@ TEST_F(TestRemoteRunner, HandleResources) {
     [](const cpp2::RunningTask&, TaskStatus&&) { FAIL() << "Never runs"; }
   );
   ASSERT_EQ(TaskRunnerResponse::DidNotRunTask, res);
+}
+
+struct FakeWorker {
+  explicit FakeWorker(std::string shard)
+    : workerID_(randInstanceID()),
+      worker_(
+        shard,
+        [&](cpp2::BistroWorker* w) { w->id = workerID_; },
+        // Each FakeBistroWorker calls this just before a task's "done" cob.
+        [&](const cpp2::RunningTask& rt, const cpp2::TaskSubprocessOptions&) {
+          if (rt.job == "foo_job") {
+            CHECK(taskCobCob_.hasValue());
+            taskCobCob_.value()(rt);
+          }
+        }
+      ) {}
+
+  // **MUST** be called before running any tasks.
+  void connect(
+      int wsid_version,
+      std::shared_ptr<const Config> config,
+      std::shared_ptr<RemoteWorkerRunner> runner,
+      int64_t cur_time) {
+
+    taskCobCob_ = [this, runner](const cpp2::RunningTask& rt) {
+      runner->remoteUpdateStatus(
+        rt,
+        // Fake receiving a reply from the remote worker, **after** the test
+        // permits this.
+        workerMayReturnStatus_.getFuture().get(),
+        runner->getSchedulerID(),
+        worker_.getBistroWorker().id
+      );
+      // Allows us to wait until a worker successfully marks the task done.
+      workerReturnedStatus_.setValue();
+    };
+
+    wsid_.schedulerID = runner->getSchedulerID();
+    wsid_.version = wsid_version;
+    wsid_ = addFakeWorker(runner.get(), config, worker_, wsid_, cur_time);
+  }
+
+  cpp2::BistroInstanceID workerID_;
+  // Lazily initialized to allow adding custom logic into the cob that is
+  // called when a worker receives a task.
+  folly::Optional<std::function<void(const cpp2::RunningTask&)>> taskCobCob_;
+  FakeBistroWorkerThread worker_;
+  folly::Promise<TaskStatus> workerMayReturnStatus_;
+  folly::Promise<folly::Unit> workerReturnedStatus_;
+  cpp2::WorkerSetID wsid_;
+};
+
+//
+// Shared code between a couple of tests that start a task, and then let the
+// worker running it be lost.
+//
+
+// constexpr segfaults clang, static constexpr class members are hard
+const char* kOneTaskJobName = "foo_job";
+const char* kOneTaskNodeName = "test_node";
+
+struct TestRemoteRunnerWithOneTask : TestRemoteRunner {
+  TestRemoteRunnerWithOneTask()
+    : TestRemoteRunner(),
+      // Create the worker threads first so that the workers exit *after*
+      // the runner does (this avoids harmless error messages about the
+      // runner being unable to talk to the worker).
+      workers_([]() {
+        std::vector<std::unique_ptr<FakeWorker>> v;
+        v.emplace_back(folly::make_unique<FakeWorker>("test_worker_1"));
+        v.emplace_back(folly::make_unique<FakeWorker>("test_worker_2"));
+        return v;
+      }()),
+      config_([]() {
+        auto cfg = std::make_shared<Config>(dynamic::object
+          ("enabled", true)
+          ("nodes", dynamic::object("levels", dynamic::array()))
+          ("resources", dynamic::object));
+        cfg->addJob(kOneTaskJobName, kJob, /*prev_config =*/ nullptr);
+        return cfg;
+      }()),
+      job_(config_->jobs.at(kOneTaskJobName)),
+      node_(kOneTaskNodeName),
+      taskStatuses_(
+        std::make_shared<TaskStatuses>(std::make_shared<NoOpTaskStore>())
+      ),
+      runner_(std::make_shared<RemoteWorkerRunner>(
+        taskStatuses_, std::shared_ptr<Monitor>()
+      )),
+      curTime_(time(nullptr)) {
+
+    // Otherwise getPtr() will fail with "job not loaded".
+    taskStatuses_->updateForConfig(*config_);
+  }
+
+  void connectWorker(int idx, int wsid_version = 0) {
+    workers_[idx]->connect(wsid_version, config_, runner_, curTime_);
+  }
+
+  void runTask() {
+    // The rest of the tests in this file use a promise with runTask to
+    // check that the cob runs.  This seems to imply a wait /
+    // synchronization, but in actuality, I think this is supposed to run
+    // synchronously, in the same thread, so assert that instead.
+    bool cob_ran = false;
+    auto outer_thread = std::this_thread::get_id();
+    auto status_snapshot = taskStatuses_->copySnapshot();
+    ASSERT_EQ(TaskRunnerResponse::RanTask, runner_->runTask(
+      *config_,
+      job_,
+      node_,
+      // The previous status, if any.
+      status_snapshot.getPtr(job_->id(), node_.id()),
+      [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
+        ASSERT_EQ(kOneTaskJobName, rt.job);
+        ASSERT_EQ(kOneTaskNodeName, rt.node);
+        ASSERT_TRUE(status.isRunning());
+        ASSERT_EQ(outer_thread, std::this_thread::get_id());
+        taskStatuses_->updateStatus(
+          job_->id(), node_.id(), rt, std::move(status)
+        );
+        cob_ran = true;
+      }
+    ));
+    ASSERT_TRUE(cob_ran);
+  }
+
+  void missHealthcheckForWorker(
+      int idx,
+      std::function<void()> between_update_and_apply_cob = []() {}) {
+
+    curTime_ += 10000000;
+    auto& w = workers_.at(idx);
+    runner_->processWorkerHeartbeat(
+      w->worker_.getBistroWorker(),
+      w->wsid_,
+      RemoteWorkerUpdate(RemoteWorkerUpdate::UNIT_TEST_TIME, curTime_),
+      between_update_and_apply_cob
+    );
+  }
+
+  std::vector<std::unique_ptr<FakeWorker>> workers_;
+
+  const std::shared_ptr<const Config> config_;
+  std::shared_ptr<const Job> job_;
+  Node node_;
+
+  std::shared_ptr<TaskStatuses> taskStatuses_;
+  // This is shared to let FakeWorker's callbacks extend its lifetime.
+  std::shared_ptr<RemoteWorkerRunner> runner_;
+
+  time_t curTime_;
+};
+
+TEST_F(TestRemoteRunnerWithOneTask, TaskExitedRacesTaskLost) {
+  connectWorker(0);
+  workers_[0]->workerMayReturnStatus_.setValue(TaskStatus::done());
+  runTask();
+  // The first missed healthcheck makes the worker unhealthy.
+  missHealthcheckForWorker(0);
+  // The second missed healthcheck makes the worker and the task lost.
+  {
+    folly::test::CaptureFD stderr(2, printString);
+    missHealthcheckForWorker(
+      0,
+      // This happens after the task is written into RemoteWorkerUpdate as
+      // lost, but before the update is actually applied.
+      [&]() {
+        // Simulate a race with a remote worker by waiting until this task's
+        // status is modified by remoteUpdateStatus above.
+        workers_[0]->workerReturnedStatus_.getFuture().get();
+      }
+    );
+    // This part of the test could, in a very unlikely scenario, fail
+    // because the RemoteWorkerRunner background thread calls updateState &
+    // applyUpdate while we are waiting for `worker_returned_status` above.
+    // I choose not to worry about it :)
+    EXPECT_PCRE_MATCH(
+      ".* the worker won a race against marking the task as lost: .*",
+      stderr.readIncremental()
+    );
+  }
 }
 
 TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
@@ -321,6 +506,7 @@ void checkTasksRunOnWorkersLeavingResources(
   }
 }
 
+// Future: Refactor this to use the TestRemoteRunnerWithOneTask harness above.
 TEST_F(TestRemoteRunner, TestBusiestSelector) {
   const auto kConfig = std::make_shared<Config>(dynamic::object
     ("enabled", true)

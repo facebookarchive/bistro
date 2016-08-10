@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -24,9 +24,7 @@ using namespace std;
 using apache::thrift::debugString;
 
 // Careful: this does not check isLoaded_, but your calling function should?
-inline TaskStatus& TaskStatusSnapshot::access(int j, int n) {
-  const int job_id = static_cast<int>(j);
-  const int node_id = static_cast<int>(n);
+inline TaskStatus& TaskStatusSnapshot::access(int job_id, int node_id) {
   if (job_id >= rows_.size()) {
     rows_.resize(job_id + 1);
   }
@@ -174,16 +172,34 @@ TaskStatus TaskStatusSnapshot::updateStatus(
   } else {  // The incoming status is not "running"
     // The previous status already wasn't "running"
     if (it == runningTasks_.end()) {
-      // Cannot happen, since RemoteWorker::recordNonRunningTaskStatus is
-      // supposed to filter out overwriteable statuses that would replace
-      // an existing "not running" status.
-      CHECK(!status.isOverwriteable());
+      // An overwritable status does not replace the current one.
+      //
+      // See TestRemoteRunner::TaskExitedRacesTaskLost for the one way
+      // to trigger this.  In short: in a rare race, a task completes
+      // **after** `updateState` decided the task got lost, but before
+      // `applyUpdate` managed to update TaskStatuses.
+      //
+      // Future: If possible, synchronize the RemoteWorker and TaskStatuses
+      // updates, and convert this to a CHECK.
+      //
+      // NB We never get here fromRemoteWorker::recordNonRunningTaskStatus,
+      // since it filters out overwriteable statuses that would replace an
+      // existing "not running" status.
+      if (status.isOverwriteable()) {
+        LOG(WARNING) << "This should be rare: storing the task status "
+          << status.toJson() << " from the worker won a race against "
+          << "marking the task as lost: " << stored_status.toJson()
+          << " for " << debugString(rt);
+        CHECK(!stored_status.isRunning());
+        return stored_status;
+      }
       // A overwriteable status is safe to replace with the new one, it just
       // means that a normal updateStatus arrived after loseRunningTasks, or
       // after a notifyIfTasksNotRunning reply.
       if (stored_status.isOverwriteable()) {
         LOG(INFO) << "Replacing overwriteable " << stored_status.toJson()
-          << " with a new status " << status.toJson();
+          << " with a new status " << status.toJson() << " for task "
+          << debugString(rt);
       } else {
         // Rarely. we will end up here due to the worker retrying
         // updateStatus after a "partial failure" -- the scheduler recording

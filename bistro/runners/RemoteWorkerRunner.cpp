@@ -475,10 +475,14 @@ LogLines RemoteWorkerRunner::getJobLogs(
 cpp2::SchedulerHeartbeatResponse RemoteWorkerRunner::processWorkerHeartbeat(
     const cpp2::BistroWorker& worker,
     const cpp2::WorkerSetID& worker_set_id,
-    RemoteWorkerUpdate update) {
+    RemoteWorkerUpdate update,
+    std::function<void()> unit_test_cob) {
 
   // Throws on protocol version mismatch, does not add worker to pool.
   auto r = workers_->processHeartbeat(&update, worker, worker_set_id);
+  // In TaskExitedRacesTaskLost, we need to inject logic between making the
+  // update and applying it.
+  unit_test_cob();
   // This will often result in the healthcheck or getRunningTasks arriving
   // before the heartbeat response does (meaning the worker does not yet
   // know the scheduler).  As a result, "new worker" healthchecks are
@@ -631,7 +635,10 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       );
       workers_.mutableWorkerOrAbort(worker.shard)
         ->recordRunningTaskStatus(rt, status);
-      // IMPORTANT: Update TaskStatuses **inside** the workers_ lock
+      // IMPORTANT: Update TaskStatuses **inside** the workers_ lock,
+      // otherwise e.g.  a worker could get lost before cb runs, failing the
+      // TaskStatusSnapshot::updateStatus() check for "when a task is not
+      // running, the received status is not overwritable".
       cb(rt, std::move(status));
     }
   }

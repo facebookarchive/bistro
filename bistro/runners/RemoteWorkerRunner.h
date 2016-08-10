@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -77,7 +77,8 @@ public:
   cpp2::SchedulerHeartbeatResponse processWorkerHeartbeat(
     const cpp2::BistroWorker&,
     const cpp2::WorkerSetID&,
-    RemoteWorkerUpdate update = RemoteWorkerUpdate()  // for unit test
+    RemoteWorkerUpdate update = RemoteWorkerUpdate(),  // for unit test
+    std::function<void()> unit_test_cob = []() {}
   ) override;
 
   void remoteUpdateStatus(

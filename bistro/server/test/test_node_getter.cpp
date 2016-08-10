@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -42,15 +42,16 @@ class GetterTest : public ::testing::Test {
 
     dynamic c = dynamic::object
       ("nodes", dynamic::object
-        ("levels", {"host", "db"})
-        ("node_sources", {
+        ("levels", dynamic::array("host", "db"))
+        ("node_sources", dynamic::array(
           dynamic::object
             ("source", "manual")
             ("prefs", dynamic::object
-              ("host1", dynamic::object("children", {"host1.1"}))
+              ("host1",
+                dynamic::object("children", dynamic::array("host1.1")))
               ("host1.1", dynamic::object("disabled", true))
             )
-        })
+        ))
       )
       ("resources", dynamic::object
         ("host", kHostConcurrency)
@@ -109,7 +110,7 @@ TEST_F(GetterTest, GetEverythingForOne) {
         ("host1", dynamic::object("resources", kHostConcurrency)))
   );
   dynamic request = dynamic::object
-    ("nodes", {"host1"})("fields", dynamic::object());
+    ("nodes", dynamic::array("host1"))("fields", dynamic::object());
 
   dynamic res = monitor_->handleNodes(*config_, request);
   EXPECT_EQ(expected, res);
@@ -125,7 +126,7 @@ TEST_F(GetterTest, GetEverythingForOneOne) {
   );
 
   dynamic request = dynamic::object
-    ("nodes", {"host1.1"})("fields", dynamic::object());
+    ("nodes", dynamic::array("host1.1"))("fields", dynamic::object());
 
   dynamic res = monitor_->handleNodes(*config_, request);
   EXPECT_EQ(expected, res);
@@ -137,7 +138,9 @@ TEST_F(GetterTest, DisabledWhenHealthy) {
     dynamic::object("host", dynamic::object("host1", dynamic::object()))
   );
 
-  dynamic request = dynamic::object("nodes", {"host1"})("fields", {"disabled"});
+  dynamic request = dynamic::object
+    ("nodes", dynamic::array("host1"))
+    ("fields", dynamic::array("disabled"));
 
   dynamic res = monitor_->handleNodes(*config_, request);
   EXPECT_EQ(expected, res);
@@ -151,7 +154,8 @@ TEST_F(GetterTest, DisabledWhenDisabled) {
       ("host1.1", dynamic::object("disabled", true)))
   );
   dynamic request = dynamic::object
-    ("nodes", {"host1.1"})("fields", {"disabled"});
+    ("nodes", dynamic::array("host1.1"))
+    ("fields", dynamic::array("disabled"));
 
   dynamic res = monitor_->handleNodes(*config_, request);
   EXPECT_EQ(expected, res);
@@ -159,7 +163,8 @@ TEST_F(GetterTest, DisabledWhenDisabled) {
 
 TEST_F(GetterTest, ThrowOnUnknownField) {
   dynamic request = dynamic::object
-    ("nodes", {"host1"})("fields", {"UnkownField"});
+    ("nodes", dynamic::array("host1"))
+    ("fields", dynamic::array("UnkownField"));
   EXPECT_THROW(monitor_->handleNodes(*config_, request), std::runtime_error);
 }
 

@@ -6,11 +6,13 @@
   },
   "nodes" : {
     "levels": [ "level1", "level2"],
-    "node_source": "manual",
-    "node_source_prefs": {
-      "node1": ["node11", "node12"],
-      "node2": ["node21", "node22"]
-    }
+    "node_sources": [{
+      "source": "manual",
+      "prefs": {
+      	"node1": ["node11", "node12"],
+      	"node2": ["node21", "node22"]
+      }
+    }]
   },
   "enabled" : true
 },

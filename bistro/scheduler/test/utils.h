@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -37,8 +37,10 @@ template<class Scheduler>
 TaskCatcher mock_schedule(bool add_third_job = false) {
   Config config(folly::dynamic::object
     ("nodes", folly::dynamic::object
-      ("levels", { "host", "db" })
-      ("node_source", "range_label")
+      ("levels", folly::dynamic::array("host", "db"))
+      ("node_sources", folly::dynamic::array(
+        folly::dynamic::object("source", "range_label")
+      ))
     )
     ("resources", folly::dynamic::object
       ("host", folly::dynamic::object
@@ -77,7 +79,7 @@ TaskCatcher mock_schedule(bool add_third_job = false) {
         ("priority", 100.0)
         ("filters", folly::dynamic::object
           ("db", folly::dynamic::object
-            ("whitelist", { "db12" })
+            ("whitelist", folly::dynamic::array("db12"))
           )
         ),
       nullptr

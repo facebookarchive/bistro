@@ -24,9 +24,8 @@
 DECLARE_int32(CAUTION_startup_wait_for_workers);
 DECLARE_int32(incremental_sleep_ms);
 
-using namespace std;
 using namespace facebook::bistro;
-using namespace folly;
+using folly::dynamic;
 
 struct TestRemoteRunner : public ::testing::Test {
   TestRemoteRunner() {
@@ -57,7 +56,8 @@ cpp2::WorkerSetID addToWorkerSetID(
 // Wait for RemoteWorkerRunner to realize that the initial wait is over.
 void waitToExitInitialWait(const RemoteWorkerRunner& runner) {
   while (runner.inInitialWaitForUnitTest()) {
-    /* sleep override */ this_thread::sleep_for(std::chrono::milliseconds(5));
+    /* sleep override */
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
 }
 
@@ -137,9 +137,9 @@ TEST_F(TestRemoteRunner, HandleResources) {
     [&worker_id](cpp2::BistroWorker* w) { w->id = worker_id; }
   );
 
-  const auto kConfig = make_shared<Config>(dynamic::object
+  const auto kConfig = std::make_shared<Config>(dynamic::object
     ("enabled", true)
-    ("nodes", dynamic::object("levels", {}))
+    ("nodes", dynamic::object("levels", dynamic::array()))
     ("resources", dynamic::object
       ("worker", dynamic::object
         ("concurrency", dynamic::object
@@ -149,10 +149,11 @@ TEST_F(TestRemoteRunner, HandleResources) {
       )
     ));
 
-  auto task_statuses = make_shared<TaskStatuses>(make_shared<NoOpTaskStore>());
-  RemoteWorkerRunner runner(task_statuses, shared_ptr<Monitor>());
+  auto task_statuses =
+    std::make_shared<TaskStatuses>(std::make_shared<NoOpTaskStore>());
+  RemoteWorkerRunner runner(task_statuses, std::shared_ptr<Monitor>());
 
-  auto job = make_shared<Job>(*kConfig, "foo_job", kJob);
+  auto job = std::make_shared<Job>(*kConfig, "foo_job", kJob);
   Node node1("test_node1");
   Node node2("test_node2");
 
@@ -217,9 +218,9 @@ TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
     }
   );
 
-  const auto kConfig = make_shared<Config>(dynamic::object
+  const auto kConfig = std::make_shared<Config>(dynamic::object
     ("enabled", true)
-    ("nodes", dynamic::object("levels", {}))
+    ("nodes", dynamic::object("levels", dynamic::array()))
     ("resources", dynamic::object
       ("worker", dynamic::object
         ("my_ram_gb", dynamic::object("default", 3)("limit", 48))
@@ -290,7 +291,7 @@ void checkTasksRunOnWorkersLeavingResources(
     folly::Promise<folly::Unit> cob_ran;
     ASSERT_EQ(TaskRunnerResponse::RanTask, runner->runTask(
       *config,
-      make_shared<Job>(*config, std::get<0>(t), dynamic::object
+      std::make_shared<Job>(*config, std::get<0>(t), dynamic::object
         ("enabled", true)
         ("owner", "owner")
         ("resources", std::get<2>(t))
@@ -321,9 +322,9 @@ void checkTasksRunOnWorkersLeavingResources(
 }
 
 TEST_F(TestRemoteRunner, TestBusiestSelector) {
-  const auto kConfig = make_shared<Config>(dynamic::object
+  const auto kConfig = std::make_shared<Config>(dynamic::object
     ("enabled", true)
-    ("nodes", dynamic::object("levels", {}))
+    ("nodes", dynamic::object("levels", dynamic::array()))
     ("resources", dynamic::object
       ("worker", dynamic::object
         ("cheap", dynamic::object
@@ -359,8 +360,9 @@ TEST_F(TestRemoteRunner, TestBusiestSelector) {
     w->id = w2_id;
   });
 
-  auto task_statuses = make_shared<TaskStatuses>(make_shared<NoOpTaskStore>());
-  RemoteWorkerRunner runner(task_statuses, shared_ptr<Monitor>());
+  auto task_statuses =
+    std::make_shared<TaskStatuses>(std::make_shared<NoOpTaskStore>());
+  RemoteWorkerRunner runner(task_statuses, std::shared_ptr<Monitor>());
 
   cpp2::WorkerSetID wsid;
   wsid.schedulerID = runner.getSchedulerID();
@@ -529,9 +531,9 @@ TEST_F(TestRemoteRunner, TestBusiestSelector) {
 }
 
 TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
-  const auto kConfig = make_shared<Config>(dynamic::object
+  const auto kConfig = std::make_shared<Config>(dynamic::object
     ("enabled", true)
-    ("nodes", dynamic::object("levels", {}))
+    ("nodes", dynamic::object("levels", dynamic::array()))
     ("resources", dynamic::object
       ("worker", dynamic::object
         // Weight 1 so the "busiest" selector has a sort key.
@@ -584,8 +586,9 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
     w->usableResources.gpus.back().name = "b";
   });
 
-  auto task_statuses = make_shared<TaskStatuses>(make_shared<NoOpTaskStore>());
-  RemoteWorkerRunner runner(task_statuses, shared_ptr<Monitor>());
+  auto task_statuses =
+    std::make_shared<TaskStatuses>(std::make_shared<NoOpTaskStore>());
+  RemoteWorkerRunner runner(task_statuses, std::shared_ptr<Monitor>());
 
   cpp2::WorkerSetID wsid;
   wsid.schedulerID = runner.getSchedulerID();

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -33,14 +33,14 @@ cpp2::RunningTask makeRT(const string& job, const string& node) {
 
 dynamic c = dynamic::object
   ("nodes", dynamic::object
-    ("levels", {"host", "db"})
-    ("node_source", "manual")
-      ("node_source_prefs", dynamic::object
-        ("host", {"db1", "db2", "db3"})
-      )
-    )
+    ("levels", dynamic::array("host", "db"))
+    ("node_sources", dynamic::array(dynamic::object
+      ("source", "manual")
+      ("prefs", dynamic::object("host", dynamic::array("db1", "db2", "db3")))
+    ))
+  )
   ("resources", dynamic::object)
-  ("backoff", { "fail" })
+  ("backoff", dynamic::array("fail"))
 ;
 
 TEST(TestTaskStatuses, HandleTaskStore) {

@@ -258,13 +258,13 @@ dynamic HTTPMonitor::handleTaskLogs(const Config& c, const dynamic& d) {
   // Compose the output JSON
   dynamic lines = dynamic::array;
   for (const LogLine& l : log.lines) {
-    lines.push_back({  // No emplace for dynamic???
+    lines.push_back(dynamic::array(  // No emplace for dynamic???
       l.jobID,
       l.nodeID,
       l.time,
       l.line,
       folly::to<string>(l.lineID)  // JS has no int64
-    });
+    ));
   }
   dynamic res = dynamic::object
     ("next_line_id", folly::to<string>(log.nextLineID))  // JS has no int64
@@ -313,7 +313,8 @@ dynamic HTTPMonitor::handleJobs(
 dynamic HTTPMonitor::handleNodes(const Config& c, const dynamic& request) {
   dynamic responses = dynamic::object("results", dynamic::object());
 
-  bool no_node_filter = request.getDefault("nodes", dynamic{}).empty();
+  bool no_node_filter =
+    request.getDefault("nodes", dynamic::array()).empty();
   std::unordered_set<folly::fbstring> do_this_node;
   if (!no_node_filter) {
     for (auto name : request["nodes"]) {
@@ -322,7 +323,7 @@ dynamic HTTPMonitor::handleNodes(const Config& c, const dynamic& request) {
   }
 
   bool field_disabled = true, field_resources = true;
-  if (!request.getDefault("fields", dynamic{}).empty()) {
+  if (!request.getDefault("fields", dynamic::array()).empty()) {
     field_disabled = field_resources = false;
     for (const auto& field : request["fields"]) {
       const auto& fieldName = field.asString();
@@ -376,7 +377,7 @@ dynamic HTTPMonitor::handleSortedNodeNames(const Config& c) {
   auto nodes = nodesLoader_->getDataOrThrow();
   for (const auto& n : *nodes) {
     const auto& level = c.levels.lookup(n->level());
-    ret.setDefault(level, dynamic({})).push_back(n->name());
+    ret.setDefault(level, dynamic::array()).push_back(n->name());
   }
   return ret;
 }

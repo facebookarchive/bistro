@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -100,13 +100,13 @@ int cgFileFlags(cpp2::CGroupOptions opts) {
 bool writeToCGroupFile(
     std::vector<std::string>* errors,
     const boost::filesystem::path& dir,
-    const char* file,
+    folly::StringPiece basename,
     const int64_t value,
     int cgfile_flags,
     std::function<bool(int64_t, int64_t)> check_read_back_fn
       = assertReadBackSameValue) {
 
-  auto filename = (dir / file).native();
+  auto filename = (dir / basename.str()).native();
 
   if (!folly::writeFile(
     folly::to<std::string>(value), filename.c_str(), cgfile_flags

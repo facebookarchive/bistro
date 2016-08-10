@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -30,9 +30,11 @@ TEST(TestBenchmarkRunner, HandleTaskResult) {
   Config c(dynamic::object
     ("enabled", true)
     ("nodes", dynamic::object
-      ("levels", { "level1" , "level2" })
-      ("node_source", "range_label")
-      ("node_source_prefs", dynamic::object)
+      ("levels", dynamic::array("level1" , "level2"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "range_label")
+        ("prefs", dynamic::object)
+      ))
     )
     ("resources", dynamic::object)
   );

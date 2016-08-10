@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -35,17 +35,17 @@ using folly::dynamic;
 TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
   Config config(dynamic::object
     ("nodes", dynamic::object
-      ("levels", {"host", "db"})
+      ("levels", dynamic::array("host", "db"))
       ("node_order", "lexicographic")
-      ("node_sources", {
-        dynamic::object
+      ("node_sources", dynamic::array(dynamic::object
           ("prefs", dynamic::object
-            ("host1", {"host1.db2", "host1.db1"})
-            ("host2", {"host2.db2", "host2.db1", "host2.db_disabled"})
+            ("host1", dynamic::array("host1.db2", "host1.db1"))
+            ("host2",
+              dynamic::array("host2.db2", "host2.db1", "host2.db_disabled"))
             ("host2.db_disabled", dynamic::object("disabled", true))
           )
-          ("source", "manual"),
-      })
+          ("source", "manual")
+      ))
     )
     ("resources", dynamic::object
       ("host", dynamic::object
@@ -112,7 +112,7 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
   *policy_cob_ptr = [&](std::vector<JobWithNodes>& jwns, TaskRunnerCallback) {
     // Serialize our JobWithNodes to folly::dynamic for easy comparison.
     auto resources_to_dynamic_fn = [](const PackedResources& pr) {
-      folly::dynamic d{};
+      folly::dynamic d = dynamic::array();
       for (auto r : pr) { d.push_back(r); }
       return d;
     };
@@ -150,9 +150,16 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
           ("host2.db2", 6)
         )
         ("resources", dynamic::object
-          ("instance", dynamic::object("nodes_have", {})("job_needs", {}))
-          ("worker", dynamic::object("nodes_have", {})("job_needs", {}))
-          ("host", dynamic::object("nodes_have", {7, 4})("job_needs", {3}))
+          ("instance", dynamic::object
+            ("nodes_have", dynamic::array())("job_needs", dynamic::array())
+          )
+          ("worker", dynamic::object
+            ("nodes_have", dynamic::array())("job_needs", dynamic::array())
+          )
+          ("host", dynamic::object
+            ("nodes_have", dynamic::array(7, 4))
+            ("job_needs", dynamic::array(3))
+          )
           // Example interpretation: The last node is "host2.db_disabled",
           // where job2 consumed both "db_concurrency" slots.
           ("db",
@@ -160,11 +167,13 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
             config.resourceNames.lookup("db_concurrency")
                 < config.resourceNames.lookup("chicken")
                 ? dynamic::object
-                  ("nodes_have", {2, 5,  1, 3,  1, 2,  2, 5,  0, 2})
-                  ("job_needs", {2, 3})
+                  ("nodes_have",
+                    dynamic::array(2, 5,  1, 3,  1, 2,  2, 5,  0, 2))
+                  ("job_needs", dynamic::array(2, 3))
               : dynamic::object
-                  ("nodes_have", {5, 2,  3, 1,  2, 1,  5, 2,  2, 0})
-                  ("job_needs", {3, 2})
+                  ("nodes_have",
+                    dynamic::array(5, 2,  3, 1,  2, 1,  5, 2,  2, 0))
+                  ("job_needs", dynamic::array(3, 2))
           )
         )
       );

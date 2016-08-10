@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -37,7 +37,7 @@ TEST(TestKillDisabled, KillJobOrphans) {
   FLAGS_incremental_sleep_ms = 10;  // Threads exit quickly
 
   dynamic c = dynamic::object
-    ("nodes", dynamic::object("levels", {}))
+    ("nodes", dynamic::object("levels", dynamic::array()))
     ("kill_orphan_tasks_after_sec", 0)
     ("resources", dynamic::object)
     ("enabled", true);

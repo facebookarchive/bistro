@@ -61,13 +61,14 @@ DECLARE_int32(task_thread_pool_size);
 DECLARE_int32(incremental_sleep_ms);
 
 using namespace facebook::bistro;
+using folly::dynamic;
 
 struct TestLogWriter : public BaseLogWriter {
   struct TaskLogs {
     // These are separate since no reliable sequencing can exist between 3 FDs
     std::vector<std::string> stdout_;
     std::vector<std::string> stderr_;
-    std::vector<folly::dynamic> events_;
+    std::vector<dynamic> events_;
     std::vector<TestTimePoint> eventTimes_;
   };
 
@@ -293,18 +294,18 @@ void checkNormalTaskLogs(
   EXPECT_EQ(std::vector<std::string>{"stdout\n"}, logs.stdout_);
   EXPECT_EQ(std::vector<std::string>{"stderr\n"}, logs.stderr_);
   size_t event_idx = 0;
-  for (const auto& proto_expected_event : std::vector<folly::dynamic>{
-    folly::dynamic::object
+  for (const auto& proto_expected_event : std::vector<dynamic>{
+    dynamic::object
       ("event", "running")
-      ("command", folly::dynamic(cmd.begin(), cmd.end())),
+      ("command", dynamic(cmd.begin(), cmd.end())),
     // The next two can occur in either order, but this one is likelier:
-    folly::dynamic::object("event", "task_pipes_closed"),
-    folly::dynamic::object
+    dynamic::object("event", "task_pipes_closed"),
+    dynamic::object
       ("event", "process_exited")
       ("message", "exited with status 0"),
-    folly::dynamic::object
+    dynamic::object
       ("event", "got_status")
-      ("status", folly::dynamic::object("result_bits", 4)),
+      ("status", dynamic::object("result_bits", 4)),
   }) {
     // "pipes closed" and "process exited" can occur in either order, so
     // we'll try to swap them if the default order does not fit.
@@ -557,23 +558,24 @@ TEST_F(TestTaskSubprocessQueue, TermWaitKillWithStatusKilled) {
     EXPECT_EQ(0, logs.stdout_.size());
     EXPECT_EQ(0, logs.stderr_.size());
     size_t event_idx = 0;
-    for (auto& expected_event : std::vector<folly::dynamic>{
-      folly::dynamic::object
+    for (auto& expected_event : std::vector<dynamic>{
+      dynamic::object
         ("event", "running")
-        ("command", {}),  // I'm too lazy to check the command's contents.
-      folly::dynamic::object
+        // I'm too lazy to check the command's contents.
+        ("command", dynamic::array()),
+      dynamic::object
         ("event", "process_exited")
         ("raw_status", "done")
         // Since the task produced its own status, Bistro treats it as if it
         // succeded -- this message is the only evidence of the SIGKILL.
         ("message", "killed by signal 9"),
-      folly::dynamic::object
+      dynamic::object
         ("event", "task_pipes_closed")
         ("raw_status", "done"),
-      folly::dynamic::object
+      dynamic::object
         ("event", "got_status")
         ("raw_status", "done")
-        ("status", folly::dynamic::object("result_bits", 4)),
+        ("status", dynamic::object("result_bits", 4)),
     }) {
       auto event = logs.events_[event_idx++];
       event.erase("worker_host");

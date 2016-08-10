@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -74,8 +74,9 @@ private:
 
 };
 
+// Future: untemplate this, just call it kSymbolTableNotFound.
 template<class T>
-const int SymbolTable<T>::NotFound = -1;
+constexpr int SymbolTable<T>::NotFound = -1;
 
 typedef SymbolTable<std::string> StringTable;
 

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -48,8 +48,8 @@ TEST(TestLevelForTasks, InstanceNodeOnly) {
   EXPECT_EQ(getLocalHostName(), scheduleOne(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {})
-      ("node_sources", {dynamic::object("source", "empty")})
+      ("levels", dynamic::array())
+      ("node_sources", dynamic::array(dynamic::object("source", "empty")))
     )
   ));
 }
@@ -58,10 +58,11 @@ TEST(TestLevelForTasks, CanSelectLevel) {
   dynamic d = dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"l1"})
-      ("node_sources", {dynamic::object
-        ("source", "manual")("prefs", dynamic::object("a_node", {}))
-      })
+      ("levels", dynamic::array("l1"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "manual")
+        ("prefs", dynamic::object("a_node", dynamic::array()))
+      ))
     );
   EXPECT_EQ("a_node", scheduleOne(d));
   d["level_for_tasks"] = "instance";

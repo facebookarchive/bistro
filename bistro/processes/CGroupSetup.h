@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -74,13 +74,13 @@ private:
 
 namespace {
 // Files
-const char* kCGroupProcs = "cgroup.procs";
-const char* kNotifyOnRelease = "notify_on_release";
-const char* kCPUShares = "cpu.shares";
-const char* kMemoryLimitInBytes = "memory.limit_in_bytes";
+constexpr folly::StringPiece kCGroupProcs = "cgroup.procs";
+constexpr folly::StringPiece kNotifyOnRelease = "notify_on_release";
+constexpr folly::StringPiece kCPUShares = "cpu.shares";
+constexpr folly::StringPiece kMemoryLimitInBytes = "memory.limit_in_bytes";
 // Subsystems
-const char* kMemory = "memory";
-const char* kCPU = "cpu";
+constexpr folly::StringPiece kMemory = "memory";
+constexpr folly::StringPiece kCPU = "cpu";
 }  // anonymous namespace
 
 }}  // namespace facebook::bistro

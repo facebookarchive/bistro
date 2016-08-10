@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -20,8 +20,7 @@
 #include <folly/json.h>
 
 using namespace facebook::bistro;
-using namespace folly;
-using namespace std;
+using folly::dynamic;
 
 // This makes the test far more readable, and I don't know of a better way
 // to do this, since object isn't a type.  Please don't hate.
@@ -38,56 +37,59 @@ struct StubClock {
 };
 int64_t StubClock::t = 0;
 
-void fetch(double t, initializer_list<dynamic> items, Nodes *nodes) {
+void fetch(double t, std::initializer_list<dynamic> items, Nodes *nodes) {
   static bool initialized = false;
   if (!initialized){
     NodeFetcher::add(
-      "test_add_time", shared_ptr<NodeFetcher>(new AddTimeFetcher<StubClock>{})
+      "test_add_time",
+      std::shared_ptr<NodeFetcher>(new AddTimeFetcher<StubClock>{})
     );
     initialized = true;
   }
 
   StubClock::t = t;
 
-  Config config{obj
-    ("resources", obj)
-    ("nodes", obj
-      ("levels", { "my_level" })
-      ("node_sources", {
-        obj
+  Config config(dynamic::object
+    ("resources", dynamic::object)
+    ("nodes", dynamic::object
+      ("levels", dynamic::array("my_level"))
+      ("node_sources", dynamic::array(
+        dynamic::object
           ("source", "test_add_time")
-          ("prefs", obj
+          ("prefs", dynamic::object
             ("parent_level", "instance")
-            ("schedule", items)
-          ),
-      })
+            ("schedule", dynamic::array(items))
+          )
+      ))
     )
-  };
+  );
   NodesLoader::_fetchNodesImpl(config, nodes);
 }
 
 void check_schedule(  // Negative expected times mean "disabled node"
-  time_t cur_time, initializer_list<dynamic> items, vector<time_t> exp_times,
-  vector<Node::TagSet> exp_tags = {}
-) {
+    time_t cur_time,
+    std::initializer_list<dynamic> items,
+    std::vector<time_t> exp_times,
+    std::vector<Node::TagSet> exp_tags = {}) {
+
   Nodes nodes;
   fetch(cur_time, items, &nodes);
 
-  vector<string> exp_names;
-  vector<bool> exp_enabled;
+  std::vector<std::string> exp_names;
+  std::vector<bool> exp_enabled;
   for (auto t : exp_times) {
     exp_names.emplace_back(
-      format("{}:{}", nodes.getInstance()->name(), abs(t)).str()
+      folly::format("{}:{}", nodes.getInstance()->name(), std::abs(t)).str()
     );
     exp_enabled.push_back(t >= 0);
   }
 
   // Must sort nodes for determinism; string sort is good enough
   auto nodes_iter = iterate_non_instance_nodes(nodes);
-  vector<std::shared_ptr<const Node>> sorted_nodes{
+  std::vector<std::shared_ptr<const Node>> sorted_nodes{
     begin(nodes_iter), end(nodes_iter)
   };
-  sort(
+  std::sort(
     begin(sorted_nodes),
     end(sorted_nodes),
     [](std::shared_ptr<const Node> a, std::shared_ptr<const Node> b){
@@ -95,9 +97,9 @@ void check_schedule(  // Negative expected times mean "disabled node"
     }
   );
 
-  vector<string> names;
-  vector<bool> enabled;
-  vector<Node::TagSet> tags;
+  std::vector<std::string> names;
+  std::vector<bool> enabled;
+  std::vector<Node::TagSet> tags;
   for (const auto &node : sorted_nodes) {
     EXPECT_EQ(1, node->level());
     EXPECT_EQ(nodes.getInstance(), node->parent());
@@ -116,7 +118,7 @@ void check_schedule(  // Negative expected times mean "disabled node"
 TEST(TestAddTimeFetcher, TestLifetimeMandatory) {
   EXPECT_THROW(
     check_schedule(4, {obj("cron", obj("epoch", obj("period", 4)))}, {4}),
-    runtime_error
+    std::runtime_error
   );
 }
 
@@ -192,11 +194,11 @@ TEST(TestAddTimeFetcher, TestMultiItemWithTags) {
     {
       obj
         ("lifetime", 8)
-        ("tags", {"x"})
+        ("tags", dynamic::array("x"))
         ("cron", obj("epoch", obj("period", 2)("start", 1))),
       obj
         ("lifetime", 6)
-        ("tags", {"y"})
+        ("tags", dynamic::array("y"))
         ("cron", obj("epoch", obj("period", 3)("start", 2))),
     },
     {23, 25, 26, 27, 29},
@@ -217,9 +219,10 @@ TEST(TestAddTimeFetcher, TestStandardCron) {
       ("lifetime", 14400)  // 4 hours -- anything after 01:53:20
       ("enabled_lifetime", 900)  // 15 minutes -- anything after 05:38:20
       ("cron", obj  // disabled 1:58 & 5:33, enabled 5:47
-        ("minute", {33, 47, 58})
+        ("minute", dynamic::array(33, 47, 58))
         ("hour", obj("start", 1)("period", 4))
-        ("dst_fixes", {"skip", "repeat_use_both"})  // required but irrelevant
+        // required but irrelevant
+        ("dst_fixes", dynamic::array("skip", "repeat_use_both"))
       )
     },
     {-35880, -48780, 49620}

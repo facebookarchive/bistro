@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -31,12 +31,14 @@ using namespace apache::thrift;
 namespace {
 const dynamic c = dynamic::object
   ("nodes", dynamic::object
-    ("levels", {"level1", "level2"})
-    ("node_source", "manual")
-    ("node_source_prefs", dynamic::object
-      ("node1", {"node11", "node12"})
-      ("node2", {"node21", "node22"})
-    )
+    ("levels", dynamic::array("level1", "level2"))
+    ("node_sources", dynamic::array(dynamic::object
+      ("source", "manual")
+      ("prefs", dynamic::object
+        ("node1", dynamic::array("node11", "node12"))
+        ("node2", dynamic::array("node21", "node22"))
+      )
+    ))
   )
   ("resources", dynamic::object)
   ("enabled", true)

@@ -20,17 +20,18 @@
 #include "bistro/bistro/utils/TemporaryFile.h"
 
 using namespace facebook::bistro;
-using namespace folly;
-using namespace std;
+using folly::dynamic;
 
 DECLARE_int32(log_prune_frequency);
 
 const Config kConfig(dynamic::object
   ("enabled", true)
   ("nodes", dynamic::object
-    ("levels", { "level1" , "level2" })
-    ("node_source", "range_label")
-    ("node_source_prefs", dynamic::object)
+    ("levels", dynamic::array("level1" , "level2"))
+    ("node_sources", dynamic::array(dynamic::object
+      ("source", "range_label")
+      ("prefs", dynamic::object)
+    ))
   )
   ("resources", dynamic::object)
   // Need to make leaders for the signal to reach the `sleep` child process.
@@ -39,7 +40,8 @@ const Config kConfig(dynamic::object
 const dynamic kJob = dynamic::object
   ("enabled", true)
   ("owner", "owner")
-  ("backoff", {"fail"})  // Test the weird "no backoff" default backoff.
+  // Test the weird "no backoff" default backoff.
+  ("backoff", dynamic::array("fail"))
 ;
 
 struct TestLocalRunner : public ::testing::Test {
@@ -63,11 +65,11 @@ void checkDoneTaskAndLogs(
     std::vector<std::string> stdout,
     std::vector<std::string> stderr) {
 
-  auto job = make_shared<Job>(kConfig, "foo_job", d_job);
+  auto job = std::make_shared<Job>(kConfig, "foo_job", d_job);
   Node node("test_node");
 
   auto start_time = time(nullptr);
-  Synchronized<TaskStatus> status;
+  folly::Synchronized<TaskStatus> status;
   runner->runTask(
     kConfig,
     job,
@@ -81,16 +83,18 @@ void checkDoneTaskAndLogs(
 
   while (status->isRunning()) {
     /* sleep override */
-    this_thread::sleep_for(chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   ASSERT_TRUE(status->isDone());
 
-  for (const auto& logtype : vector<string>{"stdout", "stderr", "statuses"}) {
+  for (const auto& logtype : std::vector<std::string>{
+    "stdout", "stderr", "statuses"
+  }) {
     // A very basic log test of log retrieval, does not check most features.
     auto log = runner->getJobLogs(
       logtype,
-      vector<string>{job->name()},
-      vector<string>{node.name()},
+      std::vector<std::string>{job->name()},
+      std::vector<std::string>{node.name()},
       0,  // line_id
       true,  // is_ascending
       ".*.*"  // a match-all regex filter
@@ -104,7 +108,9 @@ void checkDoneTaskAndLogs(
       ASSERT_LE(start_time, log.lines[0].time);
       ASSERT_EQ(job->name(), log.lines[0].jobID);
       ASSERT_EQ(node.name(), log.lines[0].nodeID);
-      EXPECT_EQ("running", parseJson(log.lines[0].line)["event"].asString());
+      EXPECT_EQ(
+        "running", folly::parseJson(log.lines[0].line)["event"].asString()
+      );
       int proc_exit_idx = 2;
       if (folly::parseJson(log.lines[1].line)["event"]
           != "task_pipes_closed") {
@@ -155,7 +161,8 @@ TEST_F(TestLocalRunner, CustomCommand) {
   PCHECK(chmod(cmdFile_.getFilename().c_str(), 0700) == 0);
   LocalRunner runner("/bad/worker_command", tmpDir_.getPath());
   auto d_job = kJob;
-  d_job[kCommand] = folly::dynamic{cmdFile_.getFilename().native(), "o", "e"};
+  d_job[kCommand] =
+    dynamic::array(cmdFile_.getFilename().native(), "o", "e");
   checkDoneTaskAndLogs(&runner, d_job, {"o\n"}, {"e\n"});
 }
 
@@ -168,9 +175,9 @@ TEST_F(TestLocalRunner, HandleKill) {
   PCHECK(chmod(cmdFile_.getFilename().c_str(), 0700) == 0);
   LocalRunner runner(cmdFile_.getFilename(), tmpDir_.getPath());
 
-  auto job = make_shared<Job>(kConfig, "job", kJob);
+  auto job = std::make_shared<Job>(kConfig, "job", kJob);
   const size_t kNumNodes = 5;
-  Synchronized<std::vector<TaskStatus>> status_seqs[kNumNodes];
+  folly::Synchronized<std::vector<TaskStatus>> status_seqs[kNumNodes];
   folly::Synchronized<cpp2::RunningTask> rts[kNumNodes];
 
   auto assertTaskOnNode = [&](
@@ -194,7 +201,7 @@ TEST_F(TestLocalRunner, HandleKill) {
   };
 
   for (size_t i = 0; i < kNumNodes; ++i) {
-    Node node(to<string>("node", i));
+    Node node(folly::to<std::string>("node", i));
     runner.runTask(
       kConfig,
       job,

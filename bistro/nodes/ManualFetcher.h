@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -18,11 +18,13 @@ class Nodes;
 /**
  * NodeFetcher that is manually configured. The configuration format is:
  *
- * "node_source_prefs" : {
- *   "node1" : ["child1", "child2", "child3"],
- *   "node2" : ["child4", "child5", "child6"],
- *   "node3" : "node2"
- * }
+ *   "source": "manual",
+ *   "prefs" : {
+ *     "node1" : ["child1", "child2", "child3"],
+ *     "node2" : ["child4", "child5", "child6"],
+ *     "node3" : "node2",
+ *     "disabled_node4" : {"disabled": true, "children": ["child7"]}
+ *   }
  *
  * It's a map of node to list of children for that node. Any nodes not
  * listed in the children list of another node will default to being

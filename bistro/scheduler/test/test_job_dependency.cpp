@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -23,13 +23,15 @@ using namespace facebook::bistro;
 
 dynamic c = dynamic::object
   ("nodes", dynamic::object
-    ("levels", {"host", "db"})
-    ("node_source", "manual")
-      ("node_source_prefs", dynamic::object
-        ("host1", {"db11", "db12"})
-        ("host2", {"db21", "db22"})
+    ("levels", dynamic::array("host", "db"))
+    ("node_sources", dynamic::array(dynamic::object
+      ("source", "manual")
+      ("prefs", dynamic::object
+        ("host1", dynamic::array("db11", "db12"))
+        ("host2", dynamic::array("db21", "db22"))
       )
-    )
+    ))
+  )
   ("resources", dynamic::object
     ("host", dynamic::object
       ("host_concurrency", dynamic::object
@@ -53,7 +55,7 @@ TEST(TestDependencyScheduling, HandleInvalidDependency) {
     "job1",
     dynamic::object
       ("owner", "owner")
-      ("depends_on", {"job2"}),
+      ("depends_on", dynamic::array("job2")),
     nullptr
   );
 
@@ -79,7 +81,7 @@ TEST(TestDependencyScheduling, HandleAll) {
     dynamic::object
       ("owner", "owner")
       ("priority", 10.0)
-      ("depends_on", {"job2"}),
+      ("depends_on", dynamic::array("job2")),
     nullptr
   );
   config.addJob(

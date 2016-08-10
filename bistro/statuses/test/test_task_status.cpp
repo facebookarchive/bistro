@@ -113,7 +113,7 @@ TEST(TestTaskStatus, NeverStarted) {
 }
 
 void updateStatus(TaskStatus* s, TaskStatus&& new_status) {
-  JobBackoffSettings jbs(dynamic{ 1, 2, 4, "fail" });
+  JobBackoffSettings jbs(dynamic::array(1, 2, 4, "fail"));
   cpp2::RunningTask rt;
   rt.nextBackoffDuration = jbs.getNext(s->backoffDuration());
   s->update(rt, std::move(new_status));
@@ -290,7 +290,7 @@ TEST(TestTaskStatus, ToAndFromString) {
   );
   expectErrorFromString(
     ".* TypeError: .*, but had type `array'",
-    dynamic::object("result_bits", {})
+    dynamic::object("result_bits", dynamic::array())
   );
   expectErrorFromString(
     ".* Set exactly one required bit .*", dynamic::object("result_bits", 0)
@@ -360,15 +360,17 @@ TEST(TestTaskStatus, ToAndFromString) {
 
   // Try some valid "result_bits" with non-empty data
   expectStatusFromString(
-    TaskStatus::incomplete(makeDataPtr(dynamic::object("boof", {}))),
+    TaskStatus::incomplete(makeDataPtr(
+      dynamic::object("boof", dynamic::array())
+    )),
     dynamic::object
-      ("data", dynamic::object("boof", {}))
+      ("data", dynamic::object("boof", dynamic::array()))
       ("result_bits", static_cast<int>(TaskStatusBits::Incomplete))
   );
   expectStatusFromString(
-    TaskStatus::failed(makeDataPtr(dynamic{5, "6"})),
+    TaskStatus::failed(makeDataPtr(dynamic::array(5, "6"))),
     dynamic::object
-      ("data", {5, "6"})
+      ("data", dynamic::array(5, "6"))
       ("result_bits", static_cast<int>(TaskStatusBits::Failed))
   );
 
@@ -376,14 +378,14 @@ TEST(TestTaskStatus, ToAndFromString) {
   expectStatusFromString(
     TaskStatus::failed(),
     dynamic::object
-      ("data", {})
+      ("data", dynamic::array())
       ("result_bits", static_cast<int>(TaskStatusBits::Failed))
   );
 
   // Invalid "result" field
   expectErrorFromString(
     ".* TypeError: .*, but had type `array'",
-    dynamic::object("result", {})
+    dynamic::object("result", dynamic::array())
   );
   expectErrorFromString(
     ".* Need a valid \"result\" .*",
@@ -398,8 +400,8 @@ TEST(TestTaskStatus, ToAndFromString) {
 
   // Valid "result" fields, with and without data
   expectStatusFromString(
-    TaskStatus::failed(makeDataPtr(dynamic{5, "6"})),
-    dynamic::object("data", {5, "6"})("result", "failed")
+    TaskStatus::failed(makeDataPtr(dynamic::array(5, "6"))),
+    dynamic::object("data", dynamic::array(5, "6"))("result", "failed")
   );
   expectStatusFromString(
     TaskStatus::done(),

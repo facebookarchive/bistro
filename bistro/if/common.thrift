@@ -18,7 +18,12 @@ const i64 kNotALineID = -1;
 // == Changelog ==
 //  v1: Add WorkerSetID to SchedulerHeartbeatResponse, to be echoed
 //      by the worker with the next processHeartbeat.
-const i16 kProtocolVersion = 1;
+//  v2: Require a worker update since the new scheduler cannot know the
+//      correct duration to wait for tasks to get killed when an
+//      older-protocol worker is lost.  If needed, it is ok to revert the
+//      version bump since this is a "corner case" fix with a sane fallback.
+const i16 kProtocolVersion = 2;
+
 
 // NB: As implemented, GPUInfo in both the 'usable' and 'task' context is
 // always more stale than the msSinceEpoch in the containing
@@ -117,6 +122,11 @@ struct RunningTask {
   // The __isset bit here lets us distinguish whether resources were never
   // queried (not set), or if they aren't available (set to default).
   7: optional TaskPhysicalResources physicalResources,
+  // The scheduler dictates this to the workers, because this value is part
+  // of the scheduler's "safe wait after a task is lost" calculation.
+  //
+  // It's kind of lame for this to be per-task, but it makes the code easier.
+  8: i32 workerSuicideTaskKillWaitMs
 }
 
 // This structure isn't for incoming connections, use ServiceAddress for

@@ -139,7 +139,40 @@ TaskStatus TaskStatusSnapshot::updateStatus(
   auto task_id = std::make_pair(job_id, node_id);
   auto it = runningTasks_.find(task_id);
   if (it != runningTasks_.end()) {
-    // Cannot happen, RemoteWorker::recordNonRunningTaskStatus checks this.
+    // Cannot happen normally -- RemoteWorker::recordNonRunningTaskStatus
+    // checks the invocation ID against the worker's invocation ID.
+    //
+    // One way to trip this involves a task taking so long to exit that the
+    // scheduler decides to start a new copy.  When the task eventually
+    // **does** exit, the scheduler learns that it has double-started a
+    // task, and will crash here.  To understand the mechanism, and to read
+    // about a "fix", see the test DeathDueToTaskThatTookTooLongToKill.
+    //
+    // When a task is lost, its backoff will be set to a high enough value
+    // that we should not normally start a task while the old one is still
+    // terminating.  However, this can still trip, in either of these rare
+    // circumstances:
+    //  - The worker is unable to kill the task in a timely fashion, due to
+    //    extreme system load / kernel bugs / uninterruptible + unkillable
+    //    sleep, worker bugs, or cosmic rays.
+    //  - The scheduler is restarted before the backoff expires, forgets
+    //    the backoff (since it is not persisted as of this writing),
+    //    has no way of discovering the up-but-suicidal worker, and
+    //    so starts
+    //
+    // Yet another way this can trip is if the remote worker's "task exited
+    // after a suicide" message takes a very long time to reach the
+    // scheduler.  It is possible to mitigate this scenario, but it doesn't
+    // seem worth the complexity.
+    //
+    // I'm leaving this as a crash, so that we learn if these occur in
+    // practice. If they do, possible mitigations include:
+    //  - Continue sending heartbeats while committing suicide (requires
+    //    a bit of thought to do right.
+    //  - Persist backoff expirations.
+    //  - Have notifyFinished() tag "after suicide" task exit statuses with
+    //    a special bit, so that they can be ERRORs, while still CHECKing
+    //    for other, buggier instances of two simultaneous task instances.
     CHECK(it->second.invocationID == rt.invocationID)
       << "Cannot updateStatus since the invocation IDs don't match, new task "
       << debugString(rt) << " vs current task " << debugString(it->second)

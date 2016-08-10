@@ -15,6 +15,7 @@
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
+#include "bistro/bistro/remote/RemoteWorkerState.h"  // workerSuicide helper
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 
 namespace facebook { namespace bistro {
@@ -85,6 +86,8 @@ TaskRunnerResponse TaskRunner::runTask(
     bd.noMoreBackoffs = false;
     rt.nextBackoffDuration = job->backoffSettings().getNext(bd);
   }
+  rt.workerSuicideTaskKillWaitMs =
+    RemoteWorkerState::workerSuicideTaskKillWaitMs();
 
   return runTaskImpl(job, node, rt, job_args, cb);
 }

@@ -36,6 +36,8 @@ struct TestRemoteRunner : public ::testing::Test {
     FLAGS_incremental_sleep_ms = 10;
     // Minimize delay between RemoteWorkerRunner's updateState calls.
     FLAGS_worker_check_interval = 1;
+    // These tests are heavily threaded, and death tests don't work otherwise.
+    ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   }
 };
 
@@ -126,9 +128,13 @@ cpp2::WorkerSetID addFakeWorker(
   return wsid;
 }
 
+const int kDefaultBackoff = 5;
 const dynamic kJob = dynamic::object
   ("enabled", true)
-  ("owner", "owner");
+  ("owner", "owner")
+  // LostTasksHaveAMinimumBackoff below needs to know the default backoff.
+  // It also relies on there being exactly 1 backoff before failure.
+  ("backoff", dynamic::array(kDefaultBackoff, "fail"));
 
 TEST_F(TestRemoteRunner, HandleResources) {
   // Create the worker thread first so that the worker exits *after* the
@@ -329,6 +335,21 @@ struct TestRemoteRunnerWithOneTask : TestRemoteRunner {
     ASSERT_TRUE(cob_ran);
   }
 
+  TaskStatus getTaskStatus() {
+    auto snapshot = taskStatuses_->copySnapshot();
+    auto job_id = Job::JobNameTable->lookup(kOneTaskJobName);
+    auto node_id = Node::NodeNameTable->lookup(kOneTaskNodeName);
+    CHECK_NE(StringTable::NotFound, job_id);
+    CHECK_NE(StringTable::NotFound, node_id);
+    if (auto* status = snapshot.getPtr(
+      static_cast<Job::ID>(job_id), static_cast<Node::ID>(node_id)
+    )) {
+      LOG(INFO) << "Current status in TaskStatuses: " << status->toJson();
+      return *status;
+    }
+    LOG(FATAL) << "Got nullptr instead of a status";
+  }
+
   void missHealthcheckForWorker(
       int idx,
       std::function<void()> between_update_and_apply_cob = []() {}) {
@@ -384,6 +405,201 @@ TEST_F(TestRemoteRunnerWithOneTask, TaskExitedRacesTaskLost) {
       stderr.readIncremental()
     );
   }
+}
+
+TEST_F(TestRemoteRunnerWithOneTask, DeathDueToTaskThatTookTooLongToKill) {
+  connectWorker(0);
+  runTask();
+  // First, make the worker unhealthy, then -- lost.
+  missHealthcheckForWorker(0);
+  missHealthcheckForWorker(0);
+  // Two version bumps: w1 joined -> 1, w1 died -> 2
+  connectWorker(1, /*worker set version*/ 2);
+  runTask();
+  // This tests one of several safeguards in Bistro, which ensure that it
+  // crashes when it detects that it has started two copies of one task.
+  //
+  // The reason this particular sequence of events triggers a CHECK is as
+  // follows:
+  //
+  //  - The lost task still exists on the worker, which is trying to
+  //    kill it off.
+  //
+  //  - The scheduler starts a new task on a different worker, violating
+  //    one of its cardinal promises (presumably because its "safety" wait
+  //    was too short, or the worker machine's kernel had serious issues
+  //    with killing a task).
+  //
+  //  - The lost task's exit status finally arrives. Since each
+  //    RemoteWorker tracks its own runningTasks_, it concludes that
+  //    this is just updating the "lost" status for the task with
+  //    a proper return value -- a supported operation. However,
+  //    TaskStatuses has a global view of runningTasks_, and so
+  //    TaskStatusSnapshot::updateStatus hits this invariant violation.
+  //
+  //    It would not be great to make this a non-CHECK for a variety of
+  //    reasons, although if there is a real, practical case where
+  //    converting the CHECK to an ERROR would be desirable, speak up.
+  EXPECT_DEATH(
+    {
+      workers_[0]->workerMayReturnStatus_.setValue(TaskStatus::done());
+      // This is triggered **after** the call to remoteUpdateStatus(), which
+      // is where the CHECK would have to happen.  We have to explicitly
+      // wait for this, since gtest's "threadsafe" mode seems to skip
+      // destructors, and just fast-exit immediately after it runs the
+      // "death" code.
+      workers_[0]->workerReturnedStatus_.getFuture().get();
+    },
+    // This message TaskStatusSnapshot::updateStatus asserts that the old,
+    // lost worker sent "done" after a new task was already running -- in
+    // other words, the scheduler must have screwed and started a second
+    // copy of a task **too soon**, and therefore must crash to ensure that
+    // this failure mode is surfaced.
+    //
+    // The one way that this can happen through no fault of the scheduler is
+    // if it takes a very long time to kill tasks due to kernel issues
+    // leaving them in unkillable D states.  However, this should be
+    // sufficiently rare that it is still worth surfacing as a crash.  If
+    // you are affected, one workaround is to increase the
+    // --CAUTION_worker_suicide_backoff_safety_margin_sec value to the point
+    // where the kernel definitely has enough time to kill such stale tasks.
+    ".* Check failed: it->second\\.invocationID == rt.invocationID Cannot "
+    "updateStatus since the invocation IDs don't match, new task "
+    "RunningTask \\{.*: workerShard \\(string\\) = \"test_worker_1\",.*"
+    ": workerShard \\(string\\) = \"test_worker_2\",.*\\} with status "
+    "\\{\"time\":[0-9]*,\"result_bits\":4\\}"
+  );
+}
+
+// When a worker is lost, its tasks **need** to be in backoff for long
+// enough that we are very confident that they have been killed
+// successfully.  Otherwise, we would start a second copy of a task while
+// the first is still being terminated, which breaks Bistro's contract.
+TEST_F(TestRemoteRunnerWithOneTask, LostTasksHaveAMinimumBackoff) {
+  // See the lostRunningTasks() handler in RemoteWorkerRunner for the details
+  const int32_t kExtendedBackoff =
+    60 +  // CAUTION_worker_suicide_backoff_safety_margin_sec
+    5 + 1;  // CAUTION_worker_suicide_task_kill_wait_ms
+  ASSERT_GT(kExtendedBackoff, kDefaultBackoff);
+
+  connectWorker(0);
+  runTask();
+  // First, make the worker unhealthy, then -- lost.
+  missHealthcheckForWorker(0);
+  missHealthcheckForWorker(0);
+  // Check that once the task stops running, it has the expected lost status.
+  // We haven't fulfilled `workerMayReturnStatus_` yet, so this can only
+  // be the intermediate lost status.
+  while (true) {
+    auto status = getTaskStatus();
+    if (!status.isRunning()) {
+      EXPECT_FALSE(status.isDone());
+      EXPECT_FALSE(status.isFailed());
+      EXPECT_TRUE(status.isOverwriteable());
+      EXPECT_PCRE_MATCH(
+        "Remote worker lost \\(.*\\)",
+        status.dataThreadUnsafe()->at("exception").getString()
+      );
+      EXPECT_EQ(
+        "test_worker_1",
+        status.dataThreadUnsafe()->at("worker_shard").getString()
+      );
+      EXPECT_EQ(
+        kDefaultBackoff,
+        status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
+      );
+      // The next backoff value is computed on the basis of this struct.
+      EXPECT_FALSE(status.configuredBackoffDuration().noMoreBackoffs);
+      EXPECT_EQ(kDefaultBackoff, status.configuredBackoffDuration().seconds);
+      // But the effective backoff duration is longer.
+      auto expiration_time = status.timestamp() + kExtendedBackoff;
+      EXPECT_TRUE(status.isInBackoff(expiration_time - 1));
+      EXPECT_FALSE(status.isInBackoff(expiration_time));
+      break;
+    }
+  }
+  // The second half of this test will restart the same task, to see what
+  // happens when a task runs out of retries due to a worker being lost.
+  // The job permits exactly 1 backoff, and we have already used it.  The
+  // way to preserve the backoff without failing is `incompleteBackoff()`:
+  workers_[0]->workerMayReturnStatus_.setValue(TaskStatus::incompleteBackoff(
+    std::make_shared<dynamic>(dynamic::object())
+  ));
+  workers_[0]->workerReturnedStatus_.getFuture().get();
+
+  // Two version bumps: w1 joined -> 1, w1 died -> 2
+  connectWorker(1, /*worker set version*/ 2);
+  runTask();
+  // First, make the worker unhealthy, then -- lost.
+  missHealthcheckForWorker(1);
+  missHealthcheckForWorker(1);
+  // Check that once the task stops running, it has the expected lost status.
+  // This time around, the task fails due to being out of backoffs.
+  while (true) {
+    auto status = getTaskStatus();
+    if (!status.isRunning()) {
+      EXPECT_FALSE(status.isDone());
+      EXPECT_TRUE(status.isFailed());
+      EXPECT_TRUE(status.isOverwriteable());
+      EXPECT_PCRE_MATCH(
+        "Remote worker lost \\(.*\\)",
+        status.dataThreadUnsafe()->at("exception").getString()
+      );
+      EXPECT_EQ(
+        "test_worker_2",
+        status.dataThreadUnsafe()->at("worker_shard").getString()
+      );
+      EXPECT_EQ(
+        60,  // a magical constant from JobBackoffSettings::getNext :'-(
+        status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
+      );
+      // The next backoff value is computed on the basis of this struct.
+      EXPECT_TRUE(status.configuredBackoffDuration().noMoreBackoffs);
+      // No backoff, no duration (even though `60` was saved).
+      EXPECT_EQ(0, status.configuredBackoffDuration().seconds);
+      {
+        // The effective backoff duration is intact.
+        auto expiration_time = status.timestamp() + kExtendedBackoff;
+        EXPECT_TRUE(status.isInBackoff(expiration_time - 1));
+        EXPECT_FALSE(status.isInBackoff(expiration_time));
+      }
+
+      // Now, let's try to forgive the status, to ensure that the extended
+      // backoff is preserved, but the configured backoff is forgiven.
+      taskStatuses_->forgiveJob(kOneTaskJobName);
+
+      auto new_status = getTaskStatus();
+      EXPECT_FALSE(new_status.isDone());
+      EXPECT_FALSE(new_status.isFailed());
+      EXPECT_TRUE(new_status.isOverwriteable());
+      EXPECT_PCRE_MATCH(
+        "Remote worker lost \\(.*\\)",
+        new_status.dataThreadUnsafe()->at("exception").getString()
+      );
+      EXPECT_EQ(
+        "test_worker_2",
+        new_status.dataThreadUnsafe()->at("worker_shard").getString()
+      );
+      EXPECT_EQ(
+        0,  // was reset by forgive()
+        new_status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
+      );
+      // The next backoff value is computed on the basis of this struct.
+      EXPECT_FALSE(new_status.configuredBackoffDuration().noMoreBackoffs);
+      EXPECT_EQ(0, new_status.configuredBackoffDuration().seconds);
+      {
+        // The effective backoff duration is intact.
+        auto expiration_time = new_status.timestamp() + kExtendedBackoff;
+        EXPECT_TRUE(new_status.isInBackoff(expiration_time - 1));
+        EXPECT_FALSE(new_status.isInBackoff(expiration_time));
+      }
+
+      break;
+    }
+  }
+  // Fulfill our promises just to avoid BrokenPromise logspam.
+  workers_[1]->workerMayReturnStatus_.setValue(TaskStatus::done());
+  workers_[1]->workerReturnedStatus_.getFuture().get();
 }
 
 TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {

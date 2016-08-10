@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -38,6 +38,27 @@ DEFINE_int32(
   "consensus does not perfectly match our non-MUST_DIE worker set -- at the "
   "time of writing, I see no benefit to waiting longer. For more detail, "
   "see README.worker_set_consensus."
+);
+DEFINE_int32(
+  CAUTION_worker_suicide_backoff_safety_margin_sec, 60,
+  "When a worker commits suicide, it will TERM-wait-KILLs its tasks. Since "
+  "task termination is not instant, the scheduler needs a safety margin to "
+  "add into its 'safe initial wait' calculation, and also into the "
+  "'minimum backoff for tasks of lost workers'. This margin must also "
+  "indirectly account for the fact that Bistro's workers poll running tasks "
+  "tasks only once every 'poll_ms' -- so keep this margin large."
+);
+DEFINE_int32(
+  CAUTION_worker_suicide_task_kill_wait_ms, 5000,
+  "The scheduler (NOT the worker -- the worker ignores this flag) includes "
+  "this value with every task it starts. When, in the future, the worker "
+  "commits suicide (i.e. due to a too-long network partition, or a scheduler "
+  "request), it will SIGTERM the task, wait this long, and then SIGKILL. "
+  "The scheduler needs this value to add into its 'safe initial wait' "
+  "calculation, and into the 'minimum backoff for tasks of lost workers'. "
+  "CAUTION: Therefore, if you lower this delay on a scheduler with running "
+  "tasks, you will significantly increase the risk that the scheduler "
+  "will start a second copy of a task before the previous one has exited."
 );
 
 namespace facebook { namespace bistro {
@@ -509,13 +530,16 @@ void RemoteWorkers::updateInitialWait(RemoteWorkerUpdate* update) {
     return;
   }
 
-  time_t min_safe_wait =
+  const time_t kMinSafeWait =
     RemoteWorkerState::maxHealthcheckGap() +
     RemoteWorkerState::loseUnhealthyWorkerAfter() +
-    RemoteWorkerState::workerCheckInterval();  // extra safety gap
+    RemoteWorkerState::workerCheckInterval() +  // extra safety gap
+    RemoteWorkerState::workerSuicideBackoffSafetyMarginSec() +
+    (RemoteWorkerState::workerSuicideTaskKillWaitMs() / 1000) + 1;
+
   time_t min_start_time = update->curTime();
   if (FLAGS_CAUTION_startup_wait_for_workers < 0) {
-    min_start_time -= min_safe_wait;
+    min_start_time -= kMinSafeWait;
   } else {
     min_start_time -= FLAGS_CAUTION_startup_wait_for_workers;
     if (RemoteWorkerState::maxHealthcheckGap()
@@ -528,10 +552,10 @@ void RemoteWorkers::updateInitialWait(RemoteWorkerUpdate* update) {
         "likely that you will start second copies of tasks that are ",
         "already running (unless your heartbeat interval is much smaller). "
       );
-    } else if (min_safe_wait > FLAGS_CAUTION_startup_wait_for_workers) {
+    } else if (kMinSafeWait > FLAGS_CAUTION_startup_wait_for_workers) {
       msg += folly::to<std::string>(
         "Your custom --CAUTION_startup_wait_for_workers is ",
-        "less than the minimum safe value of ", min_safe_wait,
+        "less than the minimum safe value of ", kMinSafeWait,
         " -- this increases the risk of starting second copies of tasks ",
         "that were already running. "
       );

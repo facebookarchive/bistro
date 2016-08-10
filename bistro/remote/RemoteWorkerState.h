@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -21,6 +21,8 @@ DECLARE_int32(heartbeat_grace_period);
 DECLARE_int32(healthcheck_period);
 DECLARE_int32(healthcheck_grace_period);
 DECLARE_int32(lose_unhealthy_worker_after);
+DECLARE_int32(CAUTION_worker_suicide_backoff_safety_margin_sec);
+DECLARE_int32(CAUTION_worker_suicide_task_kill_wait_ms);
 
 namespace facebook { namespace bistro {
 
@@ -154,6 +156,14 @@ struct RemoteWorkerState {
 
   static int32_t workerCheckInterval() {
     return std::max(1, FLAGS_worker_check_interval);
+  }
+
+  static int32_t workerSuicideBackoffSafetyMarginSec() {
+    return std::max(1, FLAGS_CAUTION_worker_suicide_backoff_safety_margin_sec);
+  }
+
+  static int32_t workerSuicideTaskKillWaitMs() {
+    return std::max(1, FLAGS_CAUTION_worker_suicide_task_kill_wait_ms);
   }
 
   // Prepares the above worker health parameters to be sent to the worker.

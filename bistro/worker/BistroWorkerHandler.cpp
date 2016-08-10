@@ -51,12 +51,6 @@ DEFINE_string(
   "your overall system reliability."
 );
 DEFINE_int32(
-  worker_suicide_task_kill_wait_ms, 5000,
-  "When the worker is going down due to suicide (i.e. a too-long network "
-  "partition, or a scheduler request), it TERM-wait-KILLs its tasks. This "
-  "is how long it waits. A worker can easily take 10-100ms longer to exit."
-);
-DEFINE_int32(
   refresh_usable_physical_resources_sec, 60,
   "CGroups settings can change at runtime, altering our CPU or RAM "
   "allocation. nVidia GPUs can become lost. For both of these reasons, "
@@ -458,8 +452,7 @@ void BistroWorkerHandler::killTasksAndStop() noexcept {
   // While there are tasks, TERM-wait-KILL, rinse, and repeat.
   cpp2::KillRequest req;
   req.method = cpp2::KillMethod::TERM_WAIT_KILL;
-  req.killWaitMs = FLAGS_worker_suicide_task_kill_wait_ms;
-  std::chrono::milliseconds delay(req.killWaitMs);
+  // req's timeout is set per-task.
   while (true) {
     size_t num_running_tasks = 0;
     SYNCHRONIZED(runningTasks_) {
@@ -467,6 +460,7 @@ void BistroWorkerHandler::killTasksAndStop() noexcept {
         if (taskQueue_.isRunning(p.second)) {
           ++num_running_tasks;
         }
+        req.killWaitMs = p.second.workerSuicideTaskKillWaitMs;
         // This can throw if the task had just exited, or if its
         // signal-processing is backlogged.
         try {
@@ -477,11 +471,9 @@ void BistroWorkerHandler::killTasksAndStop() noexcept {
     if (num_running_tasks == 0) {
       break;
     }
-    /*sleep override*/ std::this_thread::sleep_for(delay);
-    // Barring 'D'-state tasks, our 'kill' implementation usually works in
-    // slightly more than the specified TERM-wait-KILL delay.  Minimize exit
-    // time by reducing the delay after the first try.
-    delay = std::chrono::milliseconds(10);  // Burn some CPU :D
+    /*sleep override*/ std::this_thread::sleep_for(
+      std::chrono::milliseconds(20)  // check 20 times per second
+    );
   }
   LOG(WARNING) << "Committing suicide";
   logStateTransitionFn_("suicide", worker_, nullptr);  // noexcept

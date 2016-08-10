@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -205,16 +205,26 @@ struct TestRemoteWorkersInitialWait : public ::testing::Test {
     FLAGS_healthcheck_period = 3;
     FLAGS_healthcheck_grace_period = 9;
     FLAGS_lose_unhealthy_worker_after = 27;
+    FLAGS_CAUTION_worker_suicide_backoff_safety_margin_sec = 81;
+    FLAGS_CAUTION_worker_suicide_task_kill_wait_ms = 243000;
   }
 };
 
-const time_t kSafeInitialWait = 27 + 9 + 3 + 1 + 1;
-
 // Check the timeouts with no workers.
 TEST_F(TestRemoteWorkersInitialWait, NoWorkers) {
+  const time_t kSafeInitialWait =
+    27 +  // lose_unhealthy_worker_after
+    // maxHealthcheckGap: _grace_period, _period, worker_check_interval
+    (9 + 3 + 1) +
+    1 +  // worker_check_interval
+    81 +  // CAUTION_worker_suicide_backoff_safety_margin_sec
+    243 + 1;  // CAUTION_worker_suicide_task_kill_wait_ms
+
   RemoteWorkers r(0, randInstanceID());
   // The last 3 shows that once the wait is over, it can't be turned back on.
-  for (time_t t : std::vector<time_t>{0, 1, 5, 39, 40, kSafeInitialWait, 3}) {
+  for (time_t t : std::vector<time_t>{
+    0, 1, 5, kSafeInitialWait - 2, kSafeInitialWait - 1, kSafeInitialWait, 3
+  }) {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, t);
     r.updateState(&update);
     if (t == kSafeInitialWait || t == 3) {

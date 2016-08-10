@@ -881,21 +881,60 @@ void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
     folly::AutoTimer<> timer(
         folly::to<std::string>("Updated statuses for ", num, " lost tasks"));
     for (const auto& id_and_task : update->lostRunningTasks()) {
-      // Note: This **will** decrease the retry count. This makes more sense
-      // than neverStarted() since the worker might have crashed **because**
-      // of this task.
-      auto status = TaskStatus::errorBackoff("Remote worker lost (crashed?)");
-      // Ensure that application-specific statuses (if they arrive while
-      // the worker is MUST_DIE but still associated) can overwrite the
-      // 'lost' status, but the 'lost' status cannot overwrite a real
-      // status that arrived between loseRunningTasks and this call.
-      status.markOverwriteable();
+      const auto& original_rt = id_and_task.second;
+      // When the scheduler loses a worker, the worker **should** also time
+      // out and try to kill all its task ASAP, even if there is a network
+      // partition.  However, its "suicide" handler uses a TERM-wait-KILL
+      // policy, leaving a short delay to let the tasks exit gracefully.
+      //
+      // Therefore, the scheduler cannot safely start a new instance of a
+      // lost task until this delay has elapsed.  "Backoff" is the normal
+      // way of specifying this in the scheduler.  However, this means the
+      // scheduler sets a higher effective backoff than what was set by the
+      // task's policy.  Then, `workerLost()` undergoes some contortions to
+      // save the policy-configured task backoff, so that the next task
+      // instance correctly computes the `getNext()` backoff.
+      //
+      // We add an extra safety margin because even with a SIGKILL, task
+      // death is not instant, and the "task finished" message may take some
+      // more time to travel from the worker to the scheduler.
+      //
+      // This does not deal with scenarios where the scheduler goes down and
+      // loses the backoff state.  This also does not handle situations
+      // where task termination or worker status delivery is so slow that
+      // the timeouts below are grossly violated.  Setting a high enough
+      // value of --CAUTION_worker_suicide_backoff_safety_margin_sec should
+      // help mitigate this.
+      //
+      // Future: If TaskSubprocessOpts were a member of RunningTask, it
+      // would be best to also add 10 * rt.subprocessOpts.pollMs here
+      // (this assumses that the EventBase threads aren't *too* backed up.
+      auto tweaked_rt = id_and_task.second;
+      const int32_t kSafeBackoffSec =
+        RemoteWorkerState::workerSuicideBackoffSafetyMarginSec()
+          + (tweaked_rt.workerSuicideTaskKillWaitMs == 0
+              ? RemoteWorkerState::workerSuicideTaskKillWaitMs()
+              : tweaked_rt.workerSuicideTaskKillWaitMs) / 1000
+          + 1;  // a lazy way of rounding up, same as in my "initial wait" math
+      if (kSafeBackoffSec > original_rt.nextBackoffDuration.seconds) {
+        // This safe value will be used even if `noMoreBackoffs` is true,
+        // and the task is forgiven -- `TaskStatus::forgive()` makes a
+        // special provision for this.
+        tweaked_rt.nextBackoffDuration.seconds = kSafeBackoffSec;
+      }
       // IMPORTANT: Do not call recordFailedTask here because the lost tasks
       // are automatically recorded by RemoteWorker::loseRunningTasks.  See
       // its code for an explanation of how we maintain status consistency
       // between RemoteWorker & TaskStatuses, even though the two updates
       // are not atomic.
-      taskStatuses_->updateStatus(id_and_task.second, std::move(status));
+      taskStatuses_->updateStatus(tweaked_rt, TaskStatus::workerLost(
+        original_rt.workerShard,
+        // Save the unmodified nextBackoffDuration value, since this is the
+        // job-configured backoff value the status would have had **after**
+        // the update().  Storing it before the update() is hacky, but who's
+        // watching?
+        original_rt.nextBackoffDuration.seconds
+      ));
     }
   }
   // This may change the state of a worker from NEW to UNHEALTHY. For

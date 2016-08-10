@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -30,7 +30,7 @@
 
 DECLARE_int32(heartbeat_period_sec);
 DECLARE_int32(incremental_sleep_ms);
-DECLARE_int32(worker_suicide_task_kill_wait_ms);
+DECLARE_int32(CAUTION_worker_suicide_task_kill_wait_ms);
 
 using namespace facebook::bistro;
 using namespace folly;
@@ -62,7 +62,7 @@ struct TestWorker : public ::testing::Test {
     // Make BackgroundThreads exit a lot faster.
     FLAGS_incremental_sleep_ms = 10;
     // Speed up HandleSuicide
-    FLAGS_worker_suicide_task_kill_wait_ms = 1000;
+    FLAGS_CAUTION_worker_suicide_task_kill_wait_ms = 1000;
   }
 };
 
@@ -198,7 +198,7 @@ struct TestSuicide : public TestWorker {
     // Make BackgroundThreads exit a lot faster.
     FLAGS_incremental_sleep_ms = 10;
     // Speed up HandleSuicide
-    FLAGS_worker_suicide_task_kill_wait_ms = 1000;
+    FLAGS_CAUTION_worker_suicide_task_kill_wait_ms = 1000;
   }
 
   void startTasks() {

@@ -66,6 +66,18 @@ namespace facebook { namespace bistro {
 using namespace std;
 using apache::thrift::debugString;
 
+namespace {
+template <typename... Args>
+bool consensusFail(const RemoteWorker& w, Args&&... args) {
+  if (!w.hasBeenHealthy()) {
+    LOG(WARNING) << "Worker " << w.getBistroWorker().shard
+      << " is not yet able to achieve consensus: "
+      << folly::to<std::string>(std::forward<Args>(args)...);
+  }
+  return false;
+}
+}  // anonymous namespace
+
 // A section of remote/README.worker_set_consensus documents this call.
 bool RemoteWorkers::consensusPermitsBecomingHealthy(const RemoteWorker& w)
     const {
@@ -75,30 +87,57 @@ bool RemoteWorkers::consensusPermitsBecomingHealthy(const RemoteWorker& w)
   CHECK_GE(
     initialWorkerSetIDs_.size(), indirectVersionsOfNonMustDieWorkers_.size()
   );
-  bool can_become_healthy =
-    // Is this worker aware of every non-MUST_DIE worker?
-    w.workerSetID().hasValue()
-    // Future: think if this can be relaxed to test indirectWorkerSetID().
-    && *w.workerSetID() == nonMustDieWorkerSetID_
-    // Does every non-MUST_DIE worker have an indirect version? -- we must
-    // test this, since the version is set only after a worker first echoes
-    // this scheduler's WorkerSetID.  If any worker lacks it, we don't have
-    // a safe consensus -- that worker might declare consensus with itself.
-    && indirectVersionsOfNonMustDieWorkers_.size()
-         == nonMustDieWorkerSetID_.hash.numWorkers
-    // Does each non-MUST_DIE worker's WorkerSetID indirectly require this
-    // worker?  "first associated" == "first WorkerSetID containing this
-    // worker", since RemoteWorkers::processHeartbeat guarantees it.
-    && w.firstAssociatedWorkerSetID().hasValue()
-    && !WorkerSetIDEarlierThan()(
-         indirectVersionsOfNonMustDieWorkers_.begin()->first,
-         w.firstAssociatedWorkerSetID()->version
-       );
-  if (!w.hasBeenHealthy() && can_become_healthy) {
+
+  // Is this worker aware of every non-MUST_DIE worker?
+  if (!w.workerSetID().hasValue()) {
+    return consensusFail(w, "It has no WorkerSetID");
+  }
+  // Future: think if this can be relaxed to test indirectWorkerSetID().
+  if (*w.workerSetID() != nonMustDieWorkerSetID_) {
+    return consensusFail(
+      w, "It has WorkerSetID ", debugString(*w.workerSetID()), " while "
+      "the scheduler has ", debugString(nonMustDieWorkerSetID_)
+    );
+  }
+
+  // Does every non-MUST_DIE worker have an indirect version? -- we must
+  // test this, since the version is set only after a worker first echoes
+  // this scheduler's WorkerSetID.  If any worker lacks it, we don't have
+  // a safe consensus -- that worker might declare consensus with itself.
+  if (indirectVersionsOfNonMustDieWorkers_.size()
+      != nonMustDieWorkerSetID_.hash.numWorkers) {
+    return consensusFail(
+      w, "Scheduler has ", indirectVersionsOfNonMustDieWorkers_.size(),
+      " non-MUST_DIE workers with indirect versions versus ",
+      nonMustDieWorkerSetID_.hash.numWorkers, " non-MUST_DIE workers"
+    );
+  }
+
+  // Does each non-MUST_DIE worker's WorkerSetID indirectly require this
+  // worker?  "first associated" == "first WorkerSetID containing this
+  // worker", since RemoteWorkers::processHeartbeat guarantees it.
+  if (!w.firstAssociatedWorkerSetID().hasValue()) {
+    return consensusFail(
+      w, "It has not yet echoed any WorkerSetID from the scheduler"
+    );
+  }
+  if (WorkerSetIDEarlierThan()(
+    indirectVersionsOfNonMustDieWorkers_.begin()->first,
+    w.firstAssociatedWorkerSetID()->version
+  )) {
+    return consensusFail(
+      w, "It first appeared in the following WorkerSetID: ",
+      w.firstAssociatedWorkerSetID()->version, " but an earlier one "
+      "is indirectly required by all non-MUST_DIE workers: ",
+      indirectVersionsOfNonMustDieWorkers_.begin()->first
+    );
+  }
+
+  if (!w.hasBeenHealthy()) {
     LOG(INFO) << "Worker " << w.getBistroWorker().shard << " has not been "
       << "healthy, but WorkerSetID consensus allows it.";
   }
-  return can_become_healthy;
+  return true;
 }
 
 namespace {

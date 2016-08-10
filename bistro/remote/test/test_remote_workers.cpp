@@ -122,24 +122,32 @@ TEST(TestRemoteWorkers, WorkerPools) {
   cpp2::WorkerSetHash wh;
 
   // getNextWorkerByHost
-  auto res = r.processHeartbeat(&update, w1, cpp2::WorkerSetID());
-  EXPECT_EQ(static_cast<int>(RemoteWorkerState::State::NEW), res->workerState);
-  addWorkerIDToHash(&wh, w1.id);
-  EXPECT_EQ(workerSetID(r, 1, wh), res->workerSetID);
-  EXPECT_EQ(IDSet{w1.id}, dredgeHostPool(r, "host1"));
+  {
+    auto res = r.processHeartbeat(&update, w1, cpp2::WorkerSetID());
+    EXPECT_EQ(
+      static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
+    );
+    addWorkerIDToHash(&wh, w1.id);
+    EXPECT_EQ(workerSetID(r, 1, wh), res->workerSetID);
+    EXPECT_EQ(IDSet{w1.id}, dredgeHostPool(r, "host1"));
 
-  res = r.processHeartbeat(&update, w2, cpp2::WorkerSetID());
-  EXPECT_EQ(static_cast<int>(RemoteWorkerState::State::NEW), res->workerState);
-  addWorkerIDToHash(&wh, w2.id);
-  EXPECT_EQ(workerSetID(r, 2, wh), res->workerSetID);
-  EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
+    res = r.processHeartbeat(&update, w2, cpp2::WorkerSetID());
+    EXPECT_EQ(
+      static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
+    );
+    addWorkerIDToHash(&wh, w2.id);
+    EXPECT_EQ(workerSetID(r, 2, wh), res->workerSetID);
+    EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
 
-  res = r.processHeartbeat(&update, w3, cpp2::WorkerSetID());
-  EXPECT_EQ(static_cast<int>(RemoteWorkerState::State::NEW), res->workerState);
-  addWorkerIDToHash(&wh, w3.id);
-  EXPECT_EQ(workerSetID(r, 3, wh), res->workerSetID);
-  EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
-  EXPECT_EQ(IDSet({w3.id}), dredgeHostPool(r, "host2"));
+    res = r.processHeartbeat(&update, w3, cpp2::WorkerSetID());
+    EXPECT_EQ(
+      static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
+    );
+    addWorkerIDToHash(&wh, w3.id);
+    EXPECT_EQ(workerSetID(r, 3, wh), res->workerSetID);
+    EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
+    EXPECT_EQ(IDSet({w3.id}), dredgeHostPool(r, "host2"));
+  }
 
   auto check_all_workers_fn = [&](std::vector<cpp2::BistroWorker> workers) {
     IDSet expected_ids;
@@ -166,35 +174,85 @@ TEST(TestRemoteWorkers, WorkerPools) {
   };
   check_all_workers_fn(std::vector<cpp2::BistroWorker>({w1, w2, w3}));
 
-  // Move a worker from one host to another
-  auto w1new = makeWorker("w1");
-  w1new.machineLock.hostname = "host2";
-  w1new.machineLock.port = 789;
-  ASSERT_NE(w1.id, w1new.id);
+  // Try and fail to replace w1 with another worker before w1 is lost.
   {
-    RemoteWorkerUpdate update2(
-      RemoteWorkerUpdate::UNIT_TEST_TIME, FLAGS_lose_unhealthy_worker_after + 1
-    );
+    auto check_worker_pools_unchanged_fn = [&]() {
+      EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
+      EXPECT_EQ(IDSet({w3.id}), dredgeHostPool(r, "host2"));
+      check_all_workers_fn(std::vector<cpp2::BistroWorker>({w1, w2, w3}));
+    };
 
-    res = r.processHeartbeat(&update2, w1new, cpp2::WorkerSetID());
-    EXPECT_EQ(
-      static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
-    );
-    removeWorkerIDFromHash(&wh, w1.id);
-    addWorkerIDToHash(&wh, w1new.id);
-    auto wsid = workerSetID(r, 5, wh);  // 1 deletion, 1 addition == 2 versions
-    EXPECT_EQ(wsid, res->workerSetID)
-      << debugString(wsid) << " != " << debugString(res->workerSetID);
+    auto w1new = makeWorker("w1");
+    w1new.machineLock.hostname = "host2";
+    w1new.machineLock.port = 789;
+    ASSERT_NE(w1.id, w1new.id);
 
-    // Sanity check: w1new should have bumped w1
-    EXPECT_EQ(1, update2.suicideWorkers().size());
-    EXPECT_EQ(w1.id, update2.suicideWorkers().begin()->second.id);
-    EXPECT_EQ(1, update2.newWorkers().size());
-    EXPECT_EQ(w1new.id, update2.newWorkers().begin()->second.id);
+    // w1new's heartbeat was rejected, and we ask it to commit suicide
+    {
+      RemoteWorkerUpdate update2(
+        RemoteWorkerUpdate::UNIT_TEST_TIME,
+        FLAGS_lose_unhealthy_worker_after - 1  // not long enough to lose w1
+      );
+      EXPECT_FALSE(
+        r.processHeartbeat(&update2, w1new, cpp2::WorkerSetID()).hasValue()
+      );
+      EXPECT_EQ(1, update2.suicideWorkers().size());
+      EXPECT_EQ(w1new.id, update2.suicideWorkers().begin()->second.id);
+      EXPECT_EQ(0, update2.newWorkers().size());
+      check_worker_pools_unchanged_fn();
+    }
+
+    // w1's heartbeat is still received OK (we used to hit a CHECK here)
+    {
+      RemoteWorkerUpdate update2(
+        RemoteWorkerUpdate::UNIT_TEST_TIME,
+        FLAGS_lose_unhealthy_worker_after - 1
+      );
+      auto res = r.processHeartbeat(&update2, w1, cpp2::WorkerSetID());
+      EXPECT_EQ(
+        static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
+      );
+      EXPECT_EQ(workerSetID(r, 3, wh), res->workerSetID);  // No change
+      EXPECT_EQ(0, update2.suicideWorkers().size());
+      EXPECT_EQ(1, update2.newWorkers().size());
+      EXPECT_EQ(w1.id, update2.newWorkers().begin()->second.id);
+      check_worker_pools_unchanged_fn();
+    }
   }
-  EXPECT_EQ(IDSet({w2.id}), dredgeHostPool(r, "host1"));
-  EXPECT_EQ(IDSet({w1new.id, w3.id}), dredgeHostPool(r, "host2"));
-  check_all_workers_fn(std::vector<cpp2::BistroWorker>({w1new, w2, w3}));
+
+  // Successfully move a worker from one host to another
+  {
+    auto w1new = makeWorker("w1");
+    w1new.machineLock.hostname = "host2";
+    w1new.machineLock.port = 789;
+    ASSERT_NE(w1.id, w1new.id);
+    {
+      RemoteWorkerUpdate update2(
+        RemoteWorkerUpdate::UNIT_TEST_TIME,
+        FLAGS_lose_unhealthy_worker_after + 1  // long enough to lose w1
+      );
+
+      auto res = r.processHeartbeat(&update2, w1new, cpp2::WorkerSetID());
+      EXPECT_EQ(
+        static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
+      );
+      removeWorkerIDFromHash(&wh, w1.id);
+      addWorkerIDToHash(&wh, w1new.id);
+      // 1 deletion, 1 addition == skip 2 versions
+      auto wsid = workerSetID(r, 5, wh);
+      EXPECT_EQ(wsid, res->workerSetID)
+        << debugString(wsid) << " != " << debugString(res->workerSetID);
+
+      // Sanity check: w1new should have bumped w1
+      EXPECT_EQ(1, update2.suicideWorkers().size());
+      EXPECT_EQ(w1.id, update2.suicideWorkers().begin()->second.id);
+      EXPECT_EQ(1, update2.newWorkers().size());
+      EXPECT_EQ(w1new.id, update2.newWorkers().begin()->second.id);
+    }
+    EXPECT_EQ(IDSet({w2.id}), dredgeHostPool(r, "host1"));
+    EXPECT_EQ(IDSet({w1new.id, w3.id}), dredgeHostPool(r, "host2"));
+    check_all_workers_fn(std::vector<cpp2::BistroWorker>({w1new, w2, w3}));
+  }
 }
 
 struct TestRemoteWorkersInitialWait : public ::testing::Test {

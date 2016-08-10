@@ -283,24 +283,12 @@ RemoteWorkers::processHeartbeat(
     ).second) << "Worker pool for hostname " << worker.machineLock.hostname
       << " already had " << " shard " << shard;
     worker_it = res.first;
-  } else {  // A RemoteWorker with this shard ID already exists
-    // If the hostname changed, move the worker to the new host pool
-    const auto& old_hostname =
-      worker_it->second->getBistroWorker().machineLock.hostname;
-    const auto& new_hostname = worker.machineLock.hostname;
-    if (new_hostname != old_hostname) {
-      // This might "invalidate" the nextShard_ iterator, but it's okay
-      // since the getNextWorker() implementation is robust.
-      CHECK(1 == mutableHostWorkerPool(old_hostname).erase(shard))
-        << "Inconsistency: did not find shard " << shard
-        << " in the worker pool for its hostname " << old_hostname;
-      CHECK(mutableHostWorkerPool(new_hostname).emplace(
-        shard, worker_it->second
-      ).second)
-        << "Changing hostname " << old_hostname << " to " << new_hostname
-        << ": target already had shard " << shard;
-    }
   }
+
+  // If the hostname changes, we will move the worker to the new host pool
+  const auto old_hostname =
+    worker_it->second->getBistroWorker().machineLock.hostname;
+
   // Update the worker's state (also update the hostname if needed)
   auto response = worker_it->second->processHeartbeat(
     update,
@@ -308,6 +296,25 @@ RemoteWorkers::processHeartbeat(
     worker_set_id,
     consensusPermitsBecomingHealthy(*worker_it->second)
   );
+
+  // Check for hostname changes **after** handling the heartbeat, since the
+  // heartbeat could have been rejected.  NB: I could also have ensured
+  // res.hasValue() here, but it seems fine to just test the symptom.
+  const auto& new_hostname =
+    worker_it->second->getBistroWorker().machineLock.hostname;
+  if (new_hostname != old_hostname) {
+    // This might "invalidate" the nextShard_ iterator, but it's okay
+    // since the getNextWorker() implementation is robust.
+    CHECK_EQ(1, mutableHostWorkerPool(old_hostname).erase(shard))
+      << "Inconsistency: did not find shard " << shard
+      << " in the worker pool for its hostname " << old_hostname;
+    CHECK(mutableHostWorkerPool(new_hostname).emplace(
+      shard, worker_it->second
+    ).second)
+      << "Changing hostname " << old_hostname << " to " << new_hostname
+      << ": target already had shard " << shard;
+  }
+
   // NB: We cannot call updateInitialWait() here since it relies on knowing
   // whether any of the workers are new, and doing that here makes each
   // heartbeat take O(# workers).

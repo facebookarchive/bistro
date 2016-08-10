@@ -32,6 +32,40 @@ using folly::dynamic;
 // node underneath.  However, the better fix is just to make the node
 // fetchers propagate disabled state properly.
 
+dynamic jobWithNodesToDynamic(
+    const Config& config,
+    std::vector<JobWithNodes>& jwns) {
+  auto resources_to_dynamic_fn = [](const PackedResources& pr) {
+    dynamic d = dynamic::array;
+    for (auto r : pr) { d.push_back(r); }
+    return d;
+  };
+
+  dynamic d = dynamic::object;
+  for (const auto& jn : jwns) {
+    auto& job_d = (d[jn.job()->name()] = dynamic::object);
+    auto& nodes_d = (job_d["node_offsets"] = dynamic::object);
+    for (const Node* n : jn.nodes) {
+      // Replicas are a hack: multiple nodes with the same name and
+      // different parents.  Ensure their offsets are all the same.
+      if (auto* existing_offset_ptr = nodes_d.get_ptr(n->name())) {
+        EXPECT_EQ(n->offset, existing_offset_ptr->asInt());
+      } else {
+        nodes_d[n->name()] = n->offset;
+      }
+    }
+    auto& rsrcs_d = (job_d["resources"] = dynamic::object);
+    for (const auto& ngr : jn.nodeGroupResources()) {
+      auto& rsrc_d =
+        (rsrcs_d[config.levels.lookup(ngr.first)] = dynamic::object);
+      rsrc_d["job_needs"] = resources_to_dynamic_fn(ngr.second.job_);
+      rsrc_d["nodes_have"] = resources_to_dynamic_fn(*ngr.second.nodes_);
+    }
+  }
+
+  return d;
+}
+
 TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
   Config config(dynamic::object
     ("nodes", dynamic::object
@@ -110,27 +144,7 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
   // This folly::Singleton pointer must live until after the schedule() call.
   auto policy_cob_ptr = UnitTestSchedulerPolicy::testPolicyCob();
   *policy_cob_ptr = [&](std::vector<JobWithNodes>& jwns, TaskRunnerCallback) {
-    // Serialize our JobWithNodes to folly::dynamic for easy comparison.
-    auto resources_to_dynamic_fn = [](const PackedResources& pr) {
-      folly::dynamic d = dynamic::array();
-      for (auto r : pr) { d.push_back(r); }
-      return d;
-    };
-    folly::dynamic d = dynamic::object;
-    for (const auto& jn : jwns) {
-      auto& job_d = (d[jn.job()->name()] = dynamic::object);
-      auto& nodes_d = (job_d["node_offsets"] = dynamic::object);
-      for (const Node* n : jn.nodes) {
-        nodes_d[n->name()] = n->offset;
-      }
-      auto& rsrcs_d = (job_d["resources"] = dynamic::object);
-      for (const auto& ngr : jn.nodeGroupResources()) {
-        auto& rsrc_d =
-          (rsrcs_d[config.levels.lookup(ngr.first)] = dynamic::object);
-        rsrc_d["job_needs"] = resources_to_dynamic_fn(ngr.second.job_);
-        rsrc_d["nodes_have"] = resources_to_dynamic_fn(*ngr.second.nodes_);
-      }
-    }
+    auto d = jobWithNodesToDynamic(config, jwns);
     // The offsets for these nodes will not show up in JobWithNodes, since
     // they are not eligible to run tasks.  However, the offsets are still
     // important to test (and this makes it clear that the "host" packed
@@ -140,7 +154,7 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
     EXPECT_EQ(8, getNodeVerySlow(*nodes_ptr, "host2.db_disabled")->offset);
     // Since we specified "node_order": "lexicographic", and there is only
     // one enabled job, the scheduler is deterministic.
-    folly::dynamic expected_d =
+    dynamic expected_d =
       dynamic::object("job", dynamic::object  // The only enabled job.
         // Stride of 2, since there are 2 "db" resources
         ("node_offsets", dynamic::object
@@ -151,10 +165,10 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
         )
         ("resources", dynamic::object
           ("instance", dynamic::object
-            ("nodes_have", dynamic::array())("job_needs", dynamic::array())
+            ("nodes_have", dynamic::array)("job_needs", dynamic::array)
           )
           ("worker", dynamic::object
-            ("nodes_have", dynamic::array())("job_needs", dynamic::array())
+            ("nodes_have", dynamic::array)("job_needs", dynamic::array)
           )
           ("host", dynamic::object
             ("nodes_have", dynamic::array(7, 4))
@@ -191,4 +205,128 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
   );
   EXPECT_TRUE(res.areTasksRunning_);
   EXPECT_EQ(expected_orphans, res.orphanTasks_);
+}
+
+struct ReplicaTest {
+  ReplicaTest()
+    : config_(dynamic::object
+        ("nodes", dynamic::object
+          ("levels", dynamic::array("host", "db"))
+          ("node_order", "lexicographic")
+          ("node_sources", dynamic::array(
+            dynamic::object
+              ("prefs", dynamic::object
+                ("host1", dynamic::array("db"))
+                ("host2", dynamic::array("db"))
+              )
+              ("source", "manual")
+          ))
+        )
+        ("resources", dynamic::object
+          ("db", dynamic::object
+            ("db_concurrency", dynamic::object("default", 1)("limit", 1))
+          )
+        )
+      ),
+      runner_(TaskStatus::running()),  // Tasks don't finish
+      nodesPtr_(std::make_shared<Nodes>()),
+      statuses_(std::make_shared<NoOpTaskStore>()) {
+
+    config_.schedulerType = SchedulerType::UnitTest;
+    config_.addJob("job", dynamic::object("owner", "owner"), nullptr);
+    NodesLoader::_fetchNodesImpl(config_, nodesPtr_.get());
+    statuses_.updateForConfig(config_);
+  }
+
+  Scheduler::Result checkSchedule(int db_concurrency_left) {
+    // This folly::Singleton pointer must live until after the schedule() call.
+    auto policy_cob_ptr = UnitTestSchedulerPolicy::testPolicyCob();
+    *policy_cob_ptr = [&](std::vector<JobWithNodes>& jwns, TaskRunnerCallback) {
+      auto d = jobWithNodesToDynamic(config_, jwns);
+      // If a task is already running on any "db" node, the isRunning()
+      // check will exclude it from the JobNodes structure.
+      dynamic node_offsets = dynamic::object;
+      if (db_concurrency_left == 1) {
+        node_offsets["db"] = 0;
+      }
+      // Since we specified "node_order": "lexicographic", and there is only
+      // one enabled job, the scheduler is deterministic.
+      dynamic expected_d =
+        dynamic::object("job", dynamic::object  // The only enabled job.
+          ("node_offsets", node_offsets)
+          ("resources", dynamic::object
+            ("instance", dynamic::object
+              ("nodes_have", dynamic::array)
+              ("job_needs", dynamic::array)
+            )
+            ("worker", dynamic::object
+              ("nodes_have", dynamic::array)
+              ("job_needs", dynamic::array)
+            )
+            ("host", dynamic::object
+              ("nodes_have", dynamic::array)
+              ("job_needs", dynamic::array)
+            )
+            // Example interpretation: The last node is "host2.db_disabled",
+            // where job2 consumed both "db_concurrency" slots.
+            ("db", dynamic::object
+              ("nodes_have", dynamic::array(db_concurrency_left))
+              ("job_needs", dynamic::array(1))
+            )
+          )
+        );
+      EXPECT_EQ(expected_d, d);
+      return 0;
+    };
+
+    return Scheduler().schedule(
+      time(nullptr),
+      config_,
+      nodesPtr_,
+      statuses_.copySnapshot(),
+      std::ref(catcher_),  // Ignored, the policy doesn't run anything anyway.
+      nullptr  // No monitor to collect errors
+    );
+  }
+
+  Config config_;
+  NoOpRunner runner_;
+  std::shared_ptr<Nodes> nodesPtr_;
+  TaskCatcher catcher_;
+  TaskStatuses statuses_;
+};
+
+TEST(TestScheduler, EnsureReplicasSharePackedResources) {
+  auto res = ReplicaTest().checkSchedule(1);
+  EXPECT_FALSE(res.areTasksRunning_);
+  EXPECT_EQ(0, res.orphanTasks_.size());
+}
+
+TEST(TestScheduler, EnsureBothReplicasCanRun) {
+  // There are two copies of the "db" node, try running on both.
+  for (size_t which_copy = 1; which_copy <= 2; ++which_copy) {
+    size_t seen_copies = 0;
+    // Re-make the test so we don't have to stop the task :D
+    ReplicaTest t;
+    for (const auto& node : *t.nodesPtr_) {
+      if (node->name() != "db") { continue; }
+      ++seen_copies;
+      if (seen_copies != which_copy) { continue; }
+
+      bool callback_ran = false;
+      auto job = t.config_.jobs.at("job");
+      t.runner_.runTask(
+        t.config_, job, *node,
+        nullptr, // no previous status
+        [&](const cpp2::RunningTask& rt, TaskStatus&& s) noexcept {
+          t.statuses_.updateStatus(job->id(), node->id(), rt, std::move(s));
+          callback_ran = true;
+        }
+      );
+      auto res = t.checkSchedule(0);
+      EXPECT_TRUE(callback_ran);
+      EXPECT_TRUE(res.areTasksRunning_);
+      EXPECT_EQ(0, res.orphanTasks_.size());
+    }
+  }
 }

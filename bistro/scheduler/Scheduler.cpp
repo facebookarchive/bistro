@@ -64,14 +64,31 @@ struct NodeGroup {
     }
     // Repeat the amounts for each node
     packed_resources.reserve(amounts.size() * nodes_.size());
-    for (size_t i = 0; i < nodes_.size(); ++i) {
-      // Compute node offsets into this NodeGroup's PackedResources.
+    // Replicas are a hack: multiple nodes with the same name and different
+    // parents.  They have to share the same packed resource, since they
+    // represent the same logical piece of work.  Future: model replicas as
+    // follows: runs on "db1_host1" -> uses "db1" and "host1" resources.
+    std::unordered_map<std::string, size_t> node_name_to_offset;
+    node_name_to_offset.reserve(nodes_.size());
+    for (auto* node : nodes_) {
+      // The node's offset into this NodeGroup's PackedResources is assigned
+      // by the first replica, and reused for all additional ones.
+      //
       // This is done **after** reordering to make deterministic tests easier.
-      nodes_[i]->offset = i * amounts.size();
-      packed_resources.insert(
-        packed_resources.end(), amounts.begin(), amounts.end()
-      );
+      auto offset_insert =
+        node_name_to_offset.emplace(node->name(), node_name_to_offset.size());
+      node->offset = offset_insert.first->second * amounts.size();
+      // If this is a new offset, add packed resources for it.
+      if (offset_insert.second) {
+        packed_resources.insert(
+          packed_resources.end(), amounts.begin(), amounts.end()
+        );
+      }
     }
+    CHECK_EQ(
+      node_name_to_offset.size() * amounts.size(),
+      packed_resources.size()
+    );
   }
 
   void reorderNodes(NodeOrderType order) {
@@ -136,11 +153,16 @@ void processRunningTasks(
   // node_group_packed_resources, and simultaneously detect orphans (running
   // tasks whose jobs or nodes are deleted or disabled).  After this pass,
   // only orphans will be left in node_to_tasks.
+  //
+  // With replica nodes, a task is considered an orphan only when all the
+  // replicas go down.  This isn't really the right behavior, but it's not
+  // so broken as to fix urgently.  Future: model replicas as follows: runs
+  // on "db1_host1" -> uses "db1" and "host1" resources.
   for (auto& lng : node_groups) {
     PackedResources& packed_resources =
       (*node_group_packed_resources)[lng.first];
     for (const auto& node : lng.second.nodes_) {
-      // Find orphans: keep only tasks, whose jobs are deleted or disabled
+      // Find orphans: keep only tasks, whose jobs are deleted or disabled.
       if (node->enabled()) {  // For orphans, disabled is the same as deleted.
         auto tasks = node_to_tasks.find(node->name());
         if (tasks != node_to_tasks.end()) {  // Does node have running tasks?

@@ -12,6 +12,7 @@
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/Node.h"
+#include "bistro/bistro/config/parsing_common.h"
 
 using namespace facebook::bistro;
 using namespace folly;
@@ -20,7 +21,7 @@ using namespace std;
 TEST(TestJob, HandleWorkerLocality) {
   Config c(dynamic::object
     ("resources", dynamic::object)
-    ("nodes", dynamic::object
+    (kNodes, dynamic::object
       ("levels", dynamic::array("level1", "level2"))
       ("node_sources", dynamic::array(
         dynamic::object("source", "range_label")

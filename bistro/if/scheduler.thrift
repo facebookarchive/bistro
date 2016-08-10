@@ -35,7 +35,7 @@ typedef map<string, BistroJobConfigFilters>
 
 struct BistroJobConfig {
   1: string name,
-  2: bool enabled,
+  2: bool enabled = 0,
   3: string owner,
   // Map of resource name => resources required
   4: stringToIntMap resources,
@@ -46,8 +46,8 @@ struct BistroJobConfig {
   9: list<i32> backoffValues,
   10: bool backoffRepeat,
   // createTime & modifyTime may not be set -- only valid if they're positive.
-  11: i64 createTime,
-  12: i64 modifyTime,
+  11: i64 createTime = 0,
+  12: i64 modifyTime = 0,
   13: string levelForTasks,
   14: string levelForHostPlacement,
   15: list<string> dependsOn,

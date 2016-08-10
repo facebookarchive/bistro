@@ -72,7 +72,6 @@ private:
   const std::vector<std::string> cgroupProcsPaths_;
 };
 
-namespace {
 // Files
 constexpr folly::StringPiece kCGroupProcs = "cgroup.procs";
 constexpr folly::StringPiece kNotifyOnRelease = "notify_on_release";
@@ -81,6 +80,5 @@ constexpr folly::StringPiece kMemoryLimitInBytes = "memory.limit_in_bytes";
 // Subsystems
 constexpr folly::StringPiece kMemory = "memory";
 constexpr folly::StringPiece kCPU = "cpu";
-}  // anonymous namespace
 
 }}  // namespace facebook::bistro

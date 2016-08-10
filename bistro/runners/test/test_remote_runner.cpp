@@ -344,7 +344,7 @@ TEST_F(TestRemoteRunner, TestBusiestSelector) {
       )
     )
     ("remote_worker_selector", "busiest")
-    ("worker_resources_override", dynamic::object
+    (kWorkerResourceOverride, dynamic::object
       // The second worker is slightly smaller, so we'll fill it first.
       ("w2", dynamic::object("cheap", 25))
     )

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -146,7 +146,7 @@ void processRunningTasks(
         if (tasks != node_to_tasks.end()) {  // Does node have running tasks?
           for (auto it = tasks->second.begin(); it != tasks->second.end();) {
             auto jobs_it = config.jobs.find((*it)->job);
-            if (jobs_it != config.jobs.end() && jobs_it->second->isEnabled()) {
+            if (jobs_it != config.jobs.end() && jobs_it->second->canRun()) {
               it = tasks->second.erase(it);  // Not a job or node orphan.
             } else {
               ++it;  // Leave orphans in the list.
@@ -286,7 +286,7 @@ Scheduler::Result Scheduler::schedule(
   std::vector<JobWithNodes> job_with_nodes;
   for (const auto& job_pair : shuffled(config.jobs)) {
     const auto& job = job_pair.second;
-    if (!job->isEnabled()) {
+    if (!job->canRun()) {
       continue;
     }
 

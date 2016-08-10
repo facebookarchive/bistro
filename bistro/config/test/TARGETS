@@ -15,6 +15,7 @@ cpp_unittest(
     ],
     deps = [
         '@/bistro/bistro/config:config_lib',
+        '@/folly/experimental:test_util',
     ],
 )
 

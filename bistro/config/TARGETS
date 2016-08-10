@@ -9,6 +9,7 @@ cpp_library(
         'JobFilters.cpp',
         'Node.cpp',
         'NodeOrderType.cpp',
+        'parsing_common.cpp',
         'SchedulerType.cpp',
         'RemoteWorkerSelectorType.cpp',
     ],
@@ -16,6 +17,7 @@ cpp_library(
         '@/bistro/bistro/if:common-cpp2',
         '@/bistro/bistro/utils:utils_lib',
         '@/folly:folly',
+        '@/folly/experimental:dynamic_parser',
         '@/bistro:headers',
     ],
     external_deps = [

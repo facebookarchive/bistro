@@ -285,7 +285,7 @@ TEST(TestTaskStatus, ToAndFromString) {
 
   // Invalid "result_bits"
   expectErrorFromString(
-    ".* Invalid leading character in conversion to integral: 'bad'",
+    ".* Invalid leading character.*: .bad.",
     dynamic::object("result_bits", "bad")
   );
   expectErrorFromString(

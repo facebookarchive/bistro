@@ -13,11 +13,13 @@
 #include <folly/Conv.h>
 #include <folly/Memory.h>
 #include <folly/json.h>
+#include <folly/experimental/DynamicParser.h>
 #include <limits>
 #include <thread>
 
-#include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/utils/Exception.h"
+#include "bistro/bistro/config/Job.h"
+#include "bistro/bistro/config/parsing_common.h"
 
 // Future: remove this once there is nobody using this.
 DEFINE_bool(
@@ -30,178 +32,16 @@ DEFINE_bool(
 
 namespace facebook { namespace bistro {
 
-namespace {  // If useful, export these to some utility file.
-const folly::dynamic* dynObjectPtr(
-    const folly::dynamic& d,
-    const folly::dynamic& key) {
-  const auto* p = d.get_ptr(key);
-  if (p && !p->isObject()) {
-    throw BistroException(key.asString(), " must be an object");
-  }
-  return p;
-}
-
-const folly::dynamic* dynArrayPtr(
-    const folly::dynamic& d,
-    const folly::dynamic& key) {
-  const auto* p = d.get_ptr(key);
-  if (p && !p->isArray()) {
-    throw BistroException(key.asString(), " must be an array");
-  }
-  return p;
-}
-
-const folly::Optional<std::string> dynGetString(
-    const folly::dynamic& d,
-    const folly::dynamic& key) {
-  if (const auto* p = d.get_ptr(key)) {
-    if (!p->isString()) {
-      throw BistroException(key.asString(), " must be a string");
-    }
-    return p->asString();
-  }
-  return folly::none;
-}
-
-const folly::Optional<bool> dynGetBool(
-    const folly::dynamic& d,
-    const folly::dynamic& key) {
-  if (const auto* p = d.get_ptr(key)) {
-    if (!p->isBool()) {
-      throw BistroException(key.asString(), " must be a boolean");
-    }
-    return p->asBool();
-  }
-  return folly::none;
-}
-
-const folly::Optional<int64_t> dynGetInt(
-    const folly::dynamic& d,
-    const folly::dynamic& key) {
-  if (const auto* p = d.get_ptr(key)) {
-    if (!p->isInt()) {
-      throw BistroException(key.asString(), " must be an integer");
-    }
-    return p->asInt();
-  }
-  return folly::none;
-}
-
-const folly::Optional<double> dynGetDouble(
-    const folly::dynamic& d,
-    const folly::dynamic& key) {
-  if (const auto* p = d.get_ptr(key)) {
-    if (!p->isDouble() && !p->isInt()) {
-      throw BistroException(key.asString(), " must be a double");
-    }
-    return p->asDouble();
-  }
-  return folly::none;
-}
-
+namespace {
 const ResourceVector& workerLevelResourcesRef(const Config& config) {
-  const int worker_level_id = config.levels.lookup("worker");
+  const int worker_level_id = checkedLookup(config.levels, "worker");
   CHECK(worker_level_id != StringTable::NotFound);
   CHECK(worker_level_id > 0);
   CHECK(worker_level_id < config.resourcesByLevel.size());
   return config.resourcesByLevel[worker_level_id];
 }
-}  // anonymous namespace
 
-namespace detail {
-void parseKillOrphanTasksAfter(
-    const folly::dynamic& d,
-    folly::Optional<std::chrono::milliseconds>* maybe_kill_orphans) {
-  if (const auto* kill_orphans = d.get_ptr("kill_orphan_tasks_after_sec")) {
-    if (kill_orphans->isBool()) {
-      if (kill_orphans->asBool()) {
-        *maybe_kill_orphans = std::chrono::milliseconds(0);
-      } else {
-        maybe_kill_orphans->clear();  // false overrides the command-line arg
-      }
-    } else if (kill_orphans->isNumber()) {
-      auto v = kill_orphans->asDouble();
-      if (v >= 0.0) {
-        *maybe_kill_orphans =
-          std::chrono::milliseconds(static_cast<int>(1000 * v));
-      }
-    } else {
-      throw BistroException(
-        "kill_orphan_tasks_after_sec must be a number or a boolean"
-      );
-    }
-  }
-}
-
-folly::dynamic cgroupOptionsToDynamic(const cpp2::CGroupOptions& cgopts) {
-  return folly::dynamic::object
-    (kRoot, cgopts.root)
-    (kSlice, cgopts.slice)
-    (kSubsystems,
-     folly::dynamic(cgopts.subsystems.begin(), cgopts.subsystems.end()))
-    (kKillWithoutFreezer, cgopts.killWithoutFreezer);
-}
-
-folly::dynamic taskSubprocessOptionsToDynamic(
-    const cpp2::TaskSubprocessOptions& opts) {
-  return folly::dynamic::object
-    (kPollMs, opts.pollMs)
-    (kMaxLogLinesPerPollInterval, opts.maxLogLinesPerPollInterval)
-    (kParentDeathSignal, opts.parentDeathSignal)
-    (kProcessGroupLeader, opts.processGroupLeader)
-    (kUseCanaryPipe, opts.useCanaryPipe)
-    (kCGroups, cgroupOptionsToDynamic(opts.cgroupOptions));
-}
-
-void parseTaskSubprocessOptions(
-    const folly::dynamic& d,
-    cpp2::TaskSubprocessOptions* opts) {
-  if (const auto* tso = dynObjectPtr(d, kTaskSubprocess)) {
-    if (const auto p = dynGetInt(*tso, kPollMs)) {
-      opts->pollMs = *p;
-    }
-    if (const auto p = dynGetInt(*tso, kMaxLogLinesPerPollInterval)) {
-      opts->maxLogLinesPerPollInterval = *p;
-    }
-    if (const auto p = dynGetInt(*tso, kParentDeathSignal)) {
-      opts->parentDeathSignal = *p;
-    }
-    if (const auto p = dynGetBool(*tso, kProcessGroupLeader)) {
-      opts->processGroupLeader = *p;
-    }
-    if (const auto p = dynGetBool(*tso, kUseCanaryPipe)) {
-      opts->useCanaryPipe = *p;
-    }
-    if (const auto* cgp = dynObjectPtr(*tso, kCGroups)) {
-      auto& cgopts = opts->cgroupOptions;
-      if (const auto p = dynGetString(*cgp, kRoot)) {
-        cgopts.root = p->toStdString();
-      }
-      if (const auto p = dynGetString(*cgp, kSlice)) {
-        cgopts.slice = p->toStdString();
-      }
-      if (const auto* p = dynArrayPtr(*cgp, kSubsystems)) {
-        // Important to reset here, or else re-parsing a job would add
-        // *another* copy of every subsystem.
-        cgopts.subsystems.clear();
-        for (const auto& s : *p) {
-          if (!s.isString()) {
-            throw BistroException("cgroups subsystems entries must be strings");
-          }
-          cgopts.subsystems.emplace_back(s.asString());
-        }
-      }
-      if (const auto p = dynGetBool(*cgp, kKillWithoutFreezer)) {
-        cgopts.killWithoutFreezer = *p;
-      }
-      // cpuShares and and memoryLimitInBytes will be populated on a
-      // per-task basis, based on their worker resources using
-      // PhysicalResourceConfig (below).  unitTestCreateFiles is for tests.
-    }
-  }
-}
-
-// You must also update RemoteWorkerRunner.cpp with the implementation.
+// You must also update RemoteWorkerRunner.cpp with the policy implementation.
 const std::map<
   cpp2::PhysicalResource, std::set<cpp2::PhysicalResourceEnforcement>
 > kResourceToSupportedEnforcements = {
@@ -218,310 +58,246 @@ const std::map<
   }},
 };
 
+cpp2::PhysicalResource physicalResourceFromString(const std::string& name) {
+  if (name == kRamMB) {
+    return cpp2::PhysicalResource::RAM_MBYTES;
+  } else if (name == kCPUCore) {
+    return cpp2::PhysicalResource::CPU_CORES;
+  } else if (name == kGPUCard) {
+    return cpp2::PhysicalResource::GPU_CARDS;
+  } else {
+    // NB: Not supporting GPU_MBYTES since we don't have a usable
+    // story for it at the moment.
+    throw std::invalid_argument("Unknown physical resource type");
+  }
+}
+
+cpp2::PhysicalResourceEnforcement physicalResourceEnforcementFromString(
+    const std::string& name) {
+  if (name == kNone) {
+    return cpp2::PhysicalResourceEnforcement::NONE;
+  } else if (name == kSoft) {
+    return cpp2::PhysicalResourceEnforcement::SOFT;
+  } else if (name == kHard) {
+    return cpp2::PhysicalResourceEnforcement::HARD;
+  } else {
+    throw std::invalid_argument("Unknown resource enforcement type");
+  }
+}
+
 void parsePhysicalResourceConfigs(
+    folly::DynamicParser* p,
     const Config& config,  // Resources must be parsed already.
-    const folly::dynamic& d_parent,
-    std::vector<cpp2::PhysicalResourceConfig>* rcfgs) {
-  if (const auto* prs = dynObjectPtr(d_parent, kPhysicalResources)) {
-    for (const auto& name_and_d : prs->items()) {
+    std::vector<cpp2::PhysicalResourceConfig>* rcfgs,
+    std::unordered_map<std::string, size_t>* logical_to_physical) {
+
+  const auto num_worker_resources = workerLevelResourcesRef(config).size();
+  p->optional(kPhysicalResources, [&]() {
+    p->objectItems([&](const std::string& name, const folly::dynamic&) {
       rcfgs->emplace_back();
       auto& rcfg = rcfgs->back();
-      rcfg.physical = [](const folly::dynamic& name) {
-        if (name == kRamMB) {
-          return cpp2::PhysicalResource::RAM_MBYTES;
-        } else if (name == kCPUCore) {
-          return cpp2::PhysicalResource::CPU_CORES;
-        } else if (name == kGPUCard) {
-          return cpp2::PhysicalResource::GPU_CARDS;
-        } else {
-          // NB: Not supporting GPU_MBYTES since we don't have a usable
-          // story for it at the moment.
-          throw BistroException("Bad physical resource: ", name.asString());
-        }
-      }(name_and_d.first);
-      if (!name_and_d.second.isObject()) {
-        throw BistroException("physical_resources entries must be objects");
-      }
-      if (const auto p = dynGetString(name_and_d.second, kLogicalResource)) {
-        rcfg.logical = p->toStdString();
+      const auto idx_of_rcfg = rcfgs->size() - 1;
+
+      rcfg.physical = physicalResourceFromString(name);
+      p->required(kLogicalResource, [&](std::string&& logical) {
+        rcfg.logical = std::move(logical);
         rcfg.logicalResourceID = config.resourceNames.lookup(rcfg.logical);
-        auto num_worker_resources = workerLevelResourcesRef(config).size();
         if (rcfg.logicalResourceID == StringTable::NotFound
             || rcfg.logicalResourceID >= num_worker_resources) {
           throw BistroException(
             "Physical resource maps to unknown resource ", rcfg.logical
           );
         }
-      } else {
-        throw BistroException(
-          kLogicalResource, " is required in physical_resources entries"
-        );
-      }
-      if (const auto p = dynGetDouble(name_and_d.second, kMultiplyLogicalBy)) {
-        if (*p < 1e-12) {  // Stay well away from machine precision
-          throw BistroException(kMultiplyLogicalBy, " too small: ", *p);
+        // Make an inverted index by the string name of the logical
+        // resource, since that's what workers report.  Do this at parse
+        // time, so that errors are attached to the appropriate entry.
+        if (!logical_to_physical->emplace(rcfg.logical, idx_of_rcfg).second) {
+          throw BistroException(
+            "Logical resource used in multiple physical_resources entries"
+          );
         }
-        rcfg.multiplyLogicalBy = *p;
-      }
-      if (const auto p = dynGetString(name_and_d.second, kEnforcement)) {
-        if (*p == kNone) {
-          rcfg.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
-        } else if (*p == kSoft) {
-          rcfg.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
-        } else if (*p == kHard) {
-          rcfg.enforcement = cpp2::PhysicalResourceEnforcement::HARD;
-        } else {
-          throw BistroException("Bad resource enforcement type: ", *p);
+      });
+      p->optional(kMultiplyLogicalBy, [&](double mul) {
+        if (std::abs(mul) < 1e-12) {
+          throw BistroException("Too close to 0 machine precision");
         }
+        rcfg.multiplyLogicalBy = mul;
+      });
+      p->optional(kEnforcement, [&](const std::string& enforcement) {
+        rcfg.enforcement = physicalResourceEnforcementFromString(enforcement);
         auto it = kResourceToSupportedEnforcements.find(rcfg.physical);
         if (it == kResourceToSupportedEnforcements.end()
             || !it->second.count(rcfg.enforcement)) {
           throw BistroException(
-            "Resource ", name_and_d.first.asString(), " does not support ",
-            "enforcement type ", *p
+            "Resource ", rcfg.physical, " does not support enforcement type"
           );
         }
-      }
-      if (auto p = dynGetDouble(name_and_d.second, kPhysicalReserveAmount)) {
+      });
+      p->optional(kPhysicalReserveAmount, [&](double reserve) {
         // Allow negative values for now... maybe there is some use?
-        rcfg.physicalReserveAmount = *p;
-      }
-    }
-  }
+        rcfg.physicalReserveAmount = reserve;
+      });
+    });
+  });
 }
+}  // anonymous namespace
 
-folly::dynamic killRequestToDynamic(const cpp2::KillRequest& req) {
-  return folly::dynamic::object
-    (kMethod, [&](){
-        switch (req.method) {
-          case cpp2::KillMethod::TERM_WAIT_KILL:
-            return kTermWaitKill;
-          case cpp2::KillMethod::TERM:
-            return kTerm;
-          case cpp2::KillMethod::KILL:
-            return kKill;
-          default:
-            throw BistroException(
-              "Unknown KillMethod ", static_cast<int>(req.method)
-            );
-        }
-      }())
-    (kKillWaitMs, req.killWaitMs);
-}
-
-void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req) {
-  if (const auto* kr = dynObjectPtr(d, kKillSubprocess)) {
-    if (const auto p = dynGetString(*kr, kMethod)) {
-      if (*p == kTermWaitKill) {
-        req->method = cpp2::KillMethod::TERM_WAIT_KILL;
-      } else if (*p == kTerm) {
-        req->method = cpp2::KillMethod::TERM;
-      } else if (*p == kKill) {
-        req->method = cpp2::KillMethod::KILL;
-      } else {
-        throw BistroException("Unknown KillMethod ", *p);
-      }
-    }
-    if (const auto p = dynGetInt(*kr, kKillWaitMs)) {
-      req->killWaitMs = *p;
-    }
-  }
-}
-}  // namespace detail
-
-using namespace folly;
-using namespace std;
-
-Config::Config(const dynamic& d)
-  : idleWait(chrono::milliseconds(5000)),
-    workingWait(chrono::milliseconds(500)),
+// IMPORTANT: You MUST set each field's default **unconditionally** and
+// BEFORE attempting to parse the field.  See the "IMPORTANT" note in
+// Config.h for an explanation of Bistro's policy on defaults in the
+// presence of parse errors.
+Config::Config(const folly::dynamic& d_config)
+  : idleWait(std::chrono::milliseconds(5000)),
+    workingWait(std::chrono::milliseconds(500)),
     levels({"instance"}) {
 
-  auto it = d.find("enabled");
-  if (it != d.items().end()) {
-    enabled = it->second.asBool();
-  }
+  folly::DynamicParser p(folly::DynamicParser::OnError::RECORD, &d_config);
 
-  it = d.find("working_wait");
-  if (it != d.items().end()) {
-    workingWait = chrono::milliseconds(static_cast<int>(
-      1000 * it->second.asDouble()
-    ));
-  }
-
-  it = d.find("idle_wait");
-  if (it != d.items().end()) {
-    idleWait = chrono::milliseconds(static_cast<int>(
-      1000 * it->second.asDouble()
-    ));
-  }
-
-  it = d.find("scheduler");
-  if (it != d.items().end()) {
-    schedulerType = getSchedulerType(it->second.asString());
-  }
-
-  if (const auto maybe_sel = dynGetString(d, "remote_worker_selector")) {
-    remoteWorkerSelectorType = getRemoteWorkerSelectorType(*maybe_sel);
-  }
-
-  it = d.find("backoff");
-  if (it != d.items().end()) {
-    defaultBackoffSettings = JobBackoffSettings(it->second);
-  }
-
-  it = d.find("nodes");
-  if (it == d.items().end() || !it->second.isObject()) {
-    throw BistroException("Nodes is required in the config");
-  }
-  auto& node_settings = it->second;
-  if (auto maybe_order = dynGetString(node_settings, kNodeOrder)) {
-    nodeOrderType = getNodeOrderType(*maybe_order);
-  }
-  auto jt = node_settings.find("levels");
-  if (jt == node_settings.items().end() || !jt->second.isArray()) {
-    throw BistroException("Levels is required in the nodes config");
-  }
-  for (const dynamic& level : jt->second) {
-    levels.insert(level.asString());
-  }
-  // Add a 'worker' level as the bottom level (for resources only -- no nodes)
+  p.optional(kEnabled, [&](bool b) { enabled = b; });
+  p.optional("working_wait", [&](double n) {
+    workingWait = std::chrono::milliseconds(static_cast<int>(1000 * n));
+  });
+  p.optional("idle_wait", [&](double n) {
+    idleWait = std::chrono::milliseconds(static_cast<int>(1000 * n));
+  });
+  p.optional("scheduler", [&](const std::string& s) {
+    schedulerType = getSchedulerType(s);
+  });
+  p.optional("remote_worker_selector", [&](const std::string& s) {
+    remoteWorkerSelectorType = getRemoteWorkerSelectorType(s);
+  });
+  p.optional(kBackoff, [&](const folly::dynamic& value) {
+    defaultBackoffSettings = JobBackoffSettings(value);
+  });
+  p.required(kNodes, [&]() {
+    p.optional(kNodeOrder, [&](const std::string& s) {
+      nodeOrderType = getNodeOrderType(s);
+    });
+    p.required("levels", [&]() {
+      p.arrayItems([&](std::string&& s) { levels.insert(s); });
+    });
+    p.optional("node_sources", [&]() {
+      p.arrayItems([&]() {
+        folly::dynamic d_prefs = folly::dynamic::object();
+        p.optional("prefs", [&]() { d_prefs = p.value(); });
+        p.required("source", [&](std::string&& s) {
+          nodeConfigs.emplace_back(std::move(s), std::move(d_prefs));
+        });
+      });
+    });
+  });
+  // No matter what may be wrong with the config, add a 'worker' level as
+  // the bottom level.
   levels.insert("worker");
-
-  if (FLAGS_kill_job_if_disabled) {
-    killOrphanTasksAfter = std::chrono::milliseconds(0);
-  }
-  detail::parseKillOrphanTasksAfter(d, &killOrphanTasksAfter);
-
-  detail::parseTaskSubprocessOptions(d, &taskSubprocessOptions);
-
-  // This is outside of TaskSubprocessOptions, so that it can be changed
-  // even while the task is running.
-  detail::parseKillRequest(d, &killRequest);
-
-  // This is a DANGEROUS setting, see the doc at the declaration site.
-  if (const auto p = dynGetInt(d, kExitInitialWaitBeforeTimestamp)) {
-    exitInitialWaitBeforeTimestamp = *p;
-  }
-
-  // What is the node level that jobs will use to create tasks by default?
-  // You probably don't want to specify "worker" because there are no nodes.
-  // It's not forbidden in the spirit of laissez-faire.
-  if (const auto maybe_level_for_tasks = dynGetString(d, "level_for_tasks")) {
-    levelForTasks = levels.lookup(*maybe_level_for_tasks);
-    if (levelForTasks == StringTable::NotFound) {
-      throw BistroException("Bad level_for_tasks: ", *maybe_level_for_tasks);
-    }
-  } else {  // Default to the bottom level (the one just before "worker")
-    levelForTasks = levels.size() - 2;
-  }
-
-  // TODO(agoder): Deprecate this
-  jt = node_settings.find("node_source");
-  if (jt != node_settings.items().end()) {
-    nodeConfigs.emplace_back(
-      jt->second.asString(),
-      node_settings.getDefault("node_source_prefs")
-    );
-  }
-
-  jt = node_settings.find("node_sources");
-  if (jt != node_settings.items().end()) {
-    for (const auto& setting : jt->second) {
-      nodeConfigs.emplace_back(
-        setting["source"].asString(),
-        setting.getDefault("prefs", dynamic::object)
-      );
-    }
-  }
-
   if (nodeConfigs.empty()) {
     LOG(WARNING) << "Empty 'node_sources', can only run on the instance node.";
   }
 
-  it = d.find("resources");
-  if (it == d.items().end()) {
-    throw BistroException("Must provide resources setting in config");
+  if (FLAGS_kill_job_if_disabled) {  // A deprecated command-line default
+    killOrphanTasksAfter = std::chrono::milliseconds(0);
   }
-  if (!it->second.isObject()) {
-    throw BistroException("Resources setting must be an object");
-  }
+  parseKillOrphanTasksAfter(&p, &killOrphanTasksAfter);
+
+  parseTaskSubprocessOptions(&p, &taskSubprocessOptions);
+
+  // This is outside of TaskSubprocessOptions, so that it can be changed
+  // even while the task is running.
+  parseKillRequest(&p, &killRequest);
+
+  // This is a DANGEROUS setting, see the doc at the declaration site.
+  p.optional(kExitInitialWaitBeforeTimestamp, [&](int64_t n) {
+    exitInitialWaitBeforeTimestamp = n;
+  });
+
+  // What is the node level that jobs will use to create tasks by default?
+  // You probably don't want to specify "worker" because there are no nodes.
+  // It's not forbidden in the spirit of laissez-faire.
+  //
+  // Default to the bottom level ("instance" is 0, "worker" is last).
+  levelForTasks = getNumConfiguredLevels();
+  p.optional(kLevelForTasks, [&](const std::string& s) {
+    levelForTasks = checkedLookup(levels, s);
+  });
+
   resourcesByLevel.resize(levels.size());
   levelIDToResourceID.resize(levels.size());
-  int resource_id = 0;
-  for (const auto& by_level : it->second.items()) {
-    const auto& level = by_level.first.asString();
-    if (!by_level.second.isObject()) {
-      throw BistroException(
-        "Resources for level ", level, " must be an object"
-      );
-    }
-    for (const auto& pair : by_level.second.items()) {
-      int level_id = levels.lookup(level);
-      if (level_id == StringTable::NotFound) {
-        throw BistroException("Invalid level: ", level);
-      }
-      const auto& name = pair.first.asString();
-      const int resource_id = resourceNames.insert(name);
-      defaultJobResources.resize(resource_id + 1, 0);
-      defaultJobResources[resource_id] = pair.second["default"].asInt();
-      // Defaulting to a weight of 0 means that resource won't be a factor
-      // when using the "busiest" worker selection strategy.
-      resourceIDToWeight.resize(resource_id + 1, 0);
-      if (auto* weight_ptr = pair.second.get_ptr("weight")) {
-        if (!weight_ptr->isInt() || weight_ptr->asInt() < 0) {
-          throw BistroException("Resource weight must be an integer >= 0");
-        }
-        resourceIDToWeight[resource_id] = weight_ptr->asInt();
-      }
-      auto& r = resourcesByLevel[level_id];
-      // This is pretty crazy: each level has slots for the resources with
-      // IDs from 0 to the maximum resource ID for that level.  Most of
-      // those IDs do not belong to this level, so those slots are just set
-      // to INT_MAX, and we pray they do not run out.
-      r.resize(resource_id + 1, numeric_limits<int>::max());
-      r[resource_id] = pair.second["limit"].asInt();
-      levelIDToResourceID[level_id].push_back(resource_id);
-    }
-  }
+  p.required("resources", [&]() {
+    p.objectItems([&](const std::string& level, const folly::dynamic&) {
+      int level_id = checkedLookup(levels, level);
+      auto& level_rsrc = resourcesByLevel[level_id];
+      p.objectItems([&](const std::string& name, const folly::dynamic&) {
+        const int resource_id = resourceNames.insert(name);
+        // This inverse index MUST happen as soon as we insert into
+        // resourceNames, see the note on the "limit" default below.
+        levelIDToResourceID[level_id].push_back(resource_id);
 
-  if (const auto* ptr = dynObjectPtr(d, "worker_resources_override")) {
-    const auto& default_resources = workerLevelResourcesRef(*this);
-    for (const auto& pair : ptr->items()) {
-      const string& worker = pair.first.asString();
+        // IMPORTANT: Nothing from this point onward throws, except inside
+        // the parses, which are protected by DynamicParser (see "weight"
+        // below for an acceptable example).  This is important so that the
+        // various resource structures stay consistent with each other.
+
+        defaultJobResources.resize(resource_id + 1, 0);
+        p.required("default", [&](int64_t n) {
+          defaultJobResources[resource_id] = n;
+        });
+
+        // This is pretty crazy: each level has slots for the resources with
+        // IDs from 0 to the maximum resource ID for that level.  Most of
+        // those IDs do not belong to this level, so those slots are just set
+        // to INT_MAX, and we pray they do not run out.
+        level_rsrc.resize(resource_id + 1, std::numeric_limits<int>::max());
+        // This default is critical, for a subtle reason. In this parse, we
+        // already committed to this being a valid resouce ID.  If "limit"
+        // failed to parse and we left this at INT_MAX, then finding this ID
+        // in levelIDToResourceID and using resourcesByLevel would yield a
+        // sentinel value meaning "this level lacks this resource".  That's
+        // a recipe for a CHECK failure.  It would be even worse not to
+        // insert into levelIDToResourceID until "limit" is parsed, since
+        // that would break Job::toDynamic() -- we wouldd cleanly parse such
+        // a resource, and then fail to enumerate it via
+        // levelIDToResourceID, resulting in data-loss on save/load cycles.
+        // This default avoids both problems.
+        level_rsrc[resource_id] = 0;
+        p.required("limit", [&](int64_t n) {
+          level_rsrc[resource_id] = n;
+        });
+
+        // Defaulting to a weight of 0 means that resource won't be a factor
+        // when using the "busiest" worker selection strategy.
+        resourceIDToWeight.resize(resource_id + 1, 0);
+        p.optional("weight", [&](int64_t n) {
+          if (n < 0) { throw BistroException("Must be >= 0"); }
+          resourceIDToWeight[resource_id] = n;
+        });
+      });
+    });
+  });
+
+  p.optional(kWorkerResourceOverride, [&]() {
+    const auto& default_rsrcs = workerLevelResourcesRef(*this);
+    p.objectItems([&](const std::string& worker, const folly::dynamic&) {
       auto& worker_overrides = workerResourcesOverride[worker];
-      for (const auto& item : pair.second.items()) {
-        const string& resource_name = item.first.asString();
-        const int resource_id = resourceNames.lookup(resource_name);
-        if ((resource_id == StringTable::NotFound)
-            || (resource_id >= default_resources.size())) {
-          throw BistroException("Overriding unknown resource ", resource_name);
+      p.objectItems([&](const std::string& resource_name, int64_t amount) {
+        const int resource_id = checkedLookup(resourceNames, resource_name);
+        if (resource_id >= default_rsrcs.size()) {
+          throw BistroException("Overriding unknown resource");
         }
         // If a resource is set to max, then we haven't set it for this level.
-        if (default_resources[resource_id] == numeric_limits<int>::max()) {
-          throw BistroException(
-            "Override resource for wrong level ",
-            resource_name
-          );
+        if (default_rsrcs[resource_id] == std::numeric_limits<int>::max()) {
+          throw BistroException("Overriding resource for wrong level");
         }
-        worker_overrides.emplace_back(std::make_pair(
-          resource_id, item.second.asInt()
-        ));
-      }
-    }
-  }
+        worker_overrides.emplace_back(resource_id, amount);
+      });
+    });
+  });
 
-  detail::parsePhysicalResourceConfigs(*this, d, &physicalResourceConfigs);
-  // Make an inverted index by the string name of the logical resource,
-  // since that's what workers report.
-  for (size_t i = 0; i < physicalResourceConfigs.size(); ++i) {
-    const auto& logical_name = physicalResourceConfigs[i].logical;
-    if (!logicalToPhysical.emplace(logical_name, i).second) {
-      throw BistroException(
-        "logical resource ", logical_name, " used in more than one ",
-        "physical_resources entry"
-      );
-    }
+  parsePhysicalResourceConfigs(
+    &p, *this, &physicalResourceConfigs, &logicalToPhysical
+  );
+
+  auto errors = p.releaseErrors();
+  if (!errors.empty()) {
+    throw BistroException("Invalid config: ", folly::toPrettyJson(errors));
   }
 }
 
@@ -559,4 +335,4 @@ Config::JobStatus Config::addJob(
   return Config::JobStatus::NEW_CONFIG;
 }
 
-}}
+}}  // namespace facebook::bistro

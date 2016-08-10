@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -98,20 +98,25 @@ TEST(TestAsyncSubprocess, TestWaitpidVsSignalRace) {
   }
   timer.log("Started ", kNumThreads, " threads of 'sleep ", kSleepMs, "'");
 
+  // This wait is an attempt to start killing just as the first sleep exits.
   /* sleep override */
   std::this_thread::sleep_for(std::chrono::milliseconds(
-    kSleepMs - startup_ms / 2
+    kSleepMs - startup_ms
   ));
   timer.log("Waited for 'sleep' processes to start exiting");
 
-  // Try to center the signals around the termination time-point.
-  auto inter_signal_wait = startup_duration / (2.0 * kNumThreads);
+  // Spread out the signaling over time to maximize the odds of racing.
+  auto inter_signal_wait = startup_duration / (10.0 * kNumThreads);
   for (size_t i = 0; i < kNumThreads; ++i) {
     sigterms[i].sendSignal();
     /* sleep override */
     std::this_thread::sleep_for(inter_signal_wait);
   }
-  timer.log("Finished sending SIGTERM to the 'sleep' processes");
+  timer.log(
+    "Finished sending SIGTERM to the 'sleep' processes with an interval of ",
+    std::chrono::duration_cast<std::chrono::microseconds>(inter_signal_wait)
+    .count(), " usec"
+  );
 
   size_t sum_thread_ids_2 = 0;
   size_t num_killed = 0;
@@ -139,6 +144,11 @@ TEST(TestAsyncSubprocess, TestWaitpidVsSignalRace) {
   timer.log("Exited: ", num_exited, ", killed: ", num_killed);
   EXPECT_EQ(kNumThreads * (kNumThreads - 1) / 2, sum_thread_ids_2);
 
+  // Future: These test conditions are crappy/flaky, and require some
+  // system-specific tuning (see the "/ 10.0" above).  Can I do any better?
+  // If not, consider deleting these, and just leaving this test as a way of
+  // exercising many concurrent processes.
+  //
   // Trusting the law of large numbers (and assuming the OS is uniform-ish).
   EXPECT_LT(0, num_exited);
   EXPECT_LT(0, num_killed);

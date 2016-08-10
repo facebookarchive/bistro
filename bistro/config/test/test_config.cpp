@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -14,6 +14,7 @@
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/config/Config.h"
+#include "bistro/bistro/config/parsing_common.h"
 #include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 
@@ -24,25 +25,23 @@ using namespace std;
 
 TEST(TestConfig, HandleConstruction) {
   dynamic d = dynamic::object
-    ("enabled", true)
+    (kEnabled, true)
     ("working_wait", 0.5)
     ("idle_wait", 5.5)
     ("scheduler", "ranked_priority")
-    ("nodes", dynamic::object
-      ("levels", { "level1" , "level2" })
-      ("node_source", "range_label")
-      ("node_source_prefs", dynamic::object
-        ("key1", "val1")
-        ("key2", "val2")
-      )
-      ("node_sources", {
+    (kNodes, dynamic::object
+      ("levels", dynamic::array("level1" , "level2"))
+      ("node_sources", dynamic::array(
+        dynamic::object
+          ("source", "range_label")
+          ("prefs", dynamic::object("key1", "val1")("key2", "val2")),
         dynamic::object
           ("source", "tier_services")
           ("prefs", dynamic::object("key", "val")),
         dynamic::object
           ("source", "dbmaster_children")
-          ("prefs", dynamic::object("key", "val")),
-      })
+          ("prefs", dynamic::object("key", "val"))
+      ))
     )
     ("resources", dynamic::object
       ("level1", dynamic::object
@@ -64,13 +63,9 @@ TEST(TestConfig, HandleConstruction) {
         ("my_gpu_card", dynamic::object("default", 1)("limit", 5))
       )
     )
-    ("worker_resources_override", dynamic::object
-      ("worker1:17", dynamic::object
-        ("worker_resource_name", 55)
-      )
-      ("worker2:19", dynamic::object
-        ("worker_resource_name", 66)
-      )
+    (kWorkerResourceOverride, dynamic::object
+      ("worker1:17", dynamic::object("worker_resource_name", 55))
+      ("worker2:19", dynamic::object("worker_resource_name", 66))
     )
     (kExitInitialWaitBeforeTimestamp, 123)
   ;
@@ -102,7 +97,7 @@ TEST(TestConfig, HandleConstruction) {
     RemoteWorkerSelectorType::Busiest, Config(d).remoteWorkerSelectorType
   );
   EXPECT_EQ(NodeOrderType::Random, c.nodeOrderType);
-  d["nodes"][kNodeOrder] = "original";
+  d[kNodes][kNodeOrder] = "original";
   EXPECT_EQ(NodeOrderType::Original, Config(d).nodeOrderType);
 
   // Check default and non-default task options
@@ -117,7 +112,7 @@ TEST(TestConfig, HandleConstruction) {
     (kCGroups, folly::dynamic::object
       (kRoot, "root")
       (kSlice, "slice")
-      (kSubsystems, {"sys1", "sys2"})
+      (kSubsystems, dynamic::array("sys1", "sys2"))
       (kKillWithoutFreezer, true)
     );
   task_opts.pollMs = 111;
@@ -134,7 +129,6 @@ TEST(TestConfig, HandleConstruction) {
   // Check toDynamic here, since it's easy to forget to update test_job.cpp
   {
     auto d2 = d;
-    using facebook::bistro::detail::taskSubprocessOptionsToDynamic;
     d2[kTaskSubprocess] =
       taskSubprocessOptionsToDynamic(Config(d).taskSubprocessOptions);
     EXPECT_EQ(task_opts, Config(d2).taskSubprocessOptions);
@@ -212,18 +206,18 @@ TEST(TestConfig, HandleConstruction) {
 
   // levelForTasks defaults to the bottom (non-worker) level
   EXPECT_EQ(2, c.levelForTasks);
-  d["level_for_tasks"] = "level2";
+  d[kLevelForTasks] = "level2";
   EXPECT_EQ(2, Config(d).levelForTasks);
-  d["level_for_tasks"] = "level1";
+  d[kLevelForTasks] = "level1";
   EXPECT_EQ(1, Config(d).levelForTasks);
-  d["level_for_tasks"] = "instance";  // The instance level is also fine
+  d[kLevelForTasks] = "instance";  // The instance level is also fine
   EXPECT_EQ(0, Config(d).levelForTasks);
-  d["level_for_tasks"] = "chicken";  // Throw on invalid levels
+  d[kLevelForTasks] = "chicken";  // Throw on invalid levels
   EXPECT_THROW({Config _c(d);}, runtime_error);
-  d.erase("level_for_tasks");  // Valid again
+  d.erase(kLevelForTasks);  // Valid again
 
   {
-    d["kill_orphan_tasks_after_sec"] = 0;
+    d[kKillOrphanTasksAfterSec] = 0;
     EXPECT_EQ(0, Config{d}.killOrphanTasksAfter.value().count());
   }
 
@@ -249,12 +243,12 @@ TEST(TestConfig, HandleConstruction) {
     EXPECT_EQ(0, c.resourceIDToWeight[idx]);
   }
 
-  d["worker_resources_override"]["worker5:55"] = dynamic::object
+  d[kWorkerResourceOverride]["worker5:55"] = dynamic::object
     ("invalid_resource", 123)
   ;
   EXPECT_THROW({Config _c(d);}, runtime_error);
 
-  d["worker_resources_override"]["worker5:55"] = dynamic::object
+  d[kWorkerResourceOverride]["worker5:55"] = dynamic::object
     ("resource_name", 123) // Not a worker level resource
   ;
   EXPECT_THROW({Config _c(d);}, runtime_error);
@@ -263,14 +257,12 @@ TEST(TestConfig, HandleConstruction) {
 TEST(TestConfig, TestMissingData) {
   EXPECT_THROW(Config(dynamic(dynamic::object)), runtime_error);
   EXPECT_THROW(
-    Config(dynamic::object("nodes", dynamic::object)),
+    Config(dynamic::object(kNodes, dynamic::object)),
     runtime_error
   );
   EXPECT_THROW(
     Config(dynamic::object
-      ("nodes", dynamic::object
-       ("levels", { "foo" })
-      )
+      (kNodes, dynamic::object("levels", dynamic::array("foo")))
     ),
     runtime_error
   );
@@ -279,9 +271,7 @@ TEST(TestConfig, TestMissingData) {
 TEST(TestConfig, TestInvalidLevel) {
   EXPECT_THROW(
     Config(dynamic::object
-      ("nodes", dynamic::object
-        ("levels", { "foo" })
-      )
+      (kNodes, dynamic::object("levels", dynamic::array("foo")))
       ("resources", dynamic::object
         ("invalid_level", dynamic::object
           ("foo_resource", dynamic::object)

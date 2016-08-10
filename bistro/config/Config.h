@@ -33,10 +33,11 @@ typedef std::shared_ptr<const Job> JobPtr;
 
 struct NodeConfig {
   std::string source;
+  // Future: Eliminate this in favor of just using DynamicParser everywhere?
   SettingsMap prefs;
 
-  NodeConfig(const std::string& s, const folly::dynamic& p)
-    : source(s), prefs(p) {}
+  NodeConfig(std::string s, folly::dynamic p)
+    : source(std::move(s)), prefs(std::move(p)) {}
 };
 
 class Config {
@@ -68,27 +69,45 @@ public:
   );
 
   // Only counts explicitly given levels, excluding "instance" and "worker".
-  int getNumConfiguredLevels() const { return levels.size() - 2; }
+  int getNumConfiguredLevels() const {
+    CHECK_GE(levels.size(), 2);
+    return levels.size() - 2;
+  }
+
+  // IMPORTANT: Default values are used BOTH when the value is omitted, and
+  // when there is an error parsing the value.  The latter is important when
+  // a user queries Bistro's config while it has a parsing error -- thanks
+  // to DynamicParser, the result will contain both "errors" and the default
+  // value for the field.  This enables the user to revert to the default by
+  // simply erasing the "errors" key -- NO, you should not do that
+  // automatically.  Review configuration changes with care.
 
   bool enabled{false};
   std::chrono::milliseconds idleWait;
   std::chrono::milliseconds workingWait;
+  // none => do not kill; otherwise, kill once orphaned for this duration.
   folly::Optional<std::chrono::milliseconds> killOrphanTasksAfter;
   std::vector<NodeConfig> nodeConfigs;
   StringTable levels;
-  int levelForTasks;  // The default for jobs that don't specify one
+  // -1 isn't the default, the constructor defaults this to the bottom level.
+  int levelForTasks{-1};
   // WARNING: WARNING: WARNING: Do not manually mutate the job list (or any
   // part of the config) in response to e.g. "save job" or "delete job"
   // queries, or you will introduce configuration ping-ponging and
   // hard-to-find heisenbugs.  Any changes must propagate through the proper
   // ConfigLoader to ensure that configs have a monotonic history.
   std::unordered_map<std::string, JobPtr> jobs;
+
   SchedulerType schedulerType{SchedulerType::RoundRobin};
   RemoteWorkerSelectorType remoteWorkerSelectorType{
     RemoteWorkerSelectorType::RoundRobin
   };
-
   NodeOrderType nodeOrderType{NodeOrderType::Random};
+
+  // All of the following resource-related structures **should** always
+  // parse to an internally consistent state, even in the face of
+  // configuration errors.  See the notes in Config.cpp.  However, relying
+  // on this is discouraged.
   ResourceVector defaultJobResources;
   // Weights are used e.g. to decide which worker is most loaded when
   // attempting to maximize the number of idle workers.
@@ -97,9 +116,11 @@ public:
   std::vector<std::vector<int>> levelIDToResourceID;
   StringTable resourceNames;
 
+  // All of these have sane default constructors
   JobBackoffSettings defaultBackoffSettings;
   cpp2::TaskSubprocessOptions taskSubprocessOptions;
   cpp2::KillRequest killRequest;
+
   std::vector<cpp2::PhysicalResourceConfig> physicalResourceConfigs;
   // Inverted index: contains indexes into physicalResourceConfigs.
   std::unordered_map<std::string, size_t> logicalToPhysical;
@@ -122,69 +143,31 @@ public:
   > workerResourcesOverride;
 };
 
-// Helper functions used by Config & Job
-namespace detail {
-void parseKillOrphanTasksAfter(
-  const folly::dynamic& d,
-  folly::Optional<std::chrono::milliseconds>* maybe_kill_orphans
-);
-folly::dynamic taskSubprocessOptionsToDynamic(
-  const cpp2::TaskSubprocessOptions& opts
-);
-void parseTaskSubprocessOptions(
-  const folly::dynamic& d,
-  cpp2::TaskSubprocessOptions* opts
-);
-folly::dynamic killRequestToDynamic(const cpp2::KillRequest& req);
-void parseKillRequest(const folly::dynamic& d, cpp2::KillRequest* req);
-}  // namespace detail
-
-// Field names: better duplicated string constants than typo-prone literals.
-namespace {
 // Top-level config keys
-const char* kExitInitialWaitBeforeTimestamp =
+constexpr folly::StringPiece kExitInitialWaitBeforeTimestamp =
   "CAUTION_exit_initial_wait_before_timestamp";  // DANGEROUS, see doc above.
+constexpr folly::StringPiece kWorkerResourceOverride =
+  "worker_resources_override";
 // Nodes
-const char* kNodeOrder = "node_order";
-// Task subprocess
-const char* kTaskSubprocess = "task_subprocess";
-const char* kPollMs = "poll_ms";
-const char* kMaxLogLinesPerPollInterval
-  = "max_log_lines_per_poll_interval";
-const char* kParentDeathSignal = "parent_death_signal";
-const char* kProcessGroupLeader = "process_group_leader";
-const char* kUseCanaryPipe = "use_canary_pipe";
-// Kill request
-const char* kKillSubprocess = "kill_subprocess";
-const char* kMethod = "method";
-const char* kTermWaitKill = "term_wait_kill";
-const char* kTerm = "term";
-const char* kKill = "kill";
-const char* kKillWaitMs = "kill_wait_ms";
-// CGroups
-const char* kCGroups = "cgroups";
-const char* kRoot = "root";
-const char* kSlice = "slice";
-const char* kSubsystems = "subsystems";
-const char* kKillWithoutFreezer = "kill_without_freezer";
+constexpr folly::StringPiece kNodeOrder = "node_order";
 // Physical resource configuration
-const char* kPhysicalResources = "physical_resources";
+constexpr folly::StringPiece kPhysicalResources = "physical_resources";
 // The unit names are all singular, since each entry just maps a physical
 // unit to a logical unit.
-const char* kRamMB = "ram_mb";
-const char* kCPUCore = "cpu_core";
-const char* kGPUCard = "gpu_card";
+constexpr folly::StringPiece kRamMB = "ram_mb";
+constexpr folly::StringPiece kCPUCore = "cpu_core";
+constexpr folly::StringPiece kGPUCard = "gpu_card";
 // Keys of physical resource configs
-const char* kLogicalResource = "logical_resource";
-const char* kMultiplyLogicalBy = "multiply_logical_by";
-const char* kPhysicalReserveAmount = "physical_reserve_amount";
-const char* kEnforcement = "enforcement";
+constexpr folly::StringPiece kLogicalResource = "logical_resource";
+constexpr folly::StringPiece kMultiplyLogicalBy = "multiply_logical_by";
+constexpr folly::StringPiece kPhysicalReserveAmount =
+  "physical_reserve_amount";
+constexpr folly::StringPiece kEnforcement = "enforcement";
 // Enforcement options
-const char* kNone = "none";
-const char* kSoft = "soft";
-const char* kHard = "hard";
+constexpr folly::StringPiece kNone = "none";
+constexpr folly::StringPiece kSoft = "soft";
+constexpr folly::StringPiece kHard = "hard";
 // Job options
-const char* kCommand = "command";
-}  // anonymous namespace
+constexpr folly::StringPiece kCommand = "command";
 
 }}  // namespace facebook::bistro

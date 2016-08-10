@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -211,7 +211,7 @@ TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
       if (rt.job == kHealthcheckTaskJob) {
         return;
       }
-      EXPECT_EQ(3, tso.cgroupOptions.cpuShares);  // Tests rounding
+      EXPECT_EQ(6, tso.cgroupOptions.cpuShares);  // Tests rounding
       EXPECT_EQ(3072, tso.cgroupOptions.memoryLimitInBytes);
       tso_cob_ran.setValue();
     }

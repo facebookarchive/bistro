@@ -99,18 +99,27 @@ RemoteWorkerRunner::~RemoteWorkerRunner() {
 }
 
 namespace {
+// Clamp to the range of the physical output.
+template <typename T>
+void clampPhysical(T* phys, double unclamped, const cpp2::Resource& r) {
+  if (unclamped < 0) {  // Resources are unsigned, even if Thrift won't let us.
+    *phys  = 0;
+  } else if (unclamped > std::numeric_limits<T>::max()) {
+    *phys = std::numeric_limits<T>::max();
+  } else {
+    *phys = unclamped;
+    return;
+  }
+  LOG(WARNING) << "Clamping physical value of " << r.name << " from "
+    << unclamped << " to limit " << *phys;
+}
+
 template <typename T>
 void logicalToIntPhysicalResource(
     T* phys,
     const cpp2::PhysicalResourceConfig& p,
     const cpp2::Resource& r) {
-  *phys = ::round(p.multiplyLogicalBy * r.amount);
-  // Clamp to the range of the physical output.
-  if (*phys < 0) {  // Resources are unsigned, even if Thrift won't let us.
-    *phys = 0;
-  } else if (*phys > std::numeric_limits<T>::max()) {
-    *phys = std::numeric_limits<T>::max();
-  }
+  clampPhysical(phys, ::round(p.multiplyLogicalBy * r.amount), r);
 }
 
 folly::Optional<int> physicalToLogicalResource(
@@ -569,6 +578,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
               && p.enforcement == cpp2::PhysicalResourceEnforcement::SOFT
             ) {
               logicalToIntPhysicalResource(&cgroup_cpu_shares, p, r);
+              // Multiply by 2 here since cgroup cpu.shares must be >= 2.
+              clampPhysical(&cgroup_cpu_shares, 2*cgroup_cpu_shares, r);
             }
           }
         }

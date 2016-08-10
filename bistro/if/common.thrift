@@ -282,9 +282,10 @@ struct CGroupOptions {
   4: bool unitTestCreateFiles = 0,
   // If nonzero, limit CPU shares for the task. Maps to `cpu.shares` in the
   // `cpu` subsystem.  The sanest way to use this is to set every task's
-  // number of shares to to something like 1024 * number of requested cores.
+  // number of shares to to something like 64 * number of requested cores.
   // Then, so long as the scheduler's # cores is correct, each task is
-  // guaranteed at least as many cores as it requests.
+  // guaranteed at least as many cores as it requests.  IMPORTANT: Linux
+  // does not allow this value to be 1, so ensure it's >= 2.
   5: i16 cpuShares = 0,
   // If nonzero, sets a hard limit on the amount of memory used.
   6: i64 memoryLimitInBytes = 0,

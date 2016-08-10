@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -18,6 +18,9 @@ namespace facebook { namespace bistro {
 /**
  * Bits that represent the status of a task. A task can have a combination of
  * these. A type-safe version of cpp2::BistroTaskStatusBits.
+ *
+ * IMPORTANT: The "data" field must be a folly::dynamic::object.
+ * Future: enforce this nicely in the constructors.
  */
 enum class TaskStatusBits : unsigned short {
   Empty = 0x0,
@@ -81,6 +84,25 @@ enum class TaskStatusBits : unsigned short {
   Overwriteable =
     static_cast<unsigned short>(cpp2::BistroTaskStatusBits::OVERWRITEABLE),
 
+  // This is a private status bit, which is used to deal with the fact that
+  // tasks, which failed because their worker got lost, need to store two
+  // distinct backoff durations -- the job-configured backoff value is needed
+  // so that JobBackoffSettings::getNext can work, while the effective
+  // backoff value may need to be longer to prevent the scheduler from
+  // accidentally starting a second task while the first one is still being
+  // killed by the worker.
+  //
+  // So why add this bit? It tells TaskStatus internals that the configured
+  // backoff may differ from the effective `backoffDuration_`, meaning that
+  // we have to access the "__bistro_saved_backoff" field in `data` to find
+  // the configured backoff duration.  The alternative to this scheme would
+  // be to store both the configured and the effective backoff duration on
+  // every TaskStatus, which would significantly increase Bistro's memory
+  // footprint.  Since the number of lost-worker tasks should be small, this
+  // is a good trade of CPU to gain memory.
+  HasSavedBackoff =
+    static_cast<unsigned short>(cpp2::BistroTaskStatusBits::HAS_SAVED_BACKOFF),
+
   /**
    * These bits are used **only** by the monitor to represent permanent
    * facts about the task and whether it can run or not.  They are known
@@ -143,10 +165,17 @@ inline TaskStatusBits replaceBit(
  */
 class TaskStatus {
 
+  // This is not a pointer to a const because `forgive` mutates some
+  // implementation detail of the `data`.  However, the user-supplied data
+  // is logically const.  There would be no thread-safety benefits to making
+  // this const, since calling a mutator update() and forgive() concurrently
+  // with any read access the TaskStatus subject to races anyway.  Just copy
+  // the TaskStatus under a lock if you need safety.
+  //
   // This wastes 8 bytes per TaskStatus, but makes this class trivially
-  // copiable.  If you want to go on a perf crusade, change this to a
-  // unique_ptr and fix all the copy sites.
-  typedef std::shared_ptr<const folly::dynamic> DataPtr;
+  // copiable.  If you want to go on a memory usage crusade, change this to
+  // a unique_ptr and make a copy constructor that copies the pointer.
+  typedef std::shared_ptr<folly::dynamic> DataPtr;
 
 public:
 
@@ -188,8 +217,13 @@ public:
    */
   static TaskStatus neverStarted(const std::string& msg);
 
+  static TaskStatus workerLost(
+    std::string worker_shard, uint32_t saved_backoff
+  );
+
   /**
-   * Parses a JSON status, or a simple string. "time" is ignored.
+   * Parses a JSON status, or a simple string. When parsing JSON, "time" and
+   * many other fields that are auto-populated by Bistro will be ignored.
    */
   static TaskStatus fromString(const std::string&) noexcept;
 
@@ -212,15 +246,14 @@ public:
 
   /**
    * Replace Failed with Error. Clear backoff duration if it's in use.
+   *
+   * If the status has a saved backoff (aka came from a "workerLost()"), we
+   * will (silently) leave the backoff duration alone.  Silence isn't the
+   * best policy, and returning a meaningful message would be better, but
+   * the odds that somebody will notice that "forgiving a lost worker task"
+   * is not instantaneous are pretty low.
    */
-  void forgive() {
-    if (isFailed()) {
-      bits_ = replaceBit(bits_, TaskStatusBits::Failed, TaskStatusBits::Error);
-    }
-    if (usesBackoff()) {
-      backoffDuration_ = 0;
-    }
-  }
+  void forgive();
 
   ///
   /// Bit tests
@@ -249,7 +282,10 @@ public:
     return allSet(bits_, TaskStatusBits::Failed);
   }
 
+  // TaskStatus does not know `noMoreBackoffs`, so it is not checked.
   bool isInBackoff(time_t cur_time) const {
+    // kBistroSavedBackoff is irrelevant for the deciding whether we are in
+    // backoff -- it is only used for computing the next one.
     return usesBackoff() && (timestamp_ + backoffDuration_) > cur_time;
   }
 
@@ -265,18 +301,17 @@ public:
     return timestamp_;
   }
 
-  cpp2::BackoffDuration backoffDuration() const {
-    cpp2::BackoffDuration bd;
-    if (isFailed()) {
-      bd.noMoreBackoffs = true;
-      return bd;
-    }
-    bd.noMoreBackoffs = false;
-    bd.seconds = backoffDuration_;
-    return bd;
-  }
+  /**
+   * IMPORTANT: This is NOT the effective backoff duration, which can be
+   * longer (this is required for workerLost() to be safe). Instead, this
+   * returns the backoff that would have been configured for the job, so
+   * that we can correctly compute the next backoff value in getNext().
+   */
+  cpp2::BackoffDuration configuredBackoffDuration() const;
 
-  const folly::dynamic* data() const {
+  // Not thread-safe. Only OK to call on copies of the TaskStatus that are
+  // not at risk of being mutated concurrently.
+  const folly::dynamic* dataThreadUnsafe() const {
     return data_.get();
   }
 
@@ -310,12 +345,18 @@ private:
     return allSet(bits_, TaskStatusBits::UsesBackoff);
   }
 
+  bool hasSavedBackoff() const {
+    return allSet(bits_, TaskStatusBits::HasSavedBackoff);
+  }
+
   // Ordered for space efficiency: 16-byte, 8-byte, 4-byte, 2-byte => 32 bytes
   //
   // TODO: Since different fields are used for different statuses, a union
   // type via boost::variant would provide greater type safety.
   DataPtr data_;  // For running statuses, only TaskStatusObservers use this
   time_t timestamp_;  // For running statuses, use RunningTask's startTime
+  // The effective backoff. If HasSavedBackoff is not set, this also
+  // determines the next backoff, otherwise kBistroSavedBackoff does.
   uint32_t backoffDuration_;  // Used only for InBackoff statuses
   TaskStatusBits bits_;
 };

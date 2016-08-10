@@ -253,9 +253,11 @@ TEST_F(TestLocalRunner, HandleKill) {
     ASSERT_EQ(2, status_seqs[i]->size());
     assertTaskOnNode(i, 1, "incomplete_backoff", [](const TaskStatus& status) {
       return status.bits() == kIncompleteBackoffBits
-        && status.backoffDuration().seconds == 60 // See JobBackoffSettings.cpp
-        && status.data()
-        && status.data()->at("exception") == "Task killed, no status returned";
+        // Third value from the default backoff in JobBackoffSettings.cpp
+        && status.configuredBackoffDuration().seconds == 60
+        && status.dataThreadUnsafe()
+        && status.dataThreadUnsafe()->at("exception")
+          == "Task killed, no status returned";
     });
     assertTasksRunningFromNode(i + 1);  // Other tasks are unaffected.
   }

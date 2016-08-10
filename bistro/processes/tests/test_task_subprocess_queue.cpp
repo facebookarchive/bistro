@@ -186,7 +186,7 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
     );
     EXPECT_EQ(
       "Task killed, no status returned",
-      (*status.data()).at("exception").asString()
+      (*status.dataThreadUnsafe()).at("exception").asString()
     );
   }
 
@@ -197,7 +197,9 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
       TaskStatus&& st) noexcept {
     EXPECT_EQ(runningTask(), rt);
     EXPECT_EQ(TaskStatusBits::Error | TaskStatusBits::UsesBackoff, st.bits());
-    EXPECT_PCRE_MATCH(regex, (*st.data()).at("exception").asString());
+    EXPECT_PCRE_MATCH(
+      regex, (*st.dataThreadUnsafe()).at("exception").asString()
+    );
   }
 
   // Run a task which will expect to be killed.
@@ -459,7 +461,7 @@ TEST_F(TestTaskSubprocessQueue, NoStatus) {
         );
         EXPECT_EQ(
           "Failed to read a status",
-          (*status.data()).at("exception").asString()
+          (*status.dataThreadUnsafe()).at("exception").asString()
         );
       },
       [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
@@ -515,7 +517,7 @@ TEST_F(TestTaskSubprocessQueue, FailsToStart) {
         );
         EXPECT_PCRE_MATCH(
           ".* failed to execute /should/not/work/: No such file or directory",
-          (*status.data()).at("exception").asString()
+          (*status.dataThreadUnsafe()).at("exception").asString()
         );
       },
       [this](const cpp2::RunningTask&, cpp2::TaskPhysicalResources&&) {},

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -76,7 +76,7 @@ TaskRunnerResponse TaskRunner::runTask(
   rt.invocationID.rand = folly::Random::rand64(folly::ThreadLocalPRNG());
   if (prev_status) {
     rt.nextBackoffDuration = job->backoffSettings().getNext(
-      prev_status->backoffDuration()
+      prev_status->configuredBackoffDuration()  // **not** the effective one
     );
   } else {
     // Make up something. Or, should I leave this unset, and check in Snapshot?

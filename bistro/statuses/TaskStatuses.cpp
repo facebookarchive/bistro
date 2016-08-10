@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -45,7 +45,6 @@ void TaskStatuses::updateStatus(
     TaskStatus&& status) noexcept {
 
   // TODO(#4813858): Improve FB_LOG_EVERY_MS, get rid of this conditional?
-  auto data_ptr = status.data();
   if (FLAGS_log_status_changes_every_ms) {
     FB_LOG_EVERY_MS(INFO, FLAGS_log_status_changes_every_ms)
       << "Got status " << status.toJson() << " for " << debugString(rt)

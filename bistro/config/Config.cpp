@@ -181,6 +181,9 @@ void parseTaskSubprocessOptions(
         cgopts.slice = p->toStdString();
       }
       if (const auto* p = dynArrayPtr(*cgp, kSubsystems)) {
+        // Important to reset here, or else re-parsing a job would add
+        // *another* copy of every subsystem.
+        cgopts.subsystems.clear();
         for (const auto& s : *p) {
           if (!s.isString()) {
             throw BistroException("cgroups subsystems entries must be strings");

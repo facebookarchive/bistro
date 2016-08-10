@@ -107,6 +107,14 @@ public:
 private:
   ID id_;
   std::string name_;
+
+  // Must be the very first option, see constructor implementation.
+  //
+  // ConfigLoaders can use this to implement compare-and-swap mutation in
+  // saveJob, thereby preventing two racing saveJob() calls from silently
+  // clobbering one another.
+  int64_t versionID_;
+
   bool enabled_;
   std::string owner_;
   int levelForTasks_;
@@ -129,10 +137,6 @@ private:
   cpp2::KillRequest killRequest_;
   std::vector<std::string> command_;
 
-  // ConfigLoaders can use this to implement compare-and-swap mutation in
-  // saveJob, thereby preventing two racing saveJob() calls from silently
-  // clobbering one another.
-  int64_t versionID_{-1};
 };
 
 typedef std::shared_ptr<const Job> JobPtr;

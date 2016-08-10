@@ -24,6 +24,18 @@ Synchronized<StringTable> Job::JobNameTable = Synchronized<StringTable>();
 Job::Job(const Config& config, const string& name, const dynamic& d)
   : id_(Job::JobNameTable->insert(name)),
     name_(name),
+    // Parse version first -- if some other config is broken, and that
+    // causes the version stops being updated, we can no longer "saveJob" to
+    // fix this job.
+    versionID_([](const dynamic& d) -> int64_t {
+      if (auto* ptr = d.get_ptr("version_id")) {
+        if (!ptr->isInt()) {
+          throw std::runtime_error("'version_id' must be an integer");
+        }
+        return ptr->getInt();
+      }
+      return -1;
+    }(d)),
     enabled_(d.getDefault("enabled", true).asBool()),
     owner_(d.getDefault("owner", "").asString()),
     levelForTasks_(config.levelForTasks),
@@ -106,13 +118,6 @@ Job::Job(const Config& config, const string& name, const dynamic& d)
     detail::parseTaskSubprocessOptions(d, &taskSubprocessOptions_);
 
     detail::parseKillRequest(d, &killRequest_);
-
-    if (auto* ptr = d.get_ptr("version_id")) {
-      if (!ptr->isInt()) {
-        throw std::runtime_error("'version_id' must be an integer");
-      }
-      versionID_ = ptr->getInt();
-    }
 
     if (const auto* host_level_ptr = d.get_ptr("level_for_host_placement")) {
       if (!host_level_ptr->isString()) {
@@ -247,10 +252,11 @@ dynamic Job::toDynamic(const Config& parent_config) const {
     dynamic resources_obj = dynamic::object;
     for (const auto& resource_ids : parent_config.levelIDToResourceID) {
       for (auto resource_id : resource_ids) {
-        // No point in reporting resources that the job doesn't use.
-        if (auto num = resources_[resource_id]) {
-          resources_obj[parent_config.resourceNames.lookup(resource_id)] = num;
-        }
+        // We have to report 0 resources, in case the default usage != 0.
+        // Arguably, reporting default resources prevents problems when the
+        // global defaults change, so materialize those as well.
+        resources_obj[parent_config.resourceNames.lookup(resource_id)] =
+          resources_[resource_id];
       }
     }
     if (!resources_obj.empty()) {

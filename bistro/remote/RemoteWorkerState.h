@@ -119,6 +119,11 @@ struct RemoteWorkerState {
     }
 
     if (
+      // This is ONLY true when the worker is otherwise healthy, but is
+      // blocked by consensus.  Don't lose such workers, since that behavior
+      // is actively harmful when we are having trouble achieving consensus
+      // due to high worker turnover (see README.worker_set_consensus).
+      !disallowed &&
       lose_unhealthy_worker_after > 0 &&
       // Without this check, we'd use a stale timeBecameUnhealthy_ when
       // changing from HEALTHY to UNHEALTHY.  Using != matches NEW.

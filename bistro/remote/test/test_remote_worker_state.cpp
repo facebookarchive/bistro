@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -24,16 +24,29 @@ TEST(TestRemoteWorkerState, HandleAll) {
   s.state_ = State::UNHEALTHY;
   s.timeLastGoodHealthcheckSent_ = 1;
   s.timeLastHeartbeatReceived_ = 2;
+
   // Unhealthy because hasBeenHealthy_ is false, and there's no override
   EXPECT_EQ(
     std::make_pair(State::UNHEALTHY, true), s.computeState(3, 5, 5, 3, false)
   );
+  // Been unhealthy for 3 ticks, but should get lost after 1. However, we
+  // will not lose the worker since it is ONLY blocked from becoming healthy
+  // by not being part of the worker set consensus.
+  EXPECT_EQ(  // Compare to the "hasBeenHealthy_=true" variant below.
+    std::make_pair(State::UNHEALTHY, true), s.computeState(5, 5, 5, 1, false)
+  );
+  EXPECT_EQ(  // Die since we're unhealthy & not blocked by consensus
+    std::make_pair(State::MUST_DIE, false), s.computeState(5, 5, 2, 1, true)
+  );
+
   // Allow the worker to be healthy
   EXPECT_EQ(
     std::make_pair(State::HEALTHY, false), s.computeState(3, 5, 5, 1, true)
   );
-  // Now remove the barrier to the worker becoming healthy.
+
+  // Now remove the barrier to the worker becoming healthy on its own.
   s.hasBeenHealthy_ = true;
+
   EXPECT_EQ(
     std::make_pair(State::HEALTHY, false), s.computeState(3, 5, 5, 1, false)
   );
@@ -50,7 +63,7 @@ TEST(TestRemoteWorkerState, HandleAll) {
   EXPECT_EQ(
     std::make_pair(State::UNHEALTHY, false), s.computeState(5, 5, 2, 10, false)
   );
-  EXPECT_EQ(
+  EXPECT_EQ(  // Compare to the "hasBeenHealthy_=false" variant above.
     std::make_pair(State::MUST_DIE, false), s.computeState(5, 5, 2, 1, false)
   );
 

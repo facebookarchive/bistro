@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -90,6 +90,10 @@ RemoteWorker initializeWorker(
 }
 
 void successfulHealthcheck(int64_t test_time, RemoteWorker* worker) {
+  // This does not update timeLastHealthcheckSent_, so RemoteWorker may
+  // request another healthcheck despite this "success" being registered.
+  // To predictably **not** be requesting a redundant healthcheck, you
+  // should run this **after** a heartbeat with the current test_time.
   cpp2::RunningTask rt;
   rt.job = kHealthcheckTaskJob;
   rt.invocationID.startTime = test_time;
@@ -98,25 +102,49 @@ void successfulHealthcheck(int64_t test_time, RemoteWorker* worker) {
   ));
 }
 
-void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
-  successfulHealthcheck(test_time, worker);
-  EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker->getState());
+// If the update is mutated after construction, we throw.
+struct EnforcedNoOpUpdate {
+  explicit EnforcedNoOpUpdate(int64_t test_time)
+    : testTime_(test_time),
+      update_(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time) {}
 
-  // A healthcheck isn't enough, send a fresh heartbeat.
-  RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
+  ~EnforcedNoOpUpdate() {
+    RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, testTime_);
+    // Surprisingly, failing test assertions in a destructor works fine.
+    expectUpdateEq(expected, update_);
+  }
 
+  int64_t testTime_;
+  RemoteWorkerUpdate update_;
+};
+
+cpp2::WorkerSetID sendFirstHeartbeat(
+    RemoteWorkerUpdate* update,
+    RemoteWorker* worker) {
   // This is only called on new workers, so the default version of 0 is ok.
   cpp2::WorkerSetID wid;
 
   // consensus_permits_becoming_healthy is needed to get healthy for the
   // first time.
   EXPECT_TRUE(worker->processHeartbeat(
-    &update, worker->getBistroWorker(), wid, false
+    update, worker->getBistroWorker(), wid, false
   ).hasValue());
-  auto first_wid = wid;
   EXPECT_EQ(wid, worker->firstAssociatedWorkerSetID());
   EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker->getState());
   EXPECT_FALSE(worker->hasBeenHealthy());
+
+  return wid;
+}
+
+void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
+  successfulHealthcheck(test_time, worker);
+  EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker->getState());
+
+  // A healthcheck isn't enough, send a fresh heartbeat.
+  EnforcedNoOpUpdate update(test_time);
+
+  const auto first_wid = sendFirstHeartbeat(&update.update_, worker);
+  auto wid = first_wid;  // We'll evolve this copy
 
   // Just as above, but consensus_permits_becoming_healthy is true.
   // Drive-by test: make sure the worker set ID is echoed correctly.
@@ -127,7 +155,7 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
   addWorkerIDToHash(&wid.hash, worker->getBistroWorker().id);
   ++wid.version;
   EXPECT_TRUE(worker->processHeartbeat(
-    &update, worker->getBistroWorker(), wid, true
+    &update.update_, worker->getBistroWorker(), wid, true
   ).hasValue());
   EXPECT_EQ(first_wid, worker->firstAssociatedWorkerSetID());
   EXPECT_EQ(wid, worker->workerSetID());
@@ -136,13 +164,10 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
 
   // consensus_permits_becoming_healthy isn't needed once we've been healthy
   EXPECT_TRUE(worker->processHeartbeat(
-    &update, worker->getBistroWorker(), wid, false
+    &update.update_, worker->getBistroWorker(), wid, false
   ).hasValue());
   EXPECT_EQ(first_wid, worker->firstAssociatedWorkerSetID());
   EXPECT_EQ(RemoteWorkerState::State::HEALTHY, worker->getState());
-
-  RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-  expectUpdateEq(expected, update);
 }
 
 TEST(TestRemoteWorker, HandleNormal) {
@@ -194,6 +219,72 @@ TEST(TestRemoteWorker, HandleNormal) {
 
   EXPECT_TRUE(worker.hasBeenHealthy());
   EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
+}
+
+TEST(TestRemoteWorker, DoNotDieDueToLackOfConsensus) {
+  // In both iterations of the loop, the worker is unhealthy for the same
+  // time period.  The only difference is that in one case, it is solely
+  // unhealthy because of the lack of consensus -- and thus is not lost.  In
+  // the other case, it has other issues, and does get lost.
+  for (int do_not_lose = 0; do_not_lose <= 1; ++do_not_lose) {
+    CaptureFD stderr(2, printString);
+    int64_t test_time = 0;
+
+    // Give our worker a running task (exercises running task tracking)
+    cpp2::RunningTask rt;
+    rt.job = "foobar";
+
+    auto worker = initializeWorker(
+      // The worker has been unhealthy long enough that it's about to be lost.
+      test_time - FLAGS_lose_unhealthy_worker_after - 1,
+      {rt}
+    );
+    const auto bw = worker.getBistroWorker();
+
+    // A heartbeat and a health-check will get the worker to the point of
+    // being unhealthy **only** because of the lack of consensus.  Use
+    // `test_time - 1` since it is before the "lose unhealthy after" time.
+    if (do_not_lose) {
+      RemoteWorkerUpdate u(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time - 1);
+      auto wid = sendFirstHeartbeat(&u, &worker);
+
+      // The heartbeat leads us to request a health-check.
+      RemoteWorkerUpdate e(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time - 1);
+      e.healthcheckWorker(bw);
+      expectUpdateEq(e, u);
+
+      // And now we fake a "healthcheck successful" response.
+      EnforcedNoOpUpdate u2(test_time - 1);
+      EXPECT_TRUE(
+        worker.processHeartbeat(&u2.update_, bw, wid, false).hasValue()
+      );
+      successfulHealthcheck(test_time - 1, &worker);
+      EXPECT_TRUE(
+        worker.processHeartbeat(&u2.update_, bw, wid, false).hasValue()
+      );
+    }
+    EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
+
+    // If lack of consensus is the only problem, the worker stays unhealthy.
+    // Otherwise, it is lost.
+    {
+      RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
+      worker.updateState(&update, /*permit_becoming_healthy =*/ false);
+
+      RemoteWorkerUpdate expected(
+        RemoteWorkerUpdate::UNIT_TEST_TIME, test_time
+      );
+      if (do_not_lose) {
+        EXPECT_EQ(RemoteWorkerState::State::UNHEALTHY, worker.getState());
+      } else {
+        EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, worker.getState());
+        expected.requestSuicide(bw, "Current worker just became lost");
+        expected.loseRunningTask(std::make_pair(rt.job, rt.node), rt);
+      }
+      expectUpdateEq(expected, update);
+    }
+
+  }
 }
 
 TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {

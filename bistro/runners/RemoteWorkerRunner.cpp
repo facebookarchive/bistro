@@ -275,65 +275,29 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
   }
 }
 
-LogLines RemoteWorkerRunner::getJobLogs(
+namespace {
+/**
+ * This helper is separate from RemoteWorkerRunner::getJobLogs to
+ * make it clear that it does not use any member variables (i.e.
+ * it's effectively a pure function).
+ *
+ * Importantly, it must not access the current thread's EventBase, since
+ * this is typically called from an EventBase handler, and event_base_loop()
+ * is not reentrant.
+ */
+LogLines getJobLogsThreadAndEventBaseSafe(
+    const std::string& unqueried_workers,
+    const std::vector<cpp2::ServiceAddress>& services,
     const string& logtype,
     const vector<string>& jobs,
     const vector<string>& nodes,
     int64_t line_id,
     bool is_ascending,
-    const string& regex_filter) const {
+    const string& regex_filter) {
 
   LogLines res;
   res.nextLineID = LogLine::kNotALineID;
   time_t cur_time = time(nullptr);  // timestamp for any errors
-
-  // We are going to query all the workers. This is wasteful, but it makes
-  // it much easier to find logs for tasks, because:
-  //  1) Multiple workers can have logs for different iterations of a task
-  //  2) The logs API supports multi-queries, which, in some cases,
-  //     require us to query all workers anyhow.
-  std::vector<cpp2::ServiceAddress> services;
-  std::vector<std::string> unhealthy_workers;
-  std::vector<std::string> lost_workers;
-  SYNCHRONIZED_CONST(workers_) {
-    for (const auto& wconn : workers_.workerPool()) {
-      const auto& w = wconn.second->getBistroWorker();
-      // Instead of trying to fetch logs from unhealthy workers, which can
-      // be slow, and degrade the user experience, display a "transient"
-      // error right away.
-      auto state = wconn.second->getState();
-      if (state == RemoteWorkerState::State::UNHEALTHY) {
-        unhealthy_workers.push_back(w.shard);
-      } else if (state == RemoteWorkerState::State::MUST_DIE) {
-        lost_workers.push_back(w.shard);
-      } else {
-        services.push_back(w.addr);
-      }
-    }
-  }
-
-  // Inform the user about the logs that we are not querying.
-  std::string unqueried_workers;
-  if (!unhealthy_workers.empty()) {
-    unqueried_workers += "unhealthy: " + folly::join(", ", unhealthy_workers);
-  }
-  if (!lost_workers.empty()) {
-    if (!unqueried_workers.empty()) {
-      unqueried_workers += "; ";
-    }
-    unqueried_workers += "lost: " + folly::join(", ", lost_workers);
-  }
-
-  if (services.empty()) {
-    if (unqueried_workers.empty()) {
-      throw BistroException("No workers connected; cannot query logs.");
-    } else {
-      throw BistroException(
-        "All workers are unhealthy; cannot query logs. Known workers: ",
-        unqueried_workers
-      );
-    }
-  }
 
   if (!unqueried_workers.empty()) {
     auto err = folly::to<string>(
@@ -345,13 +309,13 @@ LogLines RemoteWorkerRunner::getJobLogs(
     res.lines.emplace_back("", "", cur_time, err, LogLine::kNotALineID);
   }
 
-  // Use this thread's EventBase so that we can loopForever() to wait.
-  auto* event_base =
-    folly::EventBaseManager::get()->getEventBase();
+  // Manages a bunch of concurrent requests to get the logs from the workers.
+  // DANGER: Do not replace by getEventBase(), see the docstring.
+  folly::EventBase event_base;
 
   // Query all the workers for their logs
   fanOutRequestToServices<cpp2::BistroWorkerAsyncClient, cpp2::LogLines>(
-    event_base,
+    &event_base,
     resolve_callback(&cpp2::BistroWorkerAsyncClient::getJobLogsByID),
     &cpp2::BistroWorkerAsyncClient::recv_getJobLogsByID,
     // Handle exceptions for individual hosts by inserting "error" log lines
@@ -419,7 +383,7 @@ LogLines RemoteWorkerRunner::getJobLogs(
     regex_filter
   );
 
-  event_base->loopForever();  // Execute scheduled work, and wait for finish_fn
+  event_base.loopForever();  // Execute scheduled work, and wait for finish_fn
 
   // Sort the merged results from all the workers.
   if (is_ascending) {
@@ -437,6 +401,75 @@ LogLines RemoteWorkerRunner::getJobLogs(
   }
 
   return res;
+}
+}  // anonymous namespace
+
+LogLines RemoteWorkerRunner::getJobLogs(
+    const string& logtype,
+    const vector<string>& jobs,
+    const vector<string>& nodes,
+    int64_t line_id,
+    bool is_ascending,
+    const string& regex_filter) const {
+
+  // We are going to query all the workers. This is wasteful, but it makes
+  // it much easier to find logs for tasks, because:
+  //  1) Multiple workers can have logs for different iterations of a task
+  //  2) The logs API supports multi-queries, which, in some cases,
+  //     require us to query all workers anyhow.
+  std::vector<cpp2::ServiceAddress> services;
+  std::vector<std::string> unhealthy_workers;
+  std::vector<std::string> lost_workers;
+  SYNCHRONIZED_CONST(workers_) {
+    for (const auto& wconn : workers_.workerPool()) {
+      const auto& w = wconn.second->getBistroWorker();
+      // Instead of trying to fetch logs from unhealthy workers, which can
+      // be slow, and degrade the user experience, display a "transient"
+      // error right away.
+      auto state = wconn.second->getState();
+      if (state == RemoteWorkerState::State::UNHEALTHY) {
+        unhealthy_workers.push_back(w.shard);
+      } else if (state == RemoteWorkerState::State::MUST_DIE) {
+        lost_workers.push_back(w.shard);
+      } else {
+        services.push_back(w.addr);
+      }
+    }
+  }
+
+  // Inform the user about the logs that we are not querying.
+  std::string unqueried_workers;
+  if (!unhealthy_workers.empty()) {
+    unqueried_workers += "unhealthy: " + folly::join(", ", unhealthy_workers);
+  }
+  if (!lost_workers.empty()) {
+    if (!unqueried_workers.empty()) {
+      unqueried_workers += "; ";
+    }
+    unqueried_workers += "lost: " + folly::join(", ", lost_workers);
+  }
+
+  if (services.empty()) {
+    if (unqueried_workers.empty()) {
+      throw BistroException("No workers connected; cannot query logs.");
+    } else {
+      throw BistroException(
+        "All workers are unhealthy; cannot query logs. Known workers: ",
+        unqueried_workers
+      );
+    }
+  }
+
+  return getJobLogsThreadAndEventBaseSafe(
+    unqueried_workers,
+    services,
+    logtype,
+    jobs,
+    nodes,
+    line_id,
+    is_ascending,
+    regex_filter
+  );
 }
 
 cpp2::SchedulerHeartbeatResponse RemoteWorkerRunner::processWorkerHeartbeat(

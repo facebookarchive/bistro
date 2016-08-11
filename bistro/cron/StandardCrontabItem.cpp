@@ -492,7 +492,7 @@ time_t findRewindTime(time_t a, time_t b, time_zone_ptr tz) {
   }
   auto first = boost::counting_iterator<time_t>(a);
   auto last = boost::counting_iterator<time_t>(b + 1);
-  auto rewind_t = *lower_bound(first, last, b, [tz](time_t test_t, time_t _b) {
+  auto rewind_t = *std::partition_point(first, last, [tz](time_t test_t) {
     return isTimeBeforeRewind(test_t, tz);
   });
   if (rewind_t > b) {

@@ -26,16 +26,17 @@ cpp2::BackoffDuration bd(int i) {
   return d;
 }
 
-JobBackoffSettings make(std::initializer_list<dynamic> l) {
-  return JobBackoffSettings(dynamic::array(l));
+template <typename... Args>
+JobBackoffSettings make(Args&&... args) {
+  return JobBackoffSettings(dynamic::array(std::forward<Args>(args)...));
 }
 
 TEST(TestJobBackoffSettings, HandleNonPositiveInterval) {
-  EXPECT_THROW(make({0}), std::runtime_error);
+  EXPECT_THROW(make(0), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleInvalidType) {
-  EXPECT_THROW(make({1, 2, 3, "invalid"}), std::runtime_error);
+  EXPECT_THROW(make(1, 2, 3, "invalid"), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleNonArray) {
@@ -45,11 +46,11 @@ TEST(TestJobBackoffSettings, HandleNonArray) {
 }
 
 TEST(TestJobBackoffSettings, HandleNonInt) {
-  EXPECT_THROW(make({1, 2, dynamic::object()}), std::runtime_error);
+  EXPECT_THROW(make(1, 2, dynamic::object()), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleDuplicate) {
-  EXPECT_THROW(make({1, 1, 2, "fail"}), std::runtime_error);
+  EXPECT_THROW(make(1, 1, 2, "fail"), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleNoValues) {
@@ -59,16 +60,16 @@ TEST(TestJobBackoffSettings, HandleNoValues) {
 }
 
 TEST(TestJobBackoffSettings, HandleInvalidRepeat) {
-  EXPECT_THROW(make({"repeat"}), std::runtime_error);
+  EXPECT_THROW(make("repeat"), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleDirectFail) {
-  auto s = make({"fail"});
+  auto s = make("fail");
   EXPECT_EQ(bd(-1), s.getNext(bd(0)));
 }
 
 TEST(TestJobBackoffSettings, HandleNoType) {
-  auto s = make({1, 2, 3});
+  auto s = make(1, 2, 3);
   EXPECT_EQ(bd(1), s.getNext(bd(0)));
   // We expect to default to fail
   EXPECT_EQ(bd(2), s.getNext(bd(1)));
@@ -77,7 +78,7 @@ TEST(TestJobBackoffSettings, HandleNoType) {
 }
 
 TEST(TestJobBackoffSettings, HandleFail) {
-  auto s = make({1, 2, 3, "fail"});
+  auto s = make(1, 2, 3, "fail");
   EXPECT_EQ(bd(1), s.getNext(bd(0)));
   EXPECT_EQ(bd(2), s.getNext(bd(1)));
   EXPECT_EQ(bd(3), s.getNext(bd(2)));
@@ -85,7 +86,7 @@ TEST(TestJobBackoffSettings, HandleFail) {
 }
 
 TEST(TestJobBackoffSettings, HandleRepeat) {
-  auto s = make({1, 2, 3, "repeat"});
+  auto s = make(1, 2, 3, "repeat");
   EXPECT_EQ(bd(1), s.getNext(bd(0)));
   EXPECT_EQ(bd(2), s.getNext(bd(1)));
   EXPECT_EQ(bd(3), s.getNext(bd(2)));
@@ -93,7 +94,7 @@ TEST(TestJobBackoffSettings, HandleRepeat) {
 }
 
 TEST(TestJobBackoffSettings, HandleConversion) {
-  auto s = make({1, 2, 3, "repeat"});
+  auto s = make(1, 2, 3, "repeat");
   auto s2 = JobBackoffSettings(s.toDynamic());
   EXPECT_EQ(s, s2);
 }

@@ -57,7 +57,11 @@ struct BistroJobConfig {
   20: common.KillRequest killRequest,
   // ConfigLoaders can use this to implement compare-and-swap for saveJob(),
   // preventing two concurrent calls from silently clobbering one another.
-  18: i64 versionID,
+  //
+  // Default to -1 because we need the "no version ID specified" behavior to
+  // be equivalent to "add new job" (rather than "update existing job") and
+  // -1 is the sentinel for this.
+  18: i64 versionID = -1,
 } (final)
 
 struct BistroCountWithSamples {

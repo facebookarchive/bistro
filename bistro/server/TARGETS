@@ -1,5 +1,6 @@
 cpp_library(
     name = 'http_server_lib',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
       'Connection.cpp',
       'HTTPMonitor.cpp',
@@ -23,6 +24,7 @@ cpp_library(
 
 cpp_binary(
     name = 'bistro_scheduler',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'main.cpp',
     ],

@@ -1,5 +1,6 @@
 cpp_library(
     name = 'statuses_lib',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'TaskStatus.cpp',
         'TaskStatusSnapshot.cpp',

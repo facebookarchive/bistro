@@ -1,11 +1,13 @@
 cpp_library(
     name='hostname_lib',
+    headers=AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs=['hostname.cpp'],
     external_deps=['boost', 'glog'],  # Future: Move startsWithAny elsewhere.
 )
 
 cpp_library(
     name='shell_lib',
+    headers=AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs=['shell.cpp'],
     deps=['@/folly:string'],
     external_deps=['boost'],
@@ -13,6 +15,7 @@ cpp_library(
 
 cpp_library(
     name='utils_lib',
+    headers=AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs=[
         # Classes
         'BackgroundThreads.cpp',

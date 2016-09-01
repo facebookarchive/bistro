@@ -1,5 +1,6 @@
 cpp_library(
     name = 'scheduler_lib',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'LongTailSchedulerPolicy.cpp',
         'RandomizedPrioritySchedulerPolicy.cpp',

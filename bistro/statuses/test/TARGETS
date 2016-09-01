@@ -1,5 +1,6 @@
 cpp_unittest(
     name = 'test_task_status',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_task_status.cpp',
     ],
@@ -11,6 +12,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_sqlite_task_store',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_sqlite_task_store.cpp',
     ],
@@ -21,6 +23,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_task_statuses',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_task_statuses.cpp',
     ],

@@ -1,5 +1,6 @@
 cpp_library(
     name = 'processes',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'AsyncCGroupReaper.cpp',
         'AsyncReadPipeRateLimiter.cpp',
@@ -19,6 +20,7 @@ cpp_library(
 
 cpp_library(
     name = 'subprocess_with_timeout',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'SubprocessOutputWithTimeout.cpp',
     ],

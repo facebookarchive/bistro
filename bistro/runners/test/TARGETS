@@ -1,5 +1,6 @@
 cpp_unittest(
     name = 'test_local_runner',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_local_runner.cpp',
     ],
@@ -10,6 +11,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_benchmark_runner',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_benchmark_runner.cpp',
     ],
@@ -20,6 +22,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_remote_runner',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_remote_runner.cpp',
     ],
@@ -31,6 +34,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_kill_orphans',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_kill_orphans.cpp',
     ],

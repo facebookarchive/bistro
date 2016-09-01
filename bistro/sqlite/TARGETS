@@ -1,5 +1,6 @@
 cpp_library(
   name = 'sqlite_lib',
+  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
   srcs = [
     'Database.cpp',
     'Statement.cpp'
@@ -16,6 +17,7 @@ cpp_library(
 
 cpp_unittest(
     name = 'test_sqlite',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = ['test_sqlite.cpp'],
     deps = [':sqlite_lib'],
 )

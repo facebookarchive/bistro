@@ -1,5 +1,6 @@
 cpp_library(
     name = 'thrift_monitor_test_thread_lib',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'ThriftMonitorTestThread.cpp',
     ],
@@ -16,6 +17,7 @@ cpp_library(
 
 cpp_unittest(
     name = 'test_thrift_monitor',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_thrift_monitor.cpp',
     ],
@@ -26,6 +28,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_node_getter',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_node_getter.cpp',
     ],

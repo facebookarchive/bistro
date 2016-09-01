@@ -1,5 +1,6 @@
 cpp_unittest(
     name = 'test_scheduler',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_scheduler.cpp',
     ],
@@ -11,6 +12,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_job_dependency',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_job_dependency.cpp',
     ],
@@ -21,6 +23,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_long_tail',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_long_tail.cpp',
     ],
@@ -31,6 +34,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_level_for_tasks',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_level_for_tasks.cpp',
     ],
@@ -41,6 +45,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_round_robin',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_round_robin.cpp',
     ],
@@ -51,6 +56,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_ranked_priority',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_ranked_priority.cpp',
     ],
@@ -61,6 +67,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_randomized_priority',
+    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_randomized_priority.cpp',
     ],

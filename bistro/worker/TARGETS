@@ -5,6 +5,7 @@ cpp_library(
         'BistroWorkerHandler.cpp',
     ],
     deps = [
+        '@/common/fb303/cpp:fb303',
         '@/bistro/bistro/if:if-cpp2',
         '@/bistro/bistro/if:worker_if-cpp2',
         '@/bistro/bistro/processes:processes',
@@ -12,7 +13,7 @@ cpp_library(
         '@/bistro/bistro/remote:remote_lib',
         '@/bistro/bistro/statuses:statuses_lib',
         '@/bistro/bistro/utils:utils_lib',
-        '@/servicerouter/client/cpp2:cpp2',
+        '@/thrift/lib/cpp2:server',
     ],
 )
 
@@ -24,6 +25,5 @@ cpp_binary(
     ],
     deps = [
         ':bistro_worker_lib',
-        '@/thrift/lib/cpp2:server',
     ],
 )

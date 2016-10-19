@@ -260,27 +260,35 @@ TEST(TestStandardCrontabItem, TestErrors) {
 
   // Incomplete or broken dst_fixes
   EXPECT_THROW(CrontabItem::fromDynamic(dynamic::object(), tz), runtime_error);
-  EXPECT_THROW(CrontabItem::fromDynamic(
-    dynamic::object("dst_fixes", {"unskip"}), tz
-  ), runtime_error);
-  EXPECT_THROW(CrontabItem::fromDynamic(
-    dynamic::object("dst_fixes", {"repeat_use_both"}), tz
-  ), runtime_error);
+  EXPECT_THROW(
+      CrontabItem::fromDynamic(
+          dynamic::object("dst_fixes", folly::dynamic::array("unskip")), tz),
+      runtime_error);
+  EXPECT_THROW(
+      CrontabItem::fromDynamic(
+          dynamic::object(
+              "dst_fixes", folly::dynamic::array("repeat_use_both")),
+          tz),
+      runtime_error);
   EXPECT_THROW(CrontabItem::fromDynamic(
     dynamic::object("dst_fixes", dynamic::object()), tz
   ), runtime_error);
   // Redundant DST fix
-  EXPECT_THROW(CrontabItem::fromDynamic(
-    dynamic::object
-      ("minute", 0)("dst_fixes", {"skip", "repeat_use_both", "unskip"}),
-    tz
-  ), runtime_error);
+  EXPECT_THROW(
+      CrontabItem::fromDynamic(
+          dynamic::object("minute", 0)(
+              "dst_fixes",
+              folly::dynamic::array("skip", "repeat_use_both", "unskip")),
+          tz),
+      runtime_error);
   // Bad DST fix entry
-  EXPECT_THROW(CrontabItem::fromDynamic(
-    dynamic::object
-      ("minute", 0)("dst_fixes", {"skip", "repeat_use_both", "clown"}),
-    tz
-  ), runtime_error);
+  EXPECT_THROW(
+      CrontabItem::fromDynamic(
+          dynamic::object("minute", 0)(
+              "dst_fixes",
+              folly::dynamic::array("skip", "repeat_use_both", "clown")),
+          tz),
+      runtime_error);
 }
 
 string parse_to_str(const string& json) {

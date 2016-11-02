@@ -21,15 +21,17 @@ namespace facebook { namespace bistro {
 
 namespace detail { template <typename Callback> class AsyncReadPipeImpl; }
 /**
- * You don't make one of these directly, instead use asyncReadPipe().  Once
- * the pipe handler is constructed, you can use these public APIs.
+ * You don't make one of these directly, instead use asyncReadPipe() below.
+ * Once the pipe handler is constructed, you can use these public APIs.
  */
 class AsyncReadPipe : public folly::EventHandler {
 public:
   // Insofar as I can tell, folly::Promise intends for this to be
   // thread-safe, meaning that you can call asyncReadPipe()->pipeClosed()
   // from outside the EventBase thread.
-  folly::Future<folly::Unit> pipeClosed() { return closedPromise_.getFuture(); }
+  folly::Future<folly::Unit> pipeClosed() {
+    return closedPromise_.getFuture();
+  }
 
   ///
   /// None of the following are thread-safe, so you may only use them from
@@ -38,8 +40,18 @@ public:
 
   bool isPaused() const { return isPaused_; }
 
-  // The callback can use pipe().close() to stop reading early.
-  folly::File& pipe() { return pipe_; }
+  // Do NOT use this to close the FD or modify its flags.
+  const folly::File& pipe() const { return pipe_; }
+
+  // Immediately closes `pipe()` and lets `AsyncReadPipe` be destroyed as
+  // soon as all of its external references go away.
+  //
+  // Can throw -- you are going to get the exception immediately, and not
+  // via the pipeClosed() future.
+  //
+  // Safe to call from the read callback, or from another callback on the
+  // same EventBase.
+  void close() { closeImpl(); }
 
   void pause() {
     if (!isPaused_) {
@@ -70,6 +82,8 @@ public:
 protected:
   template <typename Callback> friend class AsyncReadPipeImpl;
   explicit AsyncReadPipe(folly::File pipe) : pipe_(std::move(pipe)) {}
+
+  virtual void closeImpl() = 0;
 
   folly::Promise<folly::Unit> closedPromise_;
   folly::File pipe_;
@@ -158,13 +172,13 @@ public:
     // indefinitely even after the client requests a pause.
     while (pipe->pipe() && !pipe->isPaused()) {
       ssize_t ret = folly::readNoInt(pipe->pipe().fd(), buf, bufSize_);
-      if (ret == -1 && errno == EAGAIN) {  // No more data for now
-        break;
+      if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        break;  // No more data for now
       }
       folly::checkUnixError(ret, "read");
       if (ret == 0) {  // Reached end-of-file
         splitter_.flush();  // Split whatever remained in the buffer
-        pipe->pipe().close();
+        pipe->close();
         break;
       }
       splitter_(folly::StringPiece(buf, ret));
@@ -190,12 +204,13 @@ private:
  *   void (const AsyncReadPipe* p)
  *
  * It may call p->pause() to temporarily cease being called, or even
- * p->pipe().close(), which might cause the other end to get a SIGPIPE.
+ * p->close(), which might cause the other end to get a SIGPIPE.
  *
  * The reason this exposes a shared_ptr is that we cannot resume() from
  * inside the callback -- it won't be called, and whatever code path is
  * responsible for resuming had better share ownership of this handler.
- * Note that you should generally only resume() from the EventBase thread.
+ *
+ * Not thread-safe: only resume() or close() from the EventBase thread.
  */
 template <typename Callback>
 std::shared_ptr<AsyncReadPipe> asyncReadPipe(
@@ -214,6 +229,8 @@ std::shared_ptr<AsyncReadPipe> asyncReadPipe(
 }
 
 namespace detail {
+
+
 template <typename Callback>
 class AsyncReadPipeImpl : public AsyncReadPipe {
 protected:
@@ -229,12 +246,14 @@ protected:
       folly::EventBase* evb,
       std::shared_ptr<AsyncReadPipe>* handler) {
     *handler = self_;
-    // Enable nonblocking IO
+    // Mark the FD nonblocking. This affects all other copies of the FD, so
+    // this can hurt other processes that do blocking I/O on it.  We assume
+    // that since this is the read end of a pipe, we are the sole owner.
     int fd = pipe_.fd();
     int flags = ::fcntl(fd, F_GETFL);
-    folly::checkUnixError(flags, "fcntl");
+    folly::checkUnixError(flags, "fcntl get flags");
     int r = ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    folly::checkUnixError(r, "fcntl");
+    folly::checkUnixError(r, "fcntl set flags");
     // Initialize the parent class
     initHandler(evb, fd);
     resume();
@@ -245,25 +264,15 @@ protected:
   // Implementation detail -- invoke the "read" callback.
   // Final: it's unsafe to extend AsyncReadPipe, see CAREFUL above.
   void handlerReady(uint16_t events) noexcept override final {
-    // These must be the FIRST lines in the scope, so that they run last.
-    bool handler_should_die = false;
-    auto suicide_guard = folly::makeGuard([&]() {
-      if (handler_should_die) {
-        unregisterHandler();
-        // No longer self-owning. Will be destroyed here, or later, by
-        // another owning thread.
-        self_.reset();
-      }
-    });
+    // Must be FIRST line to trigger self-destruction as late as possible.
+    SelfGuard self_guard(self_);
     CHECK(events & EventHandler::READ);  // No WRITE support
     try {
       callback_(this);
       if (!pipe_) {  // The callback closed the pipe.
-        handler_should_die = true;
-        closedPromise_.setValue();
+        self_guard.dieSoon();
       }
     } catch (const std::exception& ex) {
-      handler_should_die = true;
       folly::exception_wrapper ew{std::current_exception(), ex};
       try {
         pipe_.close();
@@ -272,16 +281,80 @@ protected:
           << " pipe with FD " << pipe_.fd() << ") while handling callback "
           << "exception: " << ew.what();
       }
-      closedPromise_.setException(ew);
+      self_guard.dieSoon(std::move(ew));
+    }
+  }
+
+  void closeImpl() override {
+    if (self_) {  // Double-close is not an error
+      // Must be FIRST line to trigger self-destruction as late as possible.
+      SelfGuard self_guard(self_);
+      self_guard.dieSoon();  // Request destruction first, close() can throw.
+      pipe_.close();
     }
   }
 
 private:
-  // This object is self-owned, keeping it alive until we are sure none of
-  // its code will run on the EventBase any more.
-  std::shared_ptr<detail::AsyncReadPipeImpl<Callback>> self_;
+  using SharedPtr = std::shared_ptr<detail::AsyncReadPipeImpl<Callback>>;
+
+  // Must be declared first in the function. This guard serves two purposes:
+  //  1) Ensure that self-destruction (`self_.reset()`) is always the last
+  //     thing that happens in `handlerReady()`, preventing use-after-free.
+  //  2) Ensure that `closeImpl()` is safe to call from `handlerReady()`,
+  //     allowing `AsyncReadPipe::close()` to work correctly from inside a
+  //     read callback or from outside.  This is why this copies `self`.
+  class SelfGuard {
+  public:
+    explicit SelfGuard(SharedPtr self) : self_(self) {
+      CHECK(self_);
+      ++self_->guardNestingDepth_;
+    }
+    ~SelfGuard() {
+      CHECK_GT(self_->guardNestingDepth_, 0);
+      --self_->guardNestingDepth_;
+      if (deathException_.hasValue()) {
+        // No longer self-owned. SelfGuard::self_ may hold the last reference.
+        self_->self_.reset();
+        // Unregister & fulfill the promise eagerly in case something
+        // external to AsyncReadPipe is extending our lifetime.
+        self_->unregisterHandler();
+        // Promises can be fulfilled only once, so the outermost call does it.
+        if (!self_->guardNestingDepth_) {
+          if (*deathException_) {
+            self_->closedPromise_.setException(*deathException_);
+          } else {
+            self_->closedPromise_.setValue();
+          }
+        } else {
+          CHECK(!*deathException_) << "Only handlerReady reports exceptions";
+        }
+      } else {
+        CHECK(self_->self_) << "dieSoon never triggers ONLY in a nested call";
+      }
+    }
+    void dieSoon(folly::exception_wrapper ew = folly::exception_wrapper()) {
+      deathException_ = ew;
+    }
+  private:
+    // folly::none => don't die, no exception => die with no error.
+    folly::Optional<folly::exception_wrapper> deathException_;
+    SharedPtr self_;
+  };
+
+  friend class SelfGuard;
+
+  // This object is self-owned, keeping itself alive until we can be sure
+  // none of its code will run on the EventBase any more. Invariant:
+  // self_ is non-null so long as pipe_ is still open.
+  SharedPtr self_;
   Callback callback_;
+  // With e.g. `closeImpl()` called from `handlerReady()`, we want the
+  // outermost function to fulfill the promise.  This beats doing it in the
+  // destructor, since external holders of the shared_ptr can delay our
+  // actual destruction arbitrarily long, and deadlock on the future.
+  size_t guardNestingDepth_{0};
 };
+
 }  // namespace detail
 
 }}  // namespace facebook::bistro

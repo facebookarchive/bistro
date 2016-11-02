@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -184,4 +184,52 @@ TEST(TestAsyncReadPipe, PauseResume) {
   evb.loopOnce(EVLOOP_NONBLOCK);
   EXPECT_TRUE(closed.isReady());  // Now we know
   EXPECT_EQ(0, lines_before_pause);  // No more lines were seen
+}
+
+TEST(TestAsyncReadPipe, ExternalClose) {
+  folly::File read_pipe, write_pipe;
+  makePipe(&read_pipe, &write_pipe);
+
+  folly::EventBase evb;
+  size_t num_lines = 0;
+  auto pipe = asyncReadPipe(
+    &evb,
+    std::move(read_pipe),
+    readPipeLinesCallback([&](AsyncReadPipe* pipe, folly::StringPiece s) {
+      if (!s.empty()) {
+        LOG(INFO) << "Read: '" << s << "'";
+        ++num_lines;
+      }
+    }, 0, '\n', 1)  // 1-char buffer to ensure that close is "instant"
+  );
+  auto closed = pipe->pipeClosed();
+
+  evb.loopOnce(EVLOOP_NONBLOCK);  // No data, no action
+  EXPECT_EQ(0, num_lines);
+  EXPECT_FALSE(closed.isReady());
+
+  auto write_fn = [&](const char* msg) {
+    // Will deadlock if the pipe buffer fills up, but I'll take my chances.
+    folly::writeFull(write_pipe.fd(), msg, strlen(msg));
+  };
+
+  // Feed through some lines without closing the pipe
+  const int kMaxLines = 6;
+  for (int i = 0; i < kMaxLines; ++i) {
+    write_fn("a\n");
+    evb.loopOnce(EVLOOP_NONBLOCK);
+    EXPECT_EQ(i + 1, num_lines);
+    EXPECT_FALSE(closed.isReady());
+  }
+  // These writes will get lost since we're synchronously closing the pipe.
+  write_fn("b\n");
+  write_fn("c\n");
+  write_fn("d\n");
+  pipe->close();
+  EXPECT_TRUE(closed.isReady());
+
+  // Nothing more happens on this event base, and we're the pipe's sole owner.
+  evb.loopOnce(EVLOOP_NONBLOCK);
+  EXPECT_EQ(kMaxLines, num_lines);
+  EXPECT_EQ(1, pipe.use_count());
 }

@@ -9,7 +9,7 @@
  */
 #pragma once
 
-#include <boost/strong_typedef.hpp>
+#include <boost/serialization/strong_typedef.hpp>
 #include <folly/Optional.h>
 #include <functional>
 #include <memory>

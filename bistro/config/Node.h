@@ -12,7 +12,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/range/iterator_range.hpp>
-#include <boost/strong_typedef.hpp>
+#include <boost/serialization/strong_typedef.hpp>
 #include <memory>
 #include <string>
 #include <unordered_set>

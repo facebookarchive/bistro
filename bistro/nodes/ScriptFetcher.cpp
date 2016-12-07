@@ -40,7 +40,7 @@ void ScriptFetcher::fetch(
       },
       Subprocess::pipeStdout()
     );
-    gen::byLine(p.stdout()) | [&](StringPiece line) {
+    gen::byLine(p.stdoutFd()) | [&](StringPiece line) {
       all_nodes->add(
         line.str(),
         my_level_and_parents.first,

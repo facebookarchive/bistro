@@ -10,7 +10,9 @@
 #include "bistro/bistro/runners/RemoteWorkerRunner.h"
 
 #include <cmath>
+
 #include <folly/experimental/AutoTimer.h>
+#include <folly/gen/Base.h>
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Job.h"
@@ -311,79 +313,81 @@ LogLines getJobLogsThreadAndEventBaseSafe(
 
   // Manages a bunch of concurrent requests to get the logs from the workers.
   // DANGER: Do not replace by getEventBase(), see the docstring.
-  folly::EventBase event_base;
+  folly::EventBase eb;
 
-  // Query all the workers for their logs
-  fanOutRequestToServices<cpp2::BistroWorkerAsyncClient, cpp2::LogLines>(
-    &event_base,
-    resolve_callback(&cpp2::BistroWorkerAsyncClient::getJobLogsByID),
-    &cpp2::BistroWorkerAsyncClient::recv_getJobLogsByID,
-    // Handle exceptions for individual hosts by inserting "error" log lines
-    // into the output, so that the client still gets some partial results.
-    [&res, cur_time](exception_ptr ex, const string& service_id) {
-      try {
-        std::rethrow_exception(ex);  // ex is guaranteed to be non-null
-      } catch(const std::exception& e) {
-        auto err = folly::to<string>(
-          "Failed to fetch logs from worker ", service_id, ", this may be ",
-          "transient -- but if it is not, report it: ", e.what()
-        );
-        LOG(ERROR) << err;
-        res.lines.emplace_back("", "", cur_time, err, LogLine::kNotALineID);
-      }
-    },
-    // FinishFunc: a callback for when all workers have been processed.
-    [is_ascending, line_id, &res](
-      vector<unique_ptr<cpp2::LogLines>>&& results,
-      folly::EventBase* evb
+  auto resultsx = folly::collectAll(
+      folly::gen::from(services)
+      | folly::gen::mapped([&](auto const& addr) {
+        return folly::makeFutureWith([&]{
+          auto client =
+            getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(&eb, addr);
+          return client->future_getJobLogsByID(
+              logtype,
+              jobs,
+              nodes,
+              line_id,
+              is_ascending,
+              // at least 100 lines per worker, but try to stay under 5000
+              // lines total
+              max(5000 / int(services.size()), 100),
+              regex_filter);
+        })
+        .onError([&](folly::exception_wrapper&& ew) {
+          auto const service_id = debugString(addr);
+          // Logging is done here so that errors are emitted as they happen,
+          // rather than all at once at the end.
+          auto const err = folly::to<string>(
+            "Failed to fetch logs from worker ", service_id, ", this may be ",
+            "transient -- but if it is not, report it: ", ew.what()
+          );
+          LOG(ERROR) << err;
+          res.lines.emplace_back("", "", cur_time, err, LogLine::kNotALineID);
+          return folly::makeFuture<cpp2::LogLines>(std::move(ew));
+        });
+      })
+      | folly::gen::as<std::vector>())
+    .getVia(&eb);
+
+  auto const results = folly::gen::from(resultsx)
+    | folly::gen::filter([](auto const& _) { return _.hasValue(); })
+    | folly::gen::mapped([](auto& _) { return _.value(); })
+    | folly::gen::move
+    | folly::gen::as<std::vector>();
+
+  // Find the most restrictive nextLineID among all hosts
+  for (const auto& log : results) {
+    if (
+      // This value marks "no more lines" in LogWriter, so exclude it.
+      (log.nextLineID != LogLine::kNotALineID) && (
+        // This line only matches initially due to the previous comparison
+        (res.nextLineID == LogLine::kNotALineID) ||
+        ((res.nextLineID > log.nextLineID) == is_ascending)
+      )
     ) {
-      // Find the most restrictive nextLineID among all hosts
-      for (const auto& log : results) {
-        if (
-          // This value marks "no more lines" in LogWriter, so exclude it.
-          (log->nextLineID != LogLine::kNotALineID) && (
-            // This line only matches initially due to the previous comparison
-            (res.nextLineID == LogLine::kNotALineID) ||
-            ((res.nextLineID > log->nextLineID) == is_ascending)
-          )
-        ) {
-          res.nextLineID = log->nextLineID;
-        }
-      }
-      // Merge log lines, dropping those beyond the selected nextLineID.
-      //
-      // This means that the client is guaranteed log lines that are truly
-      // sequential in line_id, making for an API that's easy to use
-      // correctly.  In principle, this filtering could be done on the
-      // client-side, and the non-sequential lines could be displayed
-      // separately, but this seems too confusing for casual users.
-      for (const auto& log : results) {
-        for (const cpp2::LogLine& l : log->lines) {
-          if (
-            // If we are on the last page of results on all hosts, drop nothing.
-            (res.nextLineID == LogLine::kNotALineID) ||
-            ((l.lineID < res.nextLineID) == is_ascending)
-          ) {
-            res.lines.emplace_back(
-              l.jobID, l.nodeID, l.time, l.line, l.lineID
-            );
-          }
-        }
-      }
-      evb->terminateLoopSoon();
-    },
-    services,
-    logtype,
-    jobs,
-    nodes,
-    line_id,
-    is_ascending,
-    // at least 100 lines per worker, but try to stay under 5000 lines total
-    max(5000 / (int)services.size(), 100),
-    regex_filter
-  );
+      res.nextLineID = log.nextLineID;
+    }
+  }
 
-  event_base.loopForever();  // Execute scheduled work, and wait for finish_fn
+  // Merge log lines, dropping those beyond the selected nextLineID.
+  //
+  // This means that the client is guaranteed log lines that are truly
+  // sequential in line_id, making for an API that's easy to use
+  // correctly.  In principle, this filtering could be done on the
+  // client-side, and the non-sequential lines could be displayed
+  // separately, but this seems too confusing for casual users.
+  for (const auto& log : results) {
+    for (const cpp2::LogLine& l : log.lines) {
+      if (
+        // If we are on the last page of results on all hosts, drop nothing.
+        (res.nextLineID == LogLine::kNotALineID) ||
+        ((l.lineID < res.nextLineID) == is_ascending)
+      ) {
+        res.lines.emplace_back(
+          l.jobID, l.nodeID, l.time, l.line, l.lineID
+        );
+      }
+    }
+  }
 
   // Sort the merged results from all the workers.
   if (is_ascending) {

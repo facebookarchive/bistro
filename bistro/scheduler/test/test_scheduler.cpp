@@ -91,7 +91,7 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
       )
     )
   );
-  config.schedulerType = SchedulerType::UnitTest;
+  config.schedulerPolicyName = kSchedulePolicyUnitTest.str();
   config.addJob(
     "job",
     dynamic::object
@@ -232,7 +232,7 @@ struct ReplicaTest {
       nodesPtr_(std::make_shared<Nodes>()),
       statuses_(std::make_shared<NoOpTaskStore>()) {
 
-    config_.schedulerType = SchedulerType::UnitTest;
+    config_.schedulerPolicyName = kSchedulePolicyUnitTest.str();
     config_.addJob("job", dynamic::object("owner", "owner"), nullptr);
     NodesLoader::_fetchNodesImpl(config_, nodesPtr_.get());
     statuses_.updateForConfig(config_);

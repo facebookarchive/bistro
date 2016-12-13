@@ -16,7 +16,6 @@
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/Node.h"
-#include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/flags/Flags.h"
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/monitor/Monitor.h"
@@ -352,8 +351,8 @@ Scheduler::Result Scheduler::schedule(
     timer.log("Cross product computed");
   }
 
-  int scheduled_tasks = SchedulerPolicy::getSingleton(config.schedulerType)
-    ->schedule(job_with_nodes, cb);
+  int scheduled_tasks = SchedulerPolicy::getSingleton(
+      config.schedulerPolicyName)->schedule(job_with_nodes, cb);
   if (scheduled_tasks) {
     timer.log("Scheduled ", scheduled_tasks, " tasks");
   }

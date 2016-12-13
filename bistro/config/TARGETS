@@ -11,7 +11,6 @@ cpp_library(
         'Node.cpp',
         'NodeOrderType.cpp',
         'parsing_common.cpp',
-        'SchedulerType.cpp',
         'RemoteWorkerSelectorType.cpp',
     ],
     deps = [

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -13,7 +13,6 @@
 #include <vector>
 #include <unordered_map>
 
-#include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/scheduler/ResourceVector.h"
@@ -72,7 +71,11 @@ public:
 
   virtual ~SchedulerPolicy();
 
-  static SchedulerPolicy* getSingleton(SchedulerType type);
+  static void registerSchedulerPolicy(
+      std::string,
+      std::unique_ptr<SchedulerPolicy>);
+
+  static SchedulerPolicy* getSingleton(const std::string&);
 };
 
 }}

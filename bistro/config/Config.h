@@ -20,7 +20,6 @@
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/config/NodeOrderType.h"
 #include "bistro/bistro/config/RemoteWorkerSelectorType.h"
-#include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/scheduler/ResourceVector.h"
 #include "bistro/bistro/utils/SettingsMap.h"
 #include "bistro/bistro/utils/SymbolTable.h"
@@ -98,7 +97,8 @@ public:
   // ConfigLoader to ensure that configs have a monotonic history.
   std::unordered_map<std::string, JobPtr> jobs;
 
-  SchedulerType schedulerType{SchedulerType::RoundRobin};
+  std::string schedulerPolicyName;
+
   RemoteWorkerSelectorType remoteWorkerSelectorType{
     RemoteWorkerSelectorType::RoundRobin
   };
@@ -169,5 +169,12 @@ constexpr folly::StringPiece kSoft = "soft";
 constexpr folly::StringPiece kHard = "hard";
 // Job options
 constexpr folly::StringPiece kCommand = "command";
+
+constexpr folly::StringPiece kSchedulePolicyUnitTest = "unittest";
+constexpr folly::StringPiece kSchedulePolicyRoundRobin = "roundrobin";
+constexpr folly::StringPiece kSchedulePolicyRankedPriority = "ranked_priority";
+constexpr folly::StringPiece kSchedulePolicyRandomPriority =
+    "randomized_priority";
+constexpr folly::StringPiece kSchedulePolicyLongTail = "long_tail";
 
 }}  // namespace facebook::bistro

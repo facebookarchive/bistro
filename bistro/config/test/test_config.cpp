@@ -15,7 +15,6 @@
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/parsing_common.h"
-#include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 
 using apache::thrift::debugString;
@@ -28,7 +27,7 @@ TEST(TestConfig, HandleConstruction) {
     (kEnabled, true)
     ("working_wait", 0.5)
     ("idle_wait", 5.5)
-    ("scheduler", "ranked_priority")
+    ("scheduler", kSchedulePolicyRankedPriority)
     (kNodes, dynamic::object
       ("levels", dynamic::array("level1" , "level2"))
       ("node_sources", dynamic::array(
@@ -74,7 +73,7 @@ TEST(TestConfig, HandleConstruction) {
   EXPECT_TRUE(c.enabled);
   EXPECT_EQ(chrono::milliseconds(500), c.workingWait);
   EXPECT_EQ(chrono::milliseconds(5500), c.idleWait);
-  EXPECT_EQ(SchedulerType::RankedPriority, c.schedulerType);
+  EXPECT_EQ(kSchedulePolicyRankedPriority, c.schedulerPolicyName);
 
   ASSERT_EQ(3, c.nodeConfigs.size());
   EXPECT_EQ("range_label", c.nodeConfigs[0].source);

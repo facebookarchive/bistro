@@ -149,7 +149,8 @@ void parsePhysicalResourceConfigs(
 Config::Config(const folly::dynamic& d_config)
   : idleWait(std::chrono::milliseconds(5000)),
     workingWait(std::chrono::milliseconds(500)),
-    levels({"instance"}) {
+    levels({"instance"}),
+    schedulerPolicyName(kSchedulePolicyRoundRobin.str()) {
 
   folly::DynamicParser p(folly::DynamicParser::OnError::RECORD, &d_config);
 
@@ -161,7 +162,7 @@ Config::Config(const folly::dynamic& d_config)
     idleWait = std::chrono::milliseconds(static_cast<int>(1000 * n));
   });
   p.optional("scheduler", [&](const std::string& s) {
-    schedulerType = getSchedulerType(s);
+    schedulerPolicyName = s;
   });
   p.optional("remote_worker_selector", [&](const std::string& s) {
     remoteWorkerSelectorType = getRemoteWorkerSelectorType(s);

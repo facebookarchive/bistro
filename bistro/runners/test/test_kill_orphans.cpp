@@ -11,6 +11,7 @@
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/test/MockBistro.h"
+#include "bistro/bistro/scheduler/SchedulerPolicies.h"
 
 DECLARE_bool(log_performance);
 DECLARE_int32(incremental_sleep_ms);
@@ -32,6 +33,8 @@ void checkEvents(MockRunner* runner, std::vector<MockRunner::Event> events) {
 }
 
 TEST(TestKillDisabled, KillJobOrphans) {
+  registerDefaultSchedulerPolicies();
+
   FLAGS_log_performance = true;  // Shows orphan calculations.
   FLAGS_instance_node_name = "instance";
   FLAGS_incremental_sleep_ms = 10;  // Threads exit quickly

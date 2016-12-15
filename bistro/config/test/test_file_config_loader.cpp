@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -10,18 +10,21 @@
 #include <gtest/gtest.h>
 
 #include <boost/filesystem.hpp>
+#include <folly/Conv.h>
+#include <folly/dynamic.h>
 #include <fstream>
 
 #include "bistro/bistro/config/FileConfigLoader.h"
+#include "bistro/bistro/scheduler/SchedulerPolicyRegistry.h"
 #include "bistro/bistro/utils/TemporaryFile.h"
-#include <folly/Conv.h>
-#include <folly/dynamic.h>
 
 using namespace facebook::bistro;
 using namespace folly;
 using namespace std;
 
 TEST(TestFileConfigLoader, HandleValidConfig) {
+  registerSchedulerPolicy(kSchedulePolicyRankedPriority.str(), nullptr);
+
   TemporaryFile file;
   file.writeString(
     "{ \"bistro_settings\" : { "

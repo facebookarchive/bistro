@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -19,6 +19,7 @@
 #include "bistro/bistro/runners/BenchmarkRunner.h"
 #include "bistro/bistro/runners/LocalRunner.h"
 #include "bistro/bistro/runners/RemoteWorkerRunner.h"
+#include "bistro/bistro/scheduler/SchedulerPolicies.h"
 #include "bistro/bistro/server/HTTPMonitorServer.h"
 #include "bistro/bistro/server/ThriftMonitor.h"
 #include "bistro/bistro/statuses/SQLiteTaskStore.h"
@@ -56,6 +57,8 @@ int main(int argc, char* argv[]) {
   FLAGS_logtostderr = 1;
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+
+  registerDefaultSchedulerPolicies();
 
   boost::filesystem::path config_file(FLAGS_config_file);
   auto config_loader = make_shared<FileConfigLoader>(

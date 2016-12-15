@@ -20,6 +20,7 @@
 #include "bistro/bistro/utils/Exception.h"
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/parsing_common.h"
+#include "bistro/bistro/scheduler/SchedulerPolicyRegistry.h"
 
 // Future: remove this once there is nobody using this.
 DEFINE_bool(
@@ -163,6 +164,8 @@ Config::Config(const folly::dynamic& d_config)
   });
   p.optional("scheduler", [&](const std::string& s) {
     schedulerPolicyName = s;
+    // Invalid value? Throw at parse-time rather than at runtime.
+    throwUnlessPolicyNameExists(schedulerPolicyName);
   });
   p.optional("remote_worker_selector", [&](const std::string& s) {
     remoteWorkerSelectorType = getRemoteWorkerSelectorType(s);

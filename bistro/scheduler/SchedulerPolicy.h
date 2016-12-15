@@ -65,17 +65,9 @@ private:
   std::unordered_map<int, NodeGroupResources> nodeGroupToResources_;
 };
 
-class SchedulerPolicy {
-public:
-  virtual int schedule(std::vector<JobWithNodes>&, TaskRunnerCallback) = 0;
-
+struct SchedulerPolicy {
   virtual ~SchedulerPolicy();
-
-  static void registerSchedulerPolicy(
-      std::string,
-      std::unique_ptr<SchedulerPolicy>);
-
-  static SchedulerPolicy* getSingleton(const std::string&);
+  virtual int schedule(std::vector<JobWithNodes>&, TaskRunnerCallback) = 0;
 };
 
-}}
+}}  // namespace facebook::bistro

@@ -1,4 +1,11 @@
 cpp_library(
+    name = 'scheduler_policy_registry_lib',
+    headers = ['SchedulerPolicyRegistry.h'],
+    srcs = ['SchedulerPolicyRegistry.cpp'],
+    deps = ['@/bistro/bistro/utils:exception_lib'],
+)
+
+cpp_library(
     name = 'scheduler_lib',
     headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
@@ -8,15 +15,17 @@ cpp_library(
         'RoundRobinSchedulerPolicy.cpp',
         'Scheduler.cpp',
         'SchedulerPolicy.cpp',
+        'SchedulerPolicies.cpp',
         'UnitTestSchedulerPolicy.cpp',
         'utils.cpp',
     ],
     deps = [
         '@/bistro/bistro/config:config_lib',
-        '@/bistro/bistro/utils:utils_lib',
+        '@/bistro/bistro/flags:flags_lib',
         '@/bistro/bistro/nodes:nodes_lib',
         '@/bistro/bistro/statuses:statuses_lib',
-        '@/bistro/bistro/flags:flags_lib',
+        '@/bistro/bistro/scheduler:scheduler_policy_registry_lib',
+        '@/bistro/bistro/utils:utils_lib',
         '@/folly:folly',
     ],
     external_deps = [

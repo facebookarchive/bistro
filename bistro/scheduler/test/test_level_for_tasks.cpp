@@ -13,6 +13,7 @@
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
 #include "bistro/bistro/scheduler/Scheduler.h"
+#include "bistro/bistro/scheduler/SchedulerPolicies.h"
 #include "bistro/bistro/scheduler/test/utils.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/statuses/TaskStore.h"
@@ -45,6 +46,7 @@ string scheduleOne(const dynamic& d) {
 }
 
 TEST(TestLevelForTasks, InstanceNodeOnly) {
+  registerDefaultSchedulerPolicies();
   EXPECT_EQ(getLocalHostName(), scheduleOne(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
@@ -55,6 +57,7 @@ TEST(TestLevelForTasks, InstanceNodeOnly) {
 }
 
 TEST(TestLevelForTasks, CanSelectLevel) {
+  registerDefaultSchedulerPolicies();
   dynamic d = dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object

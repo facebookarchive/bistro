@@ -15,6 +15,7 @@
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/parsing_common.h"
+#include "bistro/bistro/scheduler/SchedulerPolicyRegistry.h"
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 
 using apache::thrift::debugString;
@@ -23,6 +24,8 @@ using namespace folly;
 using namespace std;
 
 TEST(TestConfig, HandleConstruction) {
+  registerSchedulerPolicy(kSchedulePolicyRankedPriority.str(), nullptr);
+
   dynamic d = dynamic::object
     (kEnabled, true)
     ("working_wait", 0.5)
@@ -74,6 +77,13 @@ TEST(TestConfig, HandleConstruction) {
   EXPECT_EQ(chrono::milliseconds(500), c.workingWait);
   EXPECT_EQ(chrono::milliseconds(5500), c.idleWait);
   EXPECT_EQ(kSchedulePolicyRankedPriority, c.schedulerPolicyName);
+
+  // Check that we throw on invalid policy names
+  {
+    auto d2 = d;
+    d2["scheduler"] = "not a real scheduler policy";
+    EXPECT_THROW({Config _c(d2);}, std::runtime_error);
+  }
 
   ASSERT_EQ(3, c.nodeConfigs.size());
   EXPECT_EQ("range_label", c.nodeConfigs[0].source);

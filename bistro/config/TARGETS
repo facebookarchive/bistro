@@ -15,6 +15,7 @@ cpp_library(
     ],
     deps = [
         '@/bistro/bistro/if:common-cpp2',
+        '@/bistro/bistro/scheduler:scheduler_policy_registry_lib',
         '@/bistro/bistro/utils:utils_lib',
         '@/folly:folly',
         '@/folly/experimental:dynamic_parser',

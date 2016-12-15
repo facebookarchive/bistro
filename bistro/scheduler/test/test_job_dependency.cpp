@@ -13,6 +13,7 @@
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
 #include "bistro/bistro/scheduler/Scheduler.h"
+#include "bistro/bistro/scheduler/SchedulerPolicies.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/statuses/TaskStore.h"
@@ -50,6 +51,7 @@ dynamic c = dynamic::object
 ;
 
 TEST(TestDependencyScheduling, HandleInvalidDependency) {
+  registerDefaultSchedulerPolicies();
   Config config(c);
   config.addJob(
     "job1",
@@ -75,6 +77,7 @@ TEST(TestDependencyScheduling, HandleInvalidDependency) {
 }
 
 TEST(TestDependencyScheduling, HandleAll) {
+  registerDefaultSchedulerPolicies();
   Config config(c);
   config.addJob(
     "job1",

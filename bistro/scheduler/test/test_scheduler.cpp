@@ -18,6 +18,7 @@
 #include "bistro/bistro/nodes/test/utils.h"
 #include "bistro/bistro/runners/NoOpRunner.h"
 #include "bistro/bistro/scheduler/Scheduler.h"
+#include "bistro/bistro/scheduler/SchedulerPolicies.h"
 #include "bistro/bistro/scheduler/test/utils.h"
 #include "bistro/bistro/scheduler/UnitTestSchedulerPolicy.h"
 #include "bistro/bistro/statuses/TaskStore.h"
@@ -67,6 +68,7 @@ dynamic jobWithNodesToDynamic(
 }
 
 TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
+  registerDefaultSchedulerPolicies();
   Config config(dynamic::object
     ("nodes", dynamic::object
       ("levels", dynamic::array("host", "db"))
@@ -297,12 +299,14 @@ struct ReplicaTest {
 };
 
 TEST(TestScheduler, EnsureReplicasSharePackedResources) {
+  registerDefaultSchedulerPolicies();
   auto res = ReplicaTest().checkSchedule(1);
   EXPECT_FALSE(res.areTasksRunning_);
   EXPECT_EQ(0, res.orphanTasks_.size());
 }
 
 TEST(TestScheduler, EnsureBothReplicasCanRun) {
+  registerDefaultSchedulerPolicies();
   // There are two copies of the "db" node, try running on both.
   for (size_t which_copy = 1; which_copy <= 2; ++which_copy) {
     size_t seen_copies = 0;

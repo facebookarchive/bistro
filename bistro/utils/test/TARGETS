@@ -1,64 +1,36 @@
 cpp_unittest(
     name = 'test_symbol_table',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_symbol_table.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/utils:utils_lib',
-    ],
+    srcs = ['test_symbol_table.cpp'],
+    deps = ['@/bistro/bistro/utils:utils_lib'],
 )
 
 cpp_unittest(
     name = 'test_settings_map',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_settings_map.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/utils:utils_lib',
-    ],
+    srcs = ['test_settings_map.cpp'],
+    deps = ['@/bistro/bistro/utils:utils_lib'],
 )
 
 cpp_unittest(
     name = 'test_shuffled_range',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_shuffled_range.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/utils:utils_lib',
-    ],
+    srcs = ['test_shuffled_range.cpp'],
+    deps = ['@/bistro/bistro/utils:utils_lib'],
 )
 
 cpp_unittest(
     name = 'test_background_thread',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_background_thread.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/utils:utils_lib',
-    ],
+    srcs = ['test_background_thread.cpp'],
+    deps = ['@/bistro/bistro/utils:utils_lib'],
 )
 
 cpp_unittest(
     name = 'test_log_writer',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_log_writer.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/utils:utils_lib',
-    ],
+    srcs = ['test_log_writer.cpp'],
+    deps = ['@/bistro/bistro/utils:utils_lib'],
 )
 
 cpp_unittest(
     name = 'test_shell',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_shell.cpp',
-    ],
+    srcs = ['test_shell.cpp'],
     deps = [
         '@/bistro/bistro/utils:utils_lib',
         '@/folly:subprocess',

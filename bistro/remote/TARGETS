@@ -1,6 +1,15 @@
 cpp_library(
     name = 'remote_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'BusiestRemoteWorkerSelector.h',
+        'RemoteWorker.h',
+        'RemoteWorkerSelector.h',
+        'RemoteWorkers.h',
+        'RemoteWorkerState.h',
+        'RemoteWorkerUpdate.h',
+        'RoundRobinRemoteWorkerSelector.h',
+        'WorkerSetID.h',
+    ],
     srcs = [
         'BusiestRemoteWorkerSelector.cpp',
         'RemoteWorker.cpp',

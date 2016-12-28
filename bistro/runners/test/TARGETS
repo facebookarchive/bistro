@@ -1,31 +1,18 @@
 cpp_unittest(
     name = 'test_local_runner',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_local_runner.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/runners:runners_lib',
-    ],
+    srcs = ['test_local_runner.cpp'],
+    deps = ['@/bistro/bistro/runners:runners_lib'],
 )
 
 cpp_unittest(
     name = 'test_benchmark_runner',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_benchmark_runner.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/runners:runners_lib',
-    ],
+    srcs = ['test_benchmark_runner.cpp'],
+    deps = ['@/bistro/bistro/runners:runners_lib'],
 )
 
 cpp_unittest(
     name = 'test_remote_runner',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_remote_runner.cpp',
-    ],
+    srcs = ['test_remote_runner.cpp'],
     deps = [
         '@/bistro/bistro/runners:runners_lib',
         '@/bistro/bistro/worker/test:bistro_worker_test_lib',
@@ -34,11 +21,6 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_kill_orphans',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_kill_orphans.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro:bistro_lib',
-    ],
+    srcs = ['test_kill_orphans.cpp'],
+    deps = ['@/bistro/bistro:bistro_lib'],
 )

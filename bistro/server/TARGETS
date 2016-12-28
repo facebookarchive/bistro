@@ -1,11 +1,16 @@
 cpp_library(
     name = 'http_server_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'Connection.h',
+        'HTTPMonitor.h',
+        'HTTPMonitorServer.h',
+        'ThriftMonitor.h',
+    ],
     srcs = [
-      'Connection.cpp',
-      'HTTPMonitor.cpp',
-      'HTTPMonitorServer.cpp',
-      'ThriftMonitor.cpp',
+        'Connection.cpp',
+        'HTTPMonitor.cpp',
+        'HTTPMonitorServer.cpp',
+        'ThriftMonitor.cpp',
     ],
     deps = [
         '@/bistro/bistro/config:config_lib',
@@ -24,10 +29,7 @@ cpp_library(
 
 cpp_binary(
     name = 'bistro_scheduler',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'main.cpp',
-    ],
+    srcs = ['main.cpp'],
     deps = [
         ':http_server_lib',
         '@/bistro/bistro:bistro_lib',

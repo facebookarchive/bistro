@@ -1,6 +1,6 @@
 cpp_library(
     name = 'bistro_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [],
     srcs = [
         'Bistro.cpp',
     ],
@@ -13,8 +13,5 @@ cpp_library(
         '@/bistro/bistro/server:http_server_lib',
         '@/bistro/bistro/statuses:statuses_lib',
         '@/bistro/bistro/utils:utils_lib',
-    ],
-    external_deps = [
-        ('boost', None),
     ],
 )

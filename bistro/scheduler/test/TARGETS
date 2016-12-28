@@ -1,9 +1,6 @@
 cpp_unittest(
     name = 'test_scheduler',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_scheduler.cpp',
-    ],
+    srcs = ['test_scheduler.cpp'],
     deps = [
         '@/bistro/bistro/scheduler:scheduler_lib',
         '@/bistro/bistro/runners:runners_lib',
@@ -12,66 +9,36 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_job_dependency',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_job_dependency.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/scheduler:scheduler_lib',
-    ],
+    srcs = ['test_job_dependency.cpp'],
+    deps = ['@/bistro/bistro/scheduler:scheduler_lib'],
 )
 
 cpp_unittest(
     name = 'test_long_tail',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_long_tail.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/scheduler:scheduler_lib',
-    ],
+    srcs = ['test_long_tail.cpp'],
+    deps = ['@/bistro/bistro/scheduler:scheduler_lib'],
 )
 
 cpp_unittest(
     name = 'test_level_for_tasks',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_level_for_tasks.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/scheduler:scheduler_lib',
-    ],
+    srcs = ['test_level_for_tasks.cpp'],
+    deps = ['@/bistro/bistro/scheduler:scheduler_lib'],
 )
 
 cpp_unittest(
     name = 'test_round_robin',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_round_robin.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/scheduler:scheduler_lib',
-    ],
+    srcs = ['test_round_robin.cpp'],
+    deps = ['@/bistro/bistro/scheduler:scheduler_lib'],
 )
 
 cpp_unittest(
     name = 'test_ranked_priority',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_ranked_priority.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/scheduler:scheduler_lib',
-    ],
+    srcs = ['test_ranked_priority.cpp'],
+    deps = ['@/bistro/bistro/scheduler:scheduler_lib'],
 )
 
 cpp_unittest(
     name = 'test_randomized_priority',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_randomized_priority.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/scheduler:scheduler_lib',
-    ],
+    srcs = ['test_randomized_priority.cpp'],
+    deps = ['@/bistro/bistro/scheduler:scheduler_lib'],
 )

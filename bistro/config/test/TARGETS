@@ -1,6 +1,5 @@
 cpp_unittest(
     name = 'test_job_filters',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_job_filters.cpp',
     ],
@@ -11,7 +10,6 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_job',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_job.cpp',
     ],
@@ -23,7 +21,6 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_node',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_node.cpp',
     ],
@@ -34,7 +31,6 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_config',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_config.cpp',
     ],
@@ -45,7 +41,6 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_backoff',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_backoff.cpp',
     ],
@@ -56,7 +51,6 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_file_config_loader',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_file_config_loader.cpp',
     ],
@@ -67,7 +61,6 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_task_placement',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = [
         'test_task_placement.cpp',
     ],

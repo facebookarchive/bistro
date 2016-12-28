@@ -1,10 +1,6 @@
 cpp_library(
     name = 'flags_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'Flags.cpp',
-    ],
-    external_deps = [
-        ('gflags'),
-    ]
+    headers = ['Flags.h'],
+    srcs = ['Flags.cpp'],
+    external_deps = ['gflags'],
 )

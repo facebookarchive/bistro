@@ -7,7 +7,19 @@ cpp_library(
 
 cpp_library(
     name = 'scheduler_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'LongTailSchedulerPolicy.h',
+        'RandomizedPrioritySchedulerPolicy.h',
+        'RankedPrioritySchedulerPolicy.h',
+        'ResourceVector.h',
+        'RoundRobinSchedulerPolicy.h',
+        'Scheduler.h',
+        'SchedulerPolicies.h',
+        'SchedulerPolicy.h',
+        'SchedulerPolicyRegistry.h',
+        'UnitTestSchedulerPolicy.h',
+        'utils.h',
+    ],
     srcs = [
         'LongTailSchedulerPolicy.cpp',
         'RandomizedPrioritySchedulerPolicy.cpp',
@@ -27,9 +39,5 @@ cpp_library(
         '@/bistro/bistro/scheduler:scheduler_policy_registry_lib',
         '@/bistro/bistro/utils:utils_lib',
         '@/folly:folly',
-    ],
-    external_deps = [
-        ('boost', None),
-        ('glog', None),
     ],
 )

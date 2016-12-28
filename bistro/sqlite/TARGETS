@@ -1,23 +1,25 @@
 cpp_library(
-  name = 'sqlite_lib',
-  headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-  srcs = [
-    'Database.cpp',
-    'Statement.cpp'
-  ],
-  deps = [
-    '@/folly:base',
-  ],
-  external_deps = [
-      ('boost', None, 'boost_filesystem'),
-      ('glog', None),
-      ('sqlite', None, 'sqlite'),
-  ],
+    name = 'sqlite_lib',
+    headers = [
+        'Database.h',
+        'Statement.h',
+    ],
+    srcs = [
+        'Database.cpp',
+        'Statement.cpp',
+    ],
+    deps = [
+        '@/folly:base',
+    ],
+    external_deps = [
+        ('boost', None, 'boost_filesystem'),
+        'glog',
+        'sqlite',
+    ],
 )
 
 cpp_unittest(
     name = 'test_sqlite',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = ['test_sqlite.cpp'],
     deps = [':sqlite_lib'],
 )

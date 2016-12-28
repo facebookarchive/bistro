@@ -1,9 +1,7 @@
 cpp_library(
     name = 'monitor_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'Monitor.cpp',
-    ],
+    headers = ['Monitor.h'],
+    srcs = ['Monitor.cpp'],
     deps = [
         '@/folly:folly',
         '@/bistro/bistro/config:config_lib',
@@ -11,8 +9,5 @@ cpp_library(
         '@/bistro/bistro/nodes:nodes_lib',
         '@/bistro/bistro/statuses:statuses_lib',
         '@/bistro/bistro/flags:flags_lib',
-    ],
-    external_deps = [
-        ('boost', None),
     ],
 )

@@ -1,6 +1,8 @@
 cpp_library(
     name = 'cron_utils_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'date_time.h',
+    ],
     srcs = [
         'date_time.cpp',
     ],

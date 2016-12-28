@@ -1,6 +1,14 @@
 cpp_library(
     name = 'processes',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'AsyncCGroupReaper.h',
+        'AsyncReadPipe.h',
+        'AsyncReadPipeRateLimiter.h',
+        'AsyncSubprocess.h',
+        'CGroupSetup.h',
+        'SubprocessOutputWithTimeout.h',
+        'TaskSubprocessQueue.h',
+    ],
     srcs = [
         'AsyncCGroupReaper.cpp',
         'AsyncReadPipeRateLimiter.cpp',
@@ -20,15 +28,15 @@ cpp_library(
 
 cpp_library(
     name = 'subprocess_with_timeout',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'SubprocessOutputWithTimeout.cpp',
+    headers = [
+        'AsyncReadPipe.h',
+        'AsyncSubprocess.h',
+        'SubprocessOutputWithTimeout.h',
     ],
+    srcs = ['SubprocessOutputWithTimeout.cpp'],
     deps = [
         '@/folly:subprocess',
         '@/folly/futures:futures',
     ],
-    external_deps = [
-        ('libevent', None),
-    ],
+    external_deps = ['libevent'],
 )

@@ -1,6 +1,14 @@
 cpp_library(
     name = 'physical_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'AllTasksPhysicalResourceMonitor.h',
+        'CGroupPaths.h',
+        'CGroupResources.h',
+        'TaskPhysicalResourceFetcher.h',
+        'UsablePhysicalResourceFetcher.h',
+        'UsablePhysicalResourceMonitor.h',
+        'utils.h',
+    ],
     srcs = [
         'AllTasksPhysicalResourceMonitor.cpp',
         'CGroupResources.cpp',
@@ -15,7 +23,5 @@ cpp_library(
         '@/bistro/bistro/processes:subprocess_with_timeout',
         '@/bistro/bistro/utils:utils_lib',
     ],
-    external_deps=[
-        ('boost', 'any'),
-    ],
+    external_deps=[('boost', None, 'boost_filesystem')],
 )

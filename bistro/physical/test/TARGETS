@@ -1,6 +1,6 @@
 cpp_unittest(
     name = 'test_all_tasks',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = ['utils.h'],
     srcs = ['test_all_tasks.cpp'],
     deps = [
         '@/bistro/bistro/physical:physical_lib',
@@ -10,7 +10,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_utils',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = ['utils.h'],
     srcs = ['test_utils.cpp'],
     deps = [
         '@/bistro/bistro/physical:physical_lib',
@@ -20,7 +20,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_cgroup_resources',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = ['utils.h'],
     srcs = ['test_cgroup_resources.cpp'],
     deps = [
         '@/bistro/bistro/physical:physical_lib',
@@ -30,7 +30,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_usable_fetcher',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = ['utils.h'],
     srcs = ['test_usable_fetcher.cpp'],
     deps = [
         '@/bistro/bistro/physical:physical_lib',

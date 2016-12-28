@@ -1,45 +1,39 @@
 cpp_unittest(
     name = 'test_async_read_pipe',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = ['test_async_read_pipe.cpp'],
     deps = ['@/bistro/bistro/processes:processes'],
 )
 
 cpp_unittest(
     name = 'test_async_read_pipe_rate_limiter',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = ['test_async_read_pipe_rate_limiter.cpp'],
     deps = ['@/bistro/bistro/processes:processes'],
 )
 
 cpp_unittest(
     name = 'test_async_subprocess',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = ['test_async_subprocess.cpp'],
     deps = ['@/bistro/bistro/processes:processes'],
 )
 
 cpp_unittest(
     name = 'test_subprocess_output_with_timeout',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = ['test_subprocess_output_with_timeout.cpp'],
     deps = ['@/bistro/bistro/processes:subprocess_with_timeout'],
 )
 
 cpp_unittest(
     name = 'test_task_subprocess_queue',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = ['test_task_subprocess_queue.cpp'],
     deps = [
         '@/bistro/bistro/processes:processes',
-        '@/bistro/bistro/test:test',
+        '@/bistro/bistro/test:test_lib',
         '@/folly/experimental:test_util',
     ],
 )
 
 cpp_unittest(
     name = 'test_cgroup_setup',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
     srcs = ['test_cgroup_setup.cpp'],
     deps = [
         '@/bistro/bistro/processes:processes',

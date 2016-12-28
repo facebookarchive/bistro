@@ -1,9 +1,7 @@
 cpp_library(
     name = 'conversion_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'ThriftConversion.cpp',
-    ],
+    headers = ['ThriftConversion.h'],
+    srcs = ['ThriftConversion.cpp'],
     deps = [
         '@/bistro/bistro/config:config_lib',
         '@/bistro/bistro/if:if-cpp2',
@@ -13,11 +11,6 @@ cpp_library(
 
 cpp_unittest(
     name = 'test_thrift_conversion',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_thrift_conversion.cpp',
-    ],
-    deps = [
-        ':conversion_lib',
-    ],
+    srcs = ['test_thrift_conversion.cpp'],
+    deps = [':conversion_lib'],
 )

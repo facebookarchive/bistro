@@ -1,6 +1,11 @@
 cpp_library(
     name = 'cron_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'CrontabItem.h',
+        'CrontabSelector.h',
+        'EpochCrontabItem.h',
+        'StandardCrontabItem.h',
+    ],
     srcs = [
         'CrontabItem.cpp',
         'CrontabSelector.cpp',

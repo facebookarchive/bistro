@@ -1,65 +1,35 @@
 cpp_unittest(
     name = 'test_add_time_fetcher',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_add_time_fetcher.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/nodes:nodes_lib',
-    ],
+    srcs = ['test_add_time_fetcher.cpp'],
+    deps = ['@/bistro/bistro/nodes:nodes_lib'],
 )
 
 cpp_unittest(
     name = 'test_range_label_fetcher',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_range_label_fetcher.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/nodes:nodes_lib',
-    ],
+    srcs = ['test_range_label_fetcher.cpp'],
+    deps = ['@/bistro/bistro/nodes:nodes_lib'],
 )
 
 cpp_unittest(
     name = 'test_manual_fetcher',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_manual_fetcher.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/nodes:nodes_lib',
-    ],
+    srcs = ['test_manual_fetcher.cpp'],
+    deps = ['@/bistro/bistro/nodes:nodes_lib'],
 )
 
 cpp_unittest(
     name = 'test_script_fetcher',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_script_fetcher.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/nodes:nodes_lib',
-    ],
+    srcs = ['test_script_fetcher.cpp'],
+    deps = ['@/bistro/bistro/nodes:nodes_lib'],
 )
 
 cpp_unittest(
     name = 'test_nodes',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_nodes.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/nodes:nodes_lib',
-    ],
+    srcs = ['test_nodes.cpp'],
+    deps = ['@/bistro/bistro/nodes:nodes_lib'],
 )
 
 cpp_unittest(
     name = 'test_nodes_utils',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_nodes_utils.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/nodes:nodes_lib',
-    ],
+    srcs = ['test_nodes_utils.cpp'],
+    deps = ['@/bistro/bistro/nodes:nodes_lib'],
 )

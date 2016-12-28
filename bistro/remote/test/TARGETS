@@ -1,20 +1,12 @@
 cpp_unittest(
     name = 'test_remote_worker_state',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_remote_worker_state.cpp',
-    ],
-    deps = [
-        '@/bistro/bistro/remote:remote_lib',
-    ],
+    srcs = ['test_remote_worker_state.cpp'],
+    deps = ['@/bistro/bistro/remote:remote_lib'],
 )
 
 cpp_unittest(
     name = 'test_remote_worker',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_remote_worker.cpp',
-    ],
+    srcs = ['test_remote_worker.cpp'],
     deps = [
         '@/bistro/bistro/remote:remote_lib',
         '@/folly/experimental:test_util',
@@ -23,10 +15,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_remote_workers',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_remote_workers.cpp',
-    ],
+    srcs = ['test_remote_workers.cpp'],
     deps = [
         '@/bistro/bistro/remote:remote_lib',
         '@/folly/experimental:test_util',
@@ -35,10 +24,7 @@ cpp_unittest(
 
 cpp_unittest(
     name = 'test_worker_set_id',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
-    srcs = [
-        'test_worker_set_id.cpp',
-    ],
+    srcs = ['test_worker_set_id.cpp'],
     deps = [
         '@/bistro/bistro/remote:remote_lib',
         '@/folly/experimental:test_util',

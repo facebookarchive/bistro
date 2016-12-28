@@ -1,6 +1,18 @@
 cpp_library(
     name = 'config_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'Config.h',
+        'ConfigLoader.h',
+        'FileConfigLoader.h',
+        'InMemoryConfigLoader.h',
+        'JobBackoffSettings.h',
+        'JobFilters.h',
+        'Job.h',
+        'Node.h',
+        'NodeOrderType.h',
+        'parsing_common.h',
+        'RemoteWorkerSelectorType.h',
+    ],
     srcs = [
         'Config.cpp',
         'ConfigLoader.cpp',

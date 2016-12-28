@@ -1,6 +1,16 @@
 cpp_library(
     name = 'nodes_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'AddTimeFetcher.h',
+        'EmptyFetcher.h',
+        'ManualFetcher.h',
+        'NodeFetcher.h',
+        'Nodes.h',
+        'NodesLoader.h',
+        'RangeLabelFetcher.h',
+        'ScriptFetcher.h',
+        'utils.h',
+    ],
     srcs = [
         'ManualFetcher.cpp',
         'NodeFetcher.cpp',
@@ -18,7 +28,7 @@ cpp_library(
         '@/folly:subprocess',  # for ScriptFetcher
     ],
     external_deps = [
-        ('boost', None),
-        ('glog', None),
+        'boost',
+        'glog',
     ],
 )

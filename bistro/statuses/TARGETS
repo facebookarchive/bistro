@@ -1,6 +1,13 @@
 cpp_library(
     name = 'statuses_lib',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [
+        'SQLiteTaskStore.h',
+        'TaskStatuses.h',
+        'TaskStatus.h',
+        'TaskStatusObserver.h',
+        'TaskStatusSnapshot.h',
+        'TaskStore.h',
+    ],
     srcs = [
         'TaskStatus.cpp',
         'TaskStatusSnapshot.cpp',
@@ -11,7 +18,5 @@ cpp_library(
         '@/bistro/bistro/config:config_lib',
         '@/bistro/bistro/sqlite:sqlite_lib',
     ],
-    external_deps = [
-        ('boost', None),
-    ],
+    external_deps = [('boost', None, 'boost_filesystem')],
 )

@@ -1,6 +1,6 @@
 cpp_benchmark(
     name = 'db_scraping_benchmark',
-    headers = AutoHeaders.RECURSIVE_GLOB,  # https://fburl.com/424819295
+    headers = [],
     srcs = [ 'db_scraping_benchmark.cpp' ],
     deps = [
         '@/bistro/bistro:bistro_lib',

@@ -224,7 +224,7 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
 
   // Run a task and ensure it can be killed immediately.
   void runAndKill(const std::string& cmd, cpp2::TaskSubprocessOptions opts) {
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>());
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
     runTask(&tsq, cmd, std::move(opts), &expectKilled);
     // Ensure that we can't start the same task twice
     try {
@@ -251,7 +251,7 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
     cpp2::RunningTask rt;
     rt.job = "job";
     rt.node = "node";
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(task_to_logs));
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(task_to_logs));
     cpp2::TaskSubprocessOptions opts;
     // If we were a PG leader, the `sleep` would also get the SIGTERM.
     opts.processGroupLeader = false;
@@ -346,7 +346,7 @@ TEST_F(TestTaskSubprocessQueue, NormalRun) {
 
   int pipe_fd = -1;
   {
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
     tsq.runTask(
       rt,
       cmd,
@@ -395,7 +395,7 @@ TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
 
   int pipe_fd = -1;
   {
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
     for (int i = 0; i < kNumTasks; ++i) {
       auto node = folly::to<std::string>("node", i);
       rt.node = node;
@@ -443,7 +443,7 @@ TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
 
 TEST_F(TestTaskSubprocessQueue, NoStatus) {
   {
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>());
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
     cpp2::RunningTask rt;
     rt.job = "job";
     rt.node = "node";
@@ -503,7 +503,7 @@ TEST_F(TestTaskSubprocessQueue, ProcGroupKillsChild) {
 
 TEST_F(TestTaskSubprocessQueue, FailsToStart) {
   {
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>());
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
     tsq.runTask(
       {},
       std::vector<std::string>{"/should/not/work/"},
@@ -622,7 +622,7 @@ TEST_F(TestTaskSubprocessQueue, RateLimitLog) {
   opts.maxLogLinesPerPollInterval = (3 /*lines*/ * kNumIters)
     / (1000 /*ms per sec*/ / opts.pollMs);  // Finish in 1 second.
   {
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(
       /*task_to_logs=*/ nullptr, /*print_logs=*/ false
     ));
     tsq.runTask(
@@ -667,7 +667,7 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   opts.cgroupOptions.slice = "slice";
   {
     // tsq's destructor is the easiest way to await task exit :)
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>());
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
     runTask(&tsq, "/bin/sleep 3600", opts, &expectKilled);
     SCOPE_EXIT { tsq.kill(runningTask(), requestSigkill()); };
     EXPECT_TRUE(boost::filesystem::is_empty("."));
@@ -676,7 +676,7 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   // The slice directory must exist for this subsystem.
   opts.cgroupOptions.subsystems = {"sys"};
   {
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>());
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
     runTask(&tsq, "/bin/sleep 3600", opts, std::bind(
       &expectErrorRegex, ".*root/subsystem/slice must be a dir.*", p::_1, p::_2
     ));
@@ -686,7 +686,7 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   EXPECT_TRUE(boost::filesystem::create_directories("root/sys/slice"));
   {
     folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
     runTask(&tsq, "/bin/echo ; exec /bin/sleep 3600", opts, &expectKilled);
     SCOPE_EXIT { tsq.kill(runningTask(), requestSigkill()); };
     while (  // Wait for the task to start.
@@ -742,7 +742,7 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperNoFreezer) {
     folly::test::CaptureFD stderr(2, printString);
     // This scope uses `tsq`'s destructor to await task exit.
     folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
     // We can kill the shell, but not the `sleep`. The trailing `echo`
     // ensures that `sh` does not just `exec()` the `sleep`.
     runTask(&tsq, "/bin/sleep 1 ; /bin/echo DONE", opts, &expectKilled);
@@ -822,7 +822,7 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperWithFreezer) {
   {
     // This scope uses `tsq`'s destructor to await task exit.
     folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
     // Since processGroupLeader is off, the initial kill only affect the
     // outer shell, but not the `sleep`.  The inner shell is an easy way to
     // find the sleep's PID.  The trailing `echo` ensures that `sh` does not
@@ -910,7 +910,7 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperKillWithoutFreezer) {
   {
     // This scope uses `tsq`'s destructor to await task exit.
     folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
-    TaskSubprocessQueue tsq(folly::make_unique<TestLogWriter>(&task_to_logs));
+    TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
     // Since processGroupLeader is off, the initial kill only affect the
     // outer shell, but not the `sleep`.  The inner shell is an easy way to
     // find the sleep's PID.  The trailing `echo` ensures that `sh` does not

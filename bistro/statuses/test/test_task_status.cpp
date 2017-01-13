@@ -327,7 +327,7 @@ void expectErrorFromString(const std::string& pcre, const folly::dynamic& d) {
 }
 
 std::unique_ptr<folly::dynamic> makeDataPtr(const folly::dynamic& d) {
-  return folly::make_unique<folly::dynamic>(d);
+  return std::make_unique<folly::dynamic>(d);
 }
 
 // This HasSavedBackoff bit, and how it uses "data" is a private

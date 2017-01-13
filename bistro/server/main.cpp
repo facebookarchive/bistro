@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
   HTTPMonitorServer http_monitor_server(http_monitor);
 
   // Initialize the thrift monitor
-  auto handler = folly::make_unique<ThriftMonitor>(
+  auto handler = std::make_unique<ThriftMonitor>(
     config_loader,
     nodes_loader,
     task_statuses,

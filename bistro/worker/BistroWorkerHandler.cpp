@@ -118,7 +118,7 @@ BistroWorkerHandler::BistroWorkerHandler(
     logStateTransitionFn_(log_state_transition_fn),
     schedulerClientFn_(scheduler_client_fn),
     workerCommand_(worker_command),
-    taskQueue_(folly::make_unique<LogWriter>(
+    taskQueue_(std::make_unique<LogWriter>(
       data_dir / FLAGS_log_db_file_name
     )),
     notifyFinishedQueue_(100000),
@@ -268,7 +268,7 @@ void BistroWorkerHandler::runTask(
       if (!usablePhysicalResources_.monitor_) {
         LOG(WARNING) << "CGroups set: " << debugString(opts.cgroupOptions);
         usablePhysicalResources_.monitor_ =
-          folly::make_unique<UsablePhysicalResourceMonitor>(
+          std::make_unique<UsablePhysicalResourceMonitor>(
             CGroupPaths(opts.cgroupOptions, folly::none),
             FLAGS_physical_resources_subprocess_timeout_ms,
             std::chrono::seconds(FLAGS_refresh_usable_physical_resources_sec)
@@ -333,7 +333,7 @@ void BistroWorkerHandler::runTask(
       // 10 tasks / sec
       folly::AutoTimer<> timer(
           "Task update queue was slow", std::chrono::milliseconds{100});
-      notifyFinishedQueue_.blockingWrite(folly::make_unique<NotifyData>(
+      notifyFinishedQueue_.blockingWrite(std::make_unique<NotifyData>(
         TaskID{rt.job, rt.node}, std::move(status)
       ));
       logStateTransitionFn_("completed_task", worker_, &rt);

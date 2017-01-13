@@ -94,7 +94,7 @@ TaskStatus TaskStatus::workerLost(std::string shard, uint32_t saved_backoff) {
       // 'lost' status, but the 'lost' status cannot overwrite a real
       // status that arrived between loseRunningTasks and this call.
       | TaskStatusBits::Overwriteable,
-    folly::make_unique<dynamic>(dynamic::object
+    std::make_unique<dynamic>(dynamic::object
       ("worker_shard", shard)
       (kException, "Remote worker lost (crashed? network down?)")
       (kBistroSavedBackoff, saved_backoff)
@@ -121,7 +121,7 @@ std::unique_ptr<folly::dynamic> makeDataPtr(const folly::dynamic* d) {
   if (d == nullptr || d->empty()) {  // Don't store empties to save RAM
     return nullptr;
   }
-  return folly::make_unique<folly::dynamic>(*d);
+  return std::make_unique<folly::dynamic>(*d);
 }
 
 folly::Optional<TaskStatus> fromSimpleLabel(

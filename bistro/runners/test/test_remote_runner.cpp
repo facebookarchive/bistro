@@ -277,8 +277,8 @@ struct TestRemoteRunnerWithOneTask : TestRemoteRunner {
       // runner being unable to talk to the worker).
       workers_([]() {
         std::vector<std::unique_ptr<FakeWorker>> v;
-        v.emplace_back(folly::make_unique<FakeWorker>("test_worker_1"));
-        v.emplace_back(folly::make_unique<FakeWorker>("test_worker_2"));
+        v.emplace_back(std::make_unique<FakeWorker>("test_worker_1"));
+        v.emplace_back(std::make_unique<FakeWorker>("test_worker_2"));
         return v;
       }()),
       config_([]() {

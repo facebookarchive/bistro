@@ -23,7 +23,7 @@ LocalRunner::LocalRunner(
     const boost::filesystem::path& cmd,
     const boost::filesystem::path& dir)
   // The default log filename matches BistroRemoteWorkerHandler
-  : taskQueue_(folly::make_unique<LogWriter>(dir / "/task_logs.sql3")),
+  : taskQueue_(std::make_unique<LogWriter>(dir / "/task_logs.sql3")),
     cmd_(cmd),
     jobsDir_(dir / "/jobs") {
 }

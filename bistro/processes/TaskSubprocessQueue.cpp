@@ -66,7 +66,7 @@ TaskStatus parseStatus(const detail::TaskSubprocessState* state) {
     if (state->wasKilled()) {
       // Task backs off, but its backoff counter is not advanced. Good
       // for preempting or restarting running tasks.
-      return TaskStatus::incompleteBackoff(folly::make_unique<folly::dynamic>(
+      return TaskStatus::incompleteBackoff(std::make_unique<folly::dynamic>(
         folly::dynamic::object
           ("exception", "Task killed, no status returned")
       ));

@@ -22,23 +22,23 @@ namespace facebook { namespace bistro {
 void registerDefaultSchedulerPolicies() {
   registerSchedulerPolicy(
     kSchedulePolicyUnitTest.str(),
-    folly::make_unique<UnitTestSchedulerPolicy>()
+    std::make_unique<UnitTestSchedulerPolicy>()
   );
   registerSchedulerPolicy(
     kSchedulePolicyRoundRobin.str(),
-    folly::make_unique<RoundRobinSchedulerPolicy>()
+    std::make_unique<RoundRobinSchedulerPolicy>()
   );
   registerSchedulerPolicy(
     kSchedulePolicyRankedPriority.str(),
-    folly::make_unique<RankedPrioritySchedulerPolicy>()
+    std::make_unique<RankedPrioritySchedulerPolicy>()
   );
   registerSchedulerPolicy(
     kSchedulePolicyRandomPriority.str(),
-    folly::make_unique<RandomizedPrioritySchedulerPolicy>()
+    std::make_unique<RandomizedPrioritySchedulerPolicy>()
   );
   registerSchedulerPolicy(
     kSchedulePolicyLongTail.str(),
-    folly::make_unique<LongTailSchedulerPolicy>()
+    std::make_unique<LongTailSchedulerPolicy>()
   );
 }
 

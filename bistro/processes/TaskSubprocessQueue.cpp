@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -373,11 +373,12 @@ void TaskSubprocessQueue::runTask(
       );
 
       boost::system::error_code ec;
-      boost::filesystem::create_directories(working_dir, ec);
+      if (!boost::filesystem::exists(working_dir, ec)) {
+        boost::filesystem::create_directories(working_dir, ec);
+      }
       if (ec) {
         throw BistroException(
-          "Failed to make working directory: ", ec.message()
-        );
+            "Failed to make working directory: ", ec.message());
       }
 
       CHECK(cmd.size() >= 1);

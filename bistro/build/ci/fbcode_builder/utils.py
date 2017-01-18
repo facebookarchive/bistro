@@ -7,8 +7,11 @@ from __future__ import unicode_literals
 
 import itertools
 import logging
+import os
 import subprocess
 import sys
+
+from contextlib import contextmanager
 
 
 def recursively_flatten_list(l):
@@ -23,3 +26,23 @@ def run_command(*cmd, **kwargs):
     logging.debug('Running: {0} with {1}'.format(cmd, kwargs))
     kwargs['stdout'] = sys.stderr
     subprocess.check_call(cmd, **kwargs)
+
+
+@contextmanager
+def make_temp_dir(d):
+    os.mkdir(d)
+    try:
+        yield d
+    finally:
+        if os.path.exists(d):
+            os.rmdir(d)
+
+
+@contextmanager
+def push_dir(d):
+    old_dir = os.getcwd()
+    os.chdir(d)
+    try:
+        yield d
+    finally:
+        os.chdir(old_dir)

@@ -45,6 +45,11 @@ class ShellQuoted(namedtuple('ShellQuoted', ('do_not_use_raw_str',))):
             'or ShellQuoted.format() instead'.format(repr(self))
         )
 
+    def __repr__(self):
+        return '{0}({1})'.format(
+            self.__class__.__name__, repr(self.do_not_use_raw_str)
+        )
+
     def format(self, **kwargs):
         '''
 
@@ -83,3 +88,11 @@ def path_join(*args):
     return ShellQuoted(os.path.join(*[
         raw_shell(shell_quote(s)) for s in args
     ]))
+
+
+def shell_comment(c):
+    'Do not shell-escape raw strings in comments, but do handle line breaks.'
+    return ShellQuoted('# {c}').format(c=ShellQuoted(
+        (raw_shell(c) if isinstance(c, ShellQuoted) else c)
+            .replace('\n', '\n# ')
+    ))

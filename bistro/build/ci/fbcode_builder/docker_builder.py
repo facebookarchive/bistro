@@ -19,7 +19,7 @@ import os
 import tempfile
 
 from .fbcode_builder import FBCodeBuilder
-from .shell_quoting import raw_shell, shell_join, ShellQuoted
+from .shell_quoting import raw_shell, shell_comment, shell_join, ShellQuoted
 from .utils import recursively_flatten_list, run_command
 
 
@@ -68,23 +68,27 @@ class DockerFBCodeBuilder(FBCodeBuilder):
             ShellQuoted('WORKDIR {dir}').format(dir=dir),
         ]
 
-    def copy_local_repo(self, repo_dir):
-        target_dir = os.path.basename(os.path.abspath(repo_dir))
+    def comment(self, comment):
+        # This should not be a command since we don't want comment changes
+        # to invalidate the Docker build cache.
+        return shell_comment(comment)
+
+    def copy_local_repo(self, repo_dir, dest_name):
         fd, archive_path = tempfile.mkstemp(
-            prefix='local_repo_{0}_'.format(target_dir),
+            prefix='local_repo_{0}_'.format(dest_name),
             suffix='.tgz',
             dir=os.path.abspath(self.option('docker_context_dir')),
         )
         os.close(fd)
         run_command('tar', 'czf', archive_path, '.', cwd=repo_dir)
         return [
-            ShellQuoted('ADD {archive} {dest_dir}').format(
-                archive=os.path.basename(archive_path), dest_dir=target_dir
+            ShellQuoted('ADD {archive} {dest_name}').format(
+                archive=os.path.basename(archive_path), dest_name=dest_name
             ),
             # Docker permissions make very little sense... see also workdir()
             ShellQuoted('USER root'),
             ShellQuoted('RUN chown -R {u} {d}').format(
-                d=target_dir, u=self._user()
+                d=dest_name, u=self._user()
             ),
             self._change_user(),
         ]

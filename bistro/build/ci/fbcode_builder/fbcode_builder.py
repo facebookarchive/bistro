@@ -115,7 +115,9 @@ class FBCodeBuilder(object):
         'Log some system diagnostics before/after setup for ease of debugging'
         # The builder's repr is not used in a command to avoid pointlessly
         # invalidating Docker's build cache.
-        return self.step('Diagnostics for {0}'.format(repr(self)), [
+        return self.step('Diagnostics', [
+            self.comment('Builder {0}'.format(repr(self))),
+            self.run(ShellQuoted('hostname')),
             self.run(ShellQuoted('cat /etc/issue')),
             self.run(ShellQuoted('g++ --version || echo g++ not installed')),
         ])
@@ -132,10 +134,10 @@ class FBCodeBuilder(object):
         'Create this directory if it does not exist, and change into it'
         raise NotImplementedError
 
-    def copy_local_repo(self, dir):
+    def copy_local_repo(self, dir, dest_name):
         '''
         Copy the local repo at `dir` into this step's `workdir()`, analog of:
-          cp -r /path/to/folly .
+          cp -r /path/to/folly folly
         '''
         raise NotImplementedError
 
@@ -227,7 +229,9 @@ class FBCodeBuilder(object):
             self.run(
                 ShellQuoted('git clone https://github.com/{p}')
                     .format(p=project)
-            ) if not local_repo_dir else self.copy_local_repo(local_repo_dir),
+            ) if not local_repo_dir else self.copy_local_repo(
+                local_repo_dir, os.path.basename(project)
+            ),
             self.workdir(path_join(base_dir, os.path.basename(project), path)),
         ] + maybe_change_branch)
 

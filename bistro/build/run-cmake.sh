@@ -90,8 +90,8 @@ cd "$build_dir/.."
 update_thrift if if/*.thrift build/fbinclude/common/fb303/if/fb303.thrift
 ./build/targets_to_cmake_lists.py .
 
-# Start in e.g. build/Debug/build, and so we can put the artifacts in Debug/.
-make_dir="$build_dir/$build_type/build"
+# Put our artifacts in build/{Debug,Release}
+make_dir="$build_dir/$build_type"
 mkdir -p "$make_dir"
 cd "$make_dir"
 

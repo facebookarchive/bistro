@@ -150,7 +150,7 @@ class CmakeDir(object):
         self.dirs = {}
         self.cmake_lines = []
 
-    def write_cmake_lists(self, path=None):
+    def write_cmake_lists(self, path=None, setup_lines=''):
         if path is None:
             path = self.name
         else:
@@ -158,6 +158,8 @@ class CmakeDir(object):
 
         print(path)
         with open(os.path.join(path, 'CMakeLists.txt'), 'w') as f:
+            print(setup_lines, end='', file=f)
+
             for l in self.cmake_lines:
                 print(l, end='', file=f)
 
@@ -191,4 +193,7 @@ def make_cmake_dir_recursive(root_path):
     return root
 
 
-make_cmake_dir_recursive(sys.argv[1]).write_cmake_lists()
+make_cmake_dir_recursive(sys.argv[1]).write_cmake_lists(
+    setup_lines='cmake_minimum_required(VERSION 2.8)\n'
+        'include("build/setup.cmake")\n',
+)

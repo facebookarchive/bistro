@@ -42,7 +42,7 @@ def build_bistro(builder):
                 'PYTHONPATH="$PYTHONPATH:"{p}/lib/python2.7/site-packages '
                 './build/run-cmake.sh Debug -DCMAKE_INSTALL_PREFIX={p}'
             ).format(p=builder.option('prefix'))),
-            builder.workdir('build/Debug/build'),
+            builder.workdir('build/Debug'),
             builder.parallel_make(),
         ]),
         builder.step('Run bistro tests', [

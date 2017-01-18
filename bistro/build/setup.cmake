@@ -9,13 +9,11 @@
 
 # Do NOT use this -- run build/run-cmake.sh instead & read its docblock.
 
-cmake_minimum_required(VERSION 2.8)
-
 include_directories(
   # Our includes start with "bistro/bistro/"
-  "${PROJECT_SOURCE_DIR}/../../.."
+  "${PROJECT_SOURCE_DIR}/../.."
   # A hack to include a stub for some FB-specific includes under "common/".
-  "${PROJECT_SOURCE_DIR}/../build/fbinclude"
+  "${PROJECT_SOURCE_DIR}/build/fbinclude"
   "${CMAKE_INSTALL_PREFIX}/include"
 )
 
@@ -61,9 +59,9 @@ macro(bistro_link_libraries name)
   )
 endmacro(bistro_link_libraries)
 
-add_subdirectory(deps/gtest-1.7.0)
+add_subdirectory(build/deps/gtest-1.7.0)
 enable_testing()
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+include_directories("${gtest_SOURCE_DIR}/include" "${gtest_SOURCE_DIR}")
 
 macro(add_gtest name)
   add_executable(${name} ${name}.cpp)
@@ -75,7 +73,3 @@ macro(add_gtest name)
   )
   add_test(${name} ${name})
 endmacro(add_gtest)
-
-# run-cmake.sh starts CMake in e.g. build/Debug/build, but we want the
-# artifacts in build/Debug, hence the /..
-add_subdirectory(.. ${PROJECT_BINARY_DIR}/..)

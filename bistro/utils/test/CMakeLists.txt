@@ -1,6 +1,0 @@
-add_gtest(test_settings_map lib_bistro_utils)
-add_gtest(test_symbol_table lib_bistro_utils)
-add_gtest(test_shuffled_range lib_bistro_utils)
-add_gtest(test_background_thread lib_bistro_utils)
-add_gtest(test_log_writer lib_bistro_utils)
-add_gtest(test_shell lib_bistro_utils)

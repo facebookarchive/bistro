@@ -2,7 +2,7 @@
 '''
 
 Converts Facebook's internal TARGETS files into CMakeLists.txt, used by
-`build.sh`.
+`run-cmake.sh`.
 
 Using Python 2.7 until all environments come with 3.x out of the box.
 
@@ -29,7 +29,7 @@ def parse_targets(dirpath, s):
         if not re.match('^(:|@/bistro/bistro[:/])', s):
             return None
         if s.endswith('-cpp2'):
-            # Handled specially by build.sh, has a special CMakeLists.txt
+            # Handled specially by run-cmake.sh, has a special CMakeLists.txt
             return 'lib_bistro_if'
         return s.split(':', 1)[1]
 
@@ -122,7 +122,7 @@ def parse_targets(dirpath, s):
         pass  # I don't think that OSS platforms need to build the Python libs
 
     def thrift_library(**kwargs):
-        pass  # Thrift is currently built by build.sh. TODO: Improve?
+        pass  # Thrift is currently built by run-cmake.sh. TODO: Improve?
 
     class util(object):
         @classmethod
@@ -177,7 +177,7 @@ def make_cmake_dir_recursive(root_path):
     root = CmakeDir(root_path)
     for dirpath, _dirnames, filenames in os.walk(root.name):
         if TARGETS in filenames:
-            # build.sh has its own hacky way of building Thrift. TODO: Fix.
+            # run-cmake.sh has its own hacky way of building Thrift. TODO: Fix.
             if dirpath == os.path.join(root.name, 'if'):
                 continue
             with open(os.path.join(dirpath, TARGETS)) as f:

@@ -7,7 +7,7 @@
 # of patent rights can be found in the PATENTS file in the same directory.
 #
 
-# Do NOT use this directly, run build/build.sh instead.
+# Do NOT use this -- run build/run-cmake.sh instead & read its docblock.
 
 cmake_minimum_required(VERSION 2.8)
 
@@ -16,7 +16,10 @@ include_directories(
   "${PROJECT_SOURCE_DIR}/../../.."
   # A hack to include a stub for some FB-specific includes under "common/".
   "${PROJECT_SOURCE_DIR}/../build/fbinclude"
+  "${CMAKE_INSTALL_PREFIX}/include"
 )
+
+link_directories("${CMAKE_INSTALL_PREFIX}/lib")
 
 add_definitions(-std=c++14 -Wno-deprecated)
 
@@ -73,6 +76,6 @@ macro(add_gtest name)
   add_test(${name} ${name})
 endmacro(add_gtest)
 
-# build.sh starts CMake in e.g. build/Debug/build, but we want the artifacts
-# in build/Debug, hence the /..
+# run-cmake.sh starts CMake in e.g. build/Debug/build, but we want the
+# artifacts in build/Debug, hence the /..
 add_subdirectory(.. ${PROJECT_BINARY_DIR}/..)

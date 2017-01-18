@@ -9,18 +9,31 @@
 #
 
 #
-# Builds Bistro and tests (and optionally runs tests) in
-#   build/Release/ or build/Debug/
+# Runs `cmake` for Bistro, directing output to build/Release/ or build/Debug/.
+#
+# If Bistro's dependencies are installed in a non-default prefix, it will
+# need some help finding them:
+#   
+#   PYTHONPATH="$PYTHONPATH:$your_prefix/lib/python2.7/site-packages" \
+#     ./run-cmake.sh Debug -DCMAKE_INSTALL_PREFIX="$your_prefix"
+#
+# The last line printed to stdout is the path where you can run `make`, so
+# this script can be used e.g. as follows:
+#
+#   cd "$(./run-cmake.sh Debug ... | tee /proc/self/fd/2 | tail)" && make
 #
 
 set -e
 
-BUILD_DIR="$(readlink -f "$(dirname "$0")")"
+build_dir="$(readlink -f "$(dirname "$0")")"
 
 if [[ "$1" != "Release" && "$1" != "Debug" ]] ; then
-  echo "Usage: $0 <Release|Debug> [runtests]" 1>&2
+  echo "Usage: $0 <Release|Debug> [CMake args]" 1>&2
   exit 1
 fi
+build_type=$1
+shift 1
+# The remaining arguments will be passed to CMake
 
 # Does not change the timestamp if the file has not changed.
 update_file() {
@@ -38,23 +51,23 @@ update_file() {
 # TODO: This neither deletes generated files nor auto-updates CMakeLists.txt
 update_thrift() {
   echo "Checking if Thrift-generated sources changed"
-  OUT_DIR="$1"
+  out_dir="$1"
   shift 1
-  TMP_DIR="$(mktemp -d)"
+  temp_dir="$(mktemp -d)"
   for f in "$@" ; do
-    python -mthrift_compiler.main -o "$TMP_DIR" --gen cpp2:stack_arguments \
-      -I ../.. -I "$BUILD_DIR/fbinclude" "$f"
+    python -mthrift_compiler.main -o "$temp_dir" --gen cpp2:stack_arguments \
+      -I ../.. -I "$build_dir/fbinclude" "$f"
   done
-  for f in "$TMP_DIR/gen-cpp2"/* ; do
-    update_file "$f" "$OUT_DIR${f#$TMP_DIR}"
+  for f in "$temp_dir/gen-cpp2"/* ; do
+    update_file "$f" "$out_dir${f#$temp_dir}"
   done
-  rm -r "$TMP_DIR/gen-cpp2"
-  rmdir "$TMP_DIR"
+  rm -r "$temp_dir/gen-cpp2"
+  rmdir "$temp_dir"
 }
 
 fetch_gtest() {
-  mkdir -p "$BUILD_DIR/deps"
-  pushd "$BUILD_DIR/deps"
+  mkdir -p "$build_dir/deps"
+  pushd "$build_dir/deps"
   if [[ ! -d gtest-1.7.0 ]] ; then
     wget https://github.com/google/googletest/archive/release-1.7.0.tar.gz \
       -O googletest-release-1.7.0.tgz
@@ -73,18 +86,21 @@ fetch_gtest() {
 fetch_gtest
 
 # Hacky way to build Thrift until we have a proper CMake module to do it.
-cd "$BUILD_DIR/.."
+cd "$build_dir/.."
 update_thrift if if/*.thrift build/fbinclude/common/fb303/if/fb303.thrift
 ./build/targets_to_cmake_lists.py .
 
 # Start in e.g. build/Debug/build, and so we can put the artifacts in Debug/.
-D="$BUILD_DIR/$1/build"
-mkdir -p "$D"
-cd "$D"
+make_dir="$build_dir/$build_type/build"
+mkdir -p "$make_dir"
+cd "$make_dir"
 
 # Re-run every time, since we use a glob to find Thrift *.cpp files.
-cmake -DCMAKE_BUILD_TYPE="$1" ../..
-make
-if [[ "$2" == "runtests" ]] ; then
-  ctest
-fi
+cmake -DCMAKE_BUILD_TYPE="$build_type" "$@" ../..
+
+cat <<EOF
+Bistro's cmake finished successfully. You can now change into the following
+directory, and run "make":
+
+$make_dir
+EOF

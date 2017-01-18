@@ -53,7 +53,7 @@ various flavors of Linux and Mac OS.
 The binaries will be in bistro/build/{Debug,Release}.  Available build
 targets are explained here:
    http://cmake.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools
-The 'runtests' argument optionally runs Bistro's unit tests via `ctest`.
+You can start Bistro's unit tests by running `ctest` in those directories.
 
 ## Your first Bistro run
 

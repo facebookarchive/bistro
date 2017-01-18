@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -50,8 +50,17 @@ dynamic c = dynamic::object
   ("scheduler", "ranked_priority")
 ;
 
+// CMake's ctest will run all these tests sequentially.
+bool test_registered_scheduler_policies = false;
+void testRegisterSchedulerPolicies() {
+  if (!test_registered_scheduler_policies) {
+    registerDefaultSchedulerPolicies();
+    test_registered_scheduler_policies = true;
+  }
+}
+
 TEST(TestDependencyScheduling, HandleInvalidDependency) {
-  registerDefaultSchedulerPolicies();
+  testRegisterSchedulerPolicies();
   Config config(c);
   config.addJob(
     "job1",
@@ -77,7 +86,7 @@ TEST(TestDependencyScheduling, HandleInvalidDependency) {
 }
 
 TEST(TestDependencyScheduling, HandleAll) {
-  registerDefaultSchedulerPolicies();
+  testRegisterSchedulerPolicies();
   Config config(c);
   config.addJob(
     "job1",

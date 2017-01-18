@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -37,15 +37,16 @@ struct StubClock {
 };
 int64_t StubClock::t = 0;
 
+bool node_fetcher_added = false;
+
 template <typename... Args>
 void fetch(double t, Nodes *nodes, Args&&... items) {
-  static bool initialized = false;
-  if (!initialized){
+  if (!node_fetcher_added){
     NodeFetcher::add(
       "test_add_time",
       std::shared_ptr<NodeFetcher>(new AddTimeFetcher<StubClock>{})
     );
-    initialized = true;
+    node_fetcher_added = true;
   }
 
   StubClock::t = t;

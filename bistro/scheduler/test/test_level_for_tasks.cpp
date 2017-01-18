@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -45,8 +45,17 @@ string scheduleOne(const dynamic& d) {
   return catcher.tasks[0].second;
 }
 
+// CMake's ctest will run all these tests sequentially.
+bool test_registered_scheduler_policies = false;
+void testRegisterSchedulerPolicies() {
+  if (!test_registered_scheduler_policies) {
+    registerDefaultSchedulerPolicies();
+    test_registered_scheduler_policies = true;
+  }
+}
+
 TEST(TestLevelForTasks, InstanceNodeOnly) {
-  registerDefaultSchedulerPolicies();
+  testRegisterSchedulerPolicies();
   EXPECT_EQ(getLocalHostName(), scheduleOne(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
@@ -57,7 +66,7 @@ TEST(TestLevelForTasks, InstanceNodeOnly) {
 }
 
 TEST(TestLevelForTasks, CanSelectLevel) {
-  registerDefaultSchedulerPolicies();
+  testRegisterSchedulerPolicies();
   dynamic d = dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -135,14 +135,10 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
   p.optional("owner", [&](std::string&& s) { config.owner = std::move(s); });
   p.optional("priority", [&](double p) { config.priority = p; });
   config.config = "{}";  // No default in .thrift file :/
-  p.optional("config", [&]() {
-    config.config = folly::toJson(p.value()).toStdString();
-  });
+  p.optional("config", [&]() { config.config = folly::toJson(p.value()); });
   // Since this toThrift is meant to be used on the output of toDynamic, it
   // is not an error to have something in "errors".
-  p.optional("errors", [&]() {
-    config.error = folly::toJson(p.value()).toStdString();
-  });
+  p.optional("errors", [&]() { config.error = folly::toJson(p.value()); });
   p.optional("create_time", [&](int64_t n) { config.createTime = n; });
   p.optional("modify_time", [&](int64_t n) { config.modifyTime = n; });
   p.optional("level_for_tasks", [&](std::string&& s) {

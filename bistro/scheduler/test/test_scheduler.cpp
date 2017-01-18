@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -32,6 +32,15 @@ using folly::dynamic;
 // starting!), then this test should get a "host_disabled", with an enabled
 // node underneath.  However, the better fix is just to make the node
 // fetchers propagate disabled state properly.
+
+// CMake's ctest will run all these tests sequentially.
+bool test_registered_scheduler_policies = false;
+void testRegisterSchedulerPolicies() {
+  if (!test_registered_scheduler_policies) {
+    registerDefaultSchedulerPolicies();
+    test_registered_scheduler_policies = true;
+  }
+}
 
 dynamic jobWithNodesToDynamic(
     const Config& config,
@@ -68,7 +77,7 @@ dynamic jobWithNodesToDynamic(
 }
 
 TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
-  registerDefaultSchedulerPolicies();
+  testRegisterSchedulerPolicies();
   Config config(dynamic::object
     ("nodes", dynamic::object
       ("levels", dynamic::array("host", "db"))
@@ -299,14 +308,14 @@ struct ReplicaTest {
 };
 
 TEST(TestScheduler, EnsureReplicasSharePackedResources) {
-  registerDefaultSchedulerPolicies();
+  testRegisterSchedulerPolicies();
   auto res = ReplicaTest().checkSchedule(1);
   EXPECT_FALSE(res.areTasksRunning_);
   EXPECT_EQ(0, res.orphanTasks_.size());
 }
 
 TEST(TestScheduler, EnsureBothReplicasCanRun) {
-  registerDefaultSchedulerPolicies();
+  testRegisterSchedulerPolicies();
   // There are two copies of the "db" node, try running on both.
   for (size_t which_copy = 1; which_copy <= 2; ++which_copy) {
     size_t seen_copies = 0;

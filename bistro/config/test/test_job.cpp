@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -38,7 +38,7 @@ void checkValueParseError(
   (*expected_cur)["error"] = (*actual_cur)["error"];
   (*expected_cur)["value"] = *value_cur;
   EXPECT_EQ(expected, j.errors());
-  EXPECT_EQ(expected_error, (*actual_cur)["error"].asString().toStdString());
+  EXPECT_EQ(expected_error, (*actual_cur)["error"].asString());
 }
 
 TEST(TestJob, HandleAll) {

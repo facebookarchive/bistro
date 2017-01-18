@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -180,6 +180,7 @@ TEST_F(TestRemoteRunner, HandleResources) {
   cpp2::WorkerSetID wsid;
   wsid.schedulerID = runner.getSchedulerID();
   addFakeWorker(&runner, kConfig, worker, wsid);
+  waitToExitInitialWait(runner);
 
   // The first task will consume all of `test_worker`'s `concurrency`.
   {
@@ -379,7 +380,7 @@ struct TestRemoteRunnerWithOneTask : TestRemoteRunner {
 
 TEST_F(TestRemoteRunnerWithOneTask, TaskExitedRacesTaskLost) {
   connectWorker(0);
-  workers_[0]->workerMayReturnStatus_.setValue(TaskStatus::done());
+  waitToExitInitialWait(*runner_);
   runTask();
   // The first missed healthcheck makes the worker unhealthy.
   missHealthcheckForWorker(0);
@@ -391,6 +392,10 @@ TEST_F(TestRemoteRunnerWithOneTask, TaskExitedRacesTaskLost) {
       // This happens after the task is written into RemoteWorkerUpdate as
       // lost, but before the update is actually applied.
       [&]() {
+        // Have the worker return the status just after the "process
+        // heartbeat" update is computed -- this minimizes the chances that
+        // the background thread `applyUpdate` will break the test.
+        workers_[0]->workerMayReturnStatus_.setValue(TaskStatus::done());
         // Simulate a race with a remote worker by waiting until this task's
         // status is modified by remoteUpdateStatus above.
         workers_[0]->workerReturnedStatus_.getFuture().get();
@@ -409,6 +414,7 @@ TEST_F(TestRemoteRunnerWithOneTask, TaskExitedRacesTaskLost) {
 
 TEST_F(TestRemoteRunnerWithOneTask, DeathDueToTaskThatTookTooLongToKill) {
   connectWorker(0);
+  waitToExitInitialWait(*runner_);
   runTask();
   // First, make the worker unhealthy, then -- lost.
   missHealthcheckForWorker(0);
@@ -483,6 +489,7 @@ TEST_F(TestRemoteRunnerWithOneTask, LostTasksHaveAMinimumBackoff) {
   ASSERT_GT(kExtendedBackoff, kDefaultBackoff);
 
   connectWorker(0);
+  waitToExitInitialWait(*runner_);
   runTask();
   // First, make the worker unhealthy, then -- lost.
   missHealthcheckForWorker(0);

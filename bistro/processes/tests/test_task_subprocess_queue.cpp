@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -668,7 +668,7 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   {
     // tsq's destructor is the easiest way to await task exit :)
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
-    runTask(&tsq, "/bin/sleep 3600", opts, &expectKilled);
+    runTask(&tsq, "exec sleep 3600", opts, &expectKilled);
     SCOPE_EXIT { tsq.kill(runningTask(), requestSigkill()); };
     EXPECT_TRUE(boost::filesystem::is_empty("."));
   }
@@ -677,7 +677,7 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   opts.cgroupOptions.subsystems = {"sys"};
   {
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
-    runTask(&tsq, "/bin/sleep 3600", opts, std::bind(
+    runTask(&tsq, "exec sleep 3600", opts, std::bind(
       &expectErrorRegex, ".*root/subsystem/slice must be a dir.*", p::_1, p::_2
     ));
   }
@@ -687,7 +687,7 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   {
     folly::Synchronized<TestLogWriter::TaskLogMap> task_to_logs;
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
-    runTask(&tsq, "/bin/echo ; exec /bin/sleep 3600", opts, &expectKilled);
+    runTask(&tsq, "/bin/echo ; exec sleep 3600", opts, &expectKilled);
     SCOPE_EXIT { tsq.kill(runningTask(), requestSigkill()); };
     while (  // Wait for the task to start.
       task_to_logs->operator[](std::make_pair("job", "node")).stdout_.empty()

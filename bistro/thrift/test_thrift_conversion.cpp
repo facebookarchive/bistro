@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -85,7 +85,7 @@ TEST(TestThriftConversion, HandleJob) {
   c.config = "{\"abc\":123}";
   c.priority = 2.0;
   c.filters["fakeLevel"] = mockFilters();
-  c.error = folly::toJson(errors_d).toStdString();
+  c.error = folly::toJson(errors_d);
   c.levelForTasks = "fakeLevel";
   c.levelForHostPlacement = "fakeLevel2";
   c.hostPlacement = "fakeHost";

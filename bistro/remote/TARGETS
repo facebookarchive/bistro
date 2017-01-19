@@ -1,0 +1,14 @@
+cpp_library(
+    name = 'remote_lib',
+    srcs = [
+        'RemoteWorker.cpp',
+        'RemoteWorkers.cpp',
+        'RemoteWorkerState.cpp',
+        'RemoteWorkerSelector.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/flags:flags_lib',
+    ],
+)

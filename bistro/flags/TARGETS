@@ -1,0 +1,9 @@
+cpp_library(
+    name = 'flags_lib',
+    srcs = [
+        'Flags.cpp',
+    ],
+    external_deps = [
+        ('gflags'),
+    ]
+)

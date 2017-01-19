@@ -1,0 +1,23 @@
+cpp_library(
+    name = 'config_lib',
+    srcs = [
+        'Config.cpp',
+        'ConfigLoader.cpp',
+        'FileConfigLoader.cpp',
+        'Job.cpp',
+        'JobBackoffSettings.cpp',
+        'JobFilters.cpp',
+        'Node.cpp',
+        'SchedulerType.cpp',
+        'RemoteWorkerSelectorType.cpp',
+        'utils.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/if:common-cpp2',
+        '@/bistro/bistro/utils:utils_lib',
+        '@/folly:folly',
+    ],
+    external_deps = [
+        ('boost', None, 'boost_filesystem'),
+    ],
+)

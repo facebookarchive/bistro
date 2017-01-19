@@ -1,0 +1,9 @@
+cpp_unittest(
+    name = 'test_date_time',
+    srcs = [
+        'test_date_time.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/cron/utils:cron_utils_lib',
+    ],
+)

@@ -1,0 +1,28 @@
+cpp_library(
+    name = 'utils_lib',
+    srcs = [
+        # Classes
+        'BackgroundThreads.cpp',
+        'LogWriter.cpp',
+        'KillableSubprocess.cpp',
+        'ProcessRunner.cpp',
+        'service_clients.cpp',
+        'server_socket.cpp',
+        'SettingsMap.cpp',
+        'SubprocessTaskQueue.cpp',
+        'TemporaryFile.cpp',
+        # Collections of utility functions
+        'hostname.cpp',
+        'shell.cpp',
+    ],
+    deps = [
+        '@/folly:folly',
+        '@/folly:subprocess',
+        '@/folly/experimental:autotimer',
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/sqlite:sqlite_lib',
+    ],
+    external_deps = [
+        ('boost', None, 'boost_regex'),
+    ],
+)

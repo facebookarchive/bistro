@@ -1,0 +1,16 @@
+cpp_library(
+    name = 'cron_lib',
+    srcs = [
+        'CrontabItem.cpp',
+        'CrontabSelector.cpp',
+        'EpochCrontabItem.cpp',
+        'StandardCrontabItem.cpp',
+    ],
+    deps = [
+        '@/folly:folly',
+        '@/bistro/bistro/cron/utils:cron_utils_lib',
+    ],
+    external_deps = [
+        ('boost', None, 'boost_date_time'),
+    ],
+)

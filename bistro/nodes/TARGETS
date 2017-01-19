@@ -1,0 +1,22 @@
+cpp_library(
+    name = 'nodes_lib',
+    srcs = [
+        'ManualFetcher.cpp',
+        'NodeFetcher.cpp',
+        'Nodes.cpp',
+        'NodesLoader.cpp',
+        'RangeLabelFetcher.cpp',
+        'ScriptFetcher.cpp',
+        'utils.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+        '@/bistro/bistro/cron:cron_lib',
+        '@/bistro/bistro/utils:utils_lib',
+        '@/folly:folly',
+    ],
+    external_deps = [
+        ('boost', None),
+        ('glog', None),
+    ],
+)

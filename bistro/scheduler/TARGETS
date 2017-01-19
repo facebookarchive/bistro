@@ -1,0 +1,24 @@
+cpp_library(
+    name = 'scheduler_lib',
+    srcs = [
+        'RankedPrioritySchedulerPolicy.cpp',
+        'RandomizedPrioritySchedulerPolicy.cpp',
+        'RoundRobinSchedulerPolicy.cpp',
+        'LongTailSchedulerPolicy.cpp',
+        'Scheduler.cpp',
+        'SchedulerPolicy.cpp',
+        'utils.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+        '@/bistro/bistro/utils:utils_lib',
+        '@/bistro/bistro/nodes:nodes_lib',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/flags:flags_lib',
+        '@/folly:folly',
+    ],
+    external_deps = [
+        ('boost', None),
+        ('glog', None),
+    ],
+)

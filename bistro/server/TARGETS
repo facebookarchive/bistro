@@ -1,0 +1,36 @@
+cpp_library(
+    name = 'http_server_lib',
+    srcs = [
+      'Connection.cpp',
+      'HTTPMonitor.cpp',
+      'HTTPServer.cpp',
+      'ThriftMonitor.cpp',
+    ],
+    deps = [
+        '@/folly:folly',
+        '@/bistro/bistro/thrift:conversion_lib',
+        '@/bistro/bistro/config:config_lib',
+        '@/bistro/bistro/if:if-cpp2',
+        '@/common/fb303/cpp:fb303',
+    ],
+    external_deps = [
+        ('boost', None),
+        ('glog', None),
+        ('zlib', None, 'z'),
+    ],
+)
+
+cpp_binary(
+    name = 'bistro',
+    srcs = [
+        'main.cpp',
+    ],
+    deps = [
+        ':http_server_lib',
+        '@/bistro/bistro:bistro_lib',
+        '@/bistro/bistro/nodes:nodes_lib',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/runners:runners_lib',
+        '@/thrift/lib/cpp2:server',
+    ],
+)

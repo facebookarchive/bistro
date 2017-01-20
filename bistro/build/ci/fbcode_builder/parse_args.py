@@ -68,7 +68,10 @@ def parse_args_to_fbcode_builder_opts(add_args_fn, top_level_opts, opts, help):
 
     new_opts = {}
     for key in top_level_opts:
-        new_opts[key] = getattr(args, key)
+        val = getattr(args, key)
+        # Allow clients to unset a default by passing a value of None in opts
+        if val is not None:
+            new_opts[key] = val
     for key, val in args.option:
         new_opts[key] = val
     for key, val in args.shell_quoted_option:

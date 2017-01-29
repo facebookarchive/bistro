@@ -13,8 +13,6 @@
 #include <fstream>
 #include <string>
 
-#include <folly/Conv.h>
-
 namespace facebook { namespace bistro {
 
 namespace {

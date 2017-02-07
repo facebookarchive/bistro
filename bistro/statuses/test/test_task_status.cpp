@@ -28,7 +28,7 @@ TEST(TestTaskStatus, Running) {
   EXPECT_EQ(nullptr, s.dataThreadUnsafe());
 
   // data on 'running' tasks is only used by TaskStatusObservers.
-  auto s2 = TaskStatus::running(make_unique<dynamic>("cat"));
+  auto s2 = TaskStatus::running(std::make_unique<dynamic>("cat"));
   EXPECT_FALSE(s2.isDone());
   EXPECT_TRUE(s2.isRunning());
   EXPECT_EQ(dynamic("cat"), *s2.dataThreadUnsafe());
@@ -43,14 +43,14 @@ TEST(TestTaskStatus, Done) {
   EXPECT_FALSE(s.isFailed());
   EXPECT_EQ(nullptr, s.dataThreadUnsafe());
 
-  auto s2 = TaskStatus::done(make_unique<dynamic>("cat"));
+  auto s2 = TaskStatus::done(std::make_unique<dynamic>("cat"));
   EXPECT_TRUE(s2.isDone());
   EXPECT_FALSE(s2.isRunning());
   EXPECT_EQ(dynamic("cat"), *s2.dataThreadUnsafe());
 }
 
 TEST(TestTaskStatus, Incomplete) {
-  auto s = TaskStatus::incomplete(make_unique<dynamic>("cat"));
+  auto s = TaskStatus::incomplete(std::make_unique<dynamic>("cat"));
   EXPECT_FALSE(s.isDone());
   EXPECT_FALSE(s.isOverwriteable());
   EXPECT_FALSE(s.isRunning());
@@ -60,7 +60,7 @@ TEST(TestTaskStatus, Incomplete) {
 }
 
 TEST(TestTaskStatus, IncompleteBackoff) {
-  auto s = TaskStatus::incompleteBackoff(make_unique<dynamic>("cat"));
+  auto s = TaskStatus::incompleteBackoff(std::make_unique<dynamic>("cat"));
   EXPECT_FALSE(s.isDone());
   EXPECT_FALSE(s.isOverwriteable());
   EXPECT_FALSE(s.isRunning());
@@ -91,7 +91,7 @@ TEST(TestTaskStatus, Error) {
   EXPECT_FALSE(s.isInBackoff(s.timestamp() + 1000));
   EXPECT_EQ(err, (*s.dataThreadUnsafe())["exception"].asString());
 
-  auto s2 = TaskStatus::errorBackoff(make_unique<dynamic>("cat"));
+  auto s2 = TaskStatus::errorBackoff(std::make_unique<dynamic>("cat"));
   EXPECT_FALSE(s2.isRunning());
   EXPECT_FALSE(s2.isDone());
   EXPECT_FALSE(s2.isFailed());
@@ -208,10 +208,10 @@ TEST(TestTaskStatus, UpdateSimple) {
 }
 
 TEST(TestTaskStatus, UpdateData) {
-  auto s = TaskStatus::running(make_unique<dynamic>("foo"));
+  auto s = TaskStatus::running(std::make_unique<dynamic>("foo"));
   EXPECT_EQ(dynamic("foo"), *s.dataThreadUnsafe());
 
-  updateStatus(&s, TaskStatus::errorBackoff(make_unique<dynamic>("bar")));
+  updateStatus(&s, TaskStatus::errorBackoff(std::make_unique<dynamic>("bar")));
   EXPECT_EQ(dynamic("bar"), *s.dataThreadUnsafe());
 }
 
@@ -231,7 +231,7 @@ TEST(TestTaskStatus, BackoffUpdates) {
   EXPECT_FALSE(s.isInBackoff(s.timestamp() + 2));
 
   // We should reset the backoff on an "incomplete"
-  updateStatus(&s, TaskStatus::incomplete(make_unique<dynamic>("cat")));
+  updateStatus(&s, TaskStatus::incomplete(std::make_unique<dynamic>("cat")));
   updateStatus(&s, TaskStatus::errorBackoff("err"));
 
   // Backoff is 1 second again

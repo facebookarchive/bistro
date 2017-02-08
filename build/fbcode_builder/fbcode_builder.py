@@ -209,7 +209,7 @@ class FBCodeBuilder(object):
                 'apt-get install -yq software-properties-common && '
                 'add-apt-repository ppa:george-edison55/cmake-3.x && '
                 'apt-get update && '
-                'apt-get upgrade cmake'
+                'apt-get upgrade -yq cmake'
             )))
 
         return self.step('Install packages for Debian-based OS', actions)

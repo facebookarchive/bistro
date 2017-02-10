@@ -30,9 +30,9 @@ if [[ -x "$BISTRO_BINARY" ]] ; then
 else
   PHABRICATOR_DOMAIN="[YOUR PHABRICATOR DOMAIN]"
   # Try the release binary, then default to the debug binary
-  BISTRO_BINARY="$D/../build/Release/bistro/bistro/server/bistro_scheduler"
+  BISTRO_BINARY="$D/../cmake/Release/bistro/bistro/server/bistro_scheduler"
   if [[ ! -x "$BISTRO_BINARY" ]] ; then
-    BISTRO_BINARY="$D/../build/Debug/bistro/bistro/server/bistro_scheduler"
+    BISTRO_BINARY="$D/../cmake/Debug/bistro/bistro/server/bistro_scheduler"
   fi
 fi
 

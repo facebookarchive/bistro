@@ -41,16 +41,16 @@ The CLI tools and web UI will be shipping shortly.
 Bistro needs a 64-bit Linux, Folly, FBThrift, Proxygen, boost, and
 libsqlite3.  You need 2-3GB of RAM to build, as well as GCC 4.9 or above.
 
-`bistro/build/ci/README` documents the usage of Docker-based scripts that
-build Bistro on Ubuntu 14.04, 16.04, and Debian 8.6.  You should be able to
-follow very similar steps on most modern Linux distributions.
+`build/README.md` documents the usage of Docker-based scripts that build
+Bistro on Ubuntu 14.04, 16.04, and Debian 8.6.  You should be able to follow
+very similar steps on most modern Linux distributions.
 
-If you run into dependency problems, look at bistro/build/CMakeLists.txt for
+If you run into dependency problems, look at `bistro/cmake/setup.cmake` for
 a full list of Bistro's external dependencies (direct and indirect).  We
 gratefully accept patches that improve Bistro's builds, or add support for
 various flavors of Linux and Mac OS.
 
-The binaries will be in bistro/build/{Debug,Release}.  Available build
+The binaries will be in bistro/cmake/{Debug,Release}.  Available build
 targets are explained here:
    http://cmake.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools
 You can start Bistro's unit tests by running `ctest` in those directories.
@@ -88,13 +88,13 @@ Open two terminals, one for the scheduler, and one for the worker.
 # In both terminals
 cd bistro/bistro
 # Start the scheduler in one terminal
-./build/Debug/server/bistro_scheduler \
+./cmake/Debug/server/bistro_scheduler \
   --server_port=6789 --http_server_port=6790 \
   --config_file=scripts/test_configs/simple --clean_statuses \
   --CAUTION_startup_wait_for_workers=1 --instance_node_name=scheduler
 # Start the worker in another
 mkdir /tmp/bistro_worker
-./build/Debug/worker/bistro_worker --server_port=27182 --scheduler_host=:: \
+./cmake/Debug/worker/bistro_worker --server_port=27182 --scheduler_host=:: \
   --scheduler_port=6789 --worker_command="$HOME/demo_bistro_task.sh" \
   --data_dir=/tmp/bistro_worker
 ```
@@ -113,7 +113,7 @@ put the SQLite database, via `--data_dir=/tmp/bistro_scheduler` and
 
 ```
 mkdir /tmp/bistro_scheduler
-./build/Debug/server/bistro_scheduler \
+./cmake/Debug/server/bistro_scheduler \
   --server_port=6789 --http_server_port=6790 \
   --config_file=scripts/test_configs/simple \
   --data_dir=/tmp/bistro_scheduler --status_table=task_statuses \
@@ -140,7 +140,7 @@ less scripts/test_configs/simple
 For debugging, we typically invoke the binaries like this:
 
 ```
-gdb build/Debug/worker/bistro_worker -ex "r ..." 2>&1 | tee WORKER.txt
+gdb cmake/Debug/worker/bistro_worker -ex "r ..." 2>&1 | tee WORKER.txt
 ```
 
 When configuring a real deployment, be sure to carefully review the `--help`

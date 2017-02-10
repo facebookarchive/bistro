@@ -111,7 +111,7 @@ def parse_targets(dirpath, s):
         _validate_keys(kwargs, 'cpp_library', {
             'srcs',  # Handled above
             'deps',  # Handled above
-            'external_deps',  # Handled in build/CMakeLists.txt
+            'external_deps',  # Handled in cmake/setup.cmake
             'headers',  # CMake handles headers automatically
         })
 
@@ -195,5 +195,5 @@ def make_cmake_dir_recursive(root_path):
 
 make_cmake_dir_recursive(sys.argv[1]).write_cmake_lists(
     setup_lines='cmake_minimum_required(VERSION 2.8)\n'
-        'include("build/setup.cmake")\n',
+        'include("cmake/setup.cmake")\n',
 )

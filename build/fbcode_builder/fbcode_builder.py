@@ -37,9 +37,6 @@ Ideas for the future -- these may not be very good :)
    shell script that runs outside of a container. Or maybe even
    synchronously executes the shell commands, `make`-style.
 
- - Support for dependencies. This was not built since FB projects'
-   dependency chains are simple, so a linear sequence of steps was enough.
-
  - A "Makefile" generator. That might make iterating on builds even quicker
    than what you can currently get with Docker build caching.
 
@@ -47,7 +44,7 @@ Ideas for the future -- these may not be very good :)
 
 import os
 
-from .shell_quoting import path_join, shell_join, ShellQuoted
+from shell_quoting import path_join, shell_join, ShellQuoted
 
 
 class FBCodeBuilder(object):
@@ -99,7 +96,7 @@ class FBCodeBuilder(object):
             raise RuntimeError(
                 'Unused options: {0} -- please check if you made a typo '
                 'in any of them. Those that are truly not useful should '
-                'be removed so that this typo detection can be useful.'
+                'be not be set so that this typo detection can be useful.'
                 .format(unused_options)
             )
         return res
@@ -259,14 +256,6 @@ class FBCodeBuilder(object):
                 vars=self._make_vars(make_vars),
             )),
         ]
-
-    def zstd_make_and_install(self):
-        'Zstd is a special snowflake, so make it easy to built it correctly'
-        return self.step('Build and install zstd', [
-            self.make_and_install(make_vars={
-                'PREFIX': self.option('prefix'),
-            })
-        ])
 
     def autoconf_install(self, name):
         return self.step('Build and install {0}'.format(name), [

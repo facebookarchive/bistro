@@ -46,3 +46,40 @@ def push_dir(d):
         yield d
     finally:
         os.chdir(old_dir)
+
+
+def read_fbcode_builder_config(filename):
+    # Allow one spec to read another
+    scope = {'read_fbcode_builder_config': read_fbcode_builder_config}
+    with open(filename) as config_file:
+        exec(config_file.read(), scope)
+    return scope['config']
+
+
+def steps_for_spec(builder, spec, processed_modules=None):
+    '''
+    Sets `builder` configuration, and returns all the builder steps
+    necessary to build `spec` and its dependencies.
+
+    Traverses the dependencies in depth-first order, honoring the sequencing
+    in each 'depends_on' list.
+    '''
+    if processed_modules is None:
+        processed_modules = set()
+    steps = []
+    for module in spec.get('depends_on', []):
+        if module not in processed_modules:
+            processed_modules.add(module)
+            steps.extend(steps_for_spec(
+                builder,
+                module.fbcode_builder_spec(builder),
+                processed_modules
+            ))
+    steps.extend(spec.get('steps', []))
+    return steps
+
+
+def build_fbcode_builder_config(config):
+    return lambda builder: builder.build(
+        steps_for_spec(builder, config['fbcode_builder_spec'](builder))
+    )

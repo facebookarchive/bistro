@@ -18,9 +18,11 @@ caching, you will want to:
 import os
 import tempfile
 
-from .fbcode_builder import FBCodeBuilder
-from .shell_quoting import raw_shell, shell_comment, shell_join, ShellQuoted
-from .utils import recursively_flatten_list, run_command
+from fbcode_builder import FBCodeBuilder
+from shell_quoting import (
+    raw_shell, shell_comment, shell_join, ShellQuoted
+)
+from utils import recursively_flatten_list, run_command
 
 
 class DockerFBCodeBuilder(FBCodeBuilder):

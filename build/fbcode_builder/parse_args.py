@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 import argparse
 import logging
 
-from .shell_quoting import raw_shell, ShellQuoted
+from shell_quoting import raw_shell, ShellQuoted
 
 
 def parse_args_to_fbcode_builder_opts(add_args_fn, top_level_opts, opts, help):

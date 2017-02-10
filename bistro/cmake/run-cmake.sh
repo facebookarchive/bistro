@@ -9,7 +9,7 @@
 #
 
 #
-# Runs `cmake` for Bistro, directing output to build/Release/ or build/Debug/.
+# Runs `cmake` for Bistro, directing output to cmake/Release/ or cmake/Debug/.
 #
 # If Bistro's dependencies are installed in a non-default prefix, it will
 # need some help finding them:
@@ -87,10 +87,10 @@ fetch_gtest
 
 # Hacky way to build Thrift until we have a proper CMake module to do it.
 cd "$build_dir/.."
-update_thrift if if/*.thrift build/fbinclude/common/fb303/if/fb303.thrift
-./build/targets_to_cmake_lists.py .
+update_thrift if if/*.thrift cmake/fbinclude/common/fb303/if/fb303.thrift
+./cmake/targets_to_cmake_lists.py .
 
-# Put our artifacts in build/{Debug,Release}
+# Put our artifacts in cmake/{Debug,Release}
 make_dir="$build_dir/$build_type"
 mkdir -p "$make_dir"
 cd "$make_dir"

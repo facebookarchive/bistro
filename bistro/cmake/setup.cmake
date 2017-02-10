@@ -7,13 +7,13 @@
 # of patent rights can be found in the PATENTS file in the same directory.
 #
 
-# Do NOT use this -- run build/run-cmake.sh instead & read its docblock.
+# Do NOT use this -- run cmake/run-cmake.sh instead & read its docblock.
 
 include_directories(
   # Our includes start with "bistro/bistro/"
   "${PROJECT_SOURCE_DIR}/../.."
   # A hack to include a stub for some FB-specific includes under "common/".
-  "${PROJECT_SOURCE_DIR}/build/fbinclude"
+  "${PROJECT_SOURCE_DIR}/cmake/fbinclude"
   "${CMAKE_INSTALL_PREFIX}/include"
 )
 
@@ -59,7 +59,7 @@ macro(bistro_link_libraries name)
   )
 endmacro(bistro_link_libraries)
 
-add_subdirectory(build/deps/gtest-1.7.0)
+add_subdirectory(cmake/deps/gtest-1.7.0)
 enable_testing()
 include_directories("${gtest_SOURCE_DIR}/include" "${gtest_SOURCE_DIR}")
 

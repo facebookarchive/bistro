@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -47,6 +47,10 @@ public:
    * Therefore, that structure must outlive all JobWithNodes.
    */
   JobWithNodes(const Config&, JobPtr, NodeGroupToPackedResources*);
+
+  JobWithNodes(
+    const JobPtr&,
+    const std::unordered_map<int, NodeGroupResources>&);
 
   JobWithNodes(JobWithNodes&&) = default;
   JobWithNodes& operator=(JobWithNodes&&) = default;

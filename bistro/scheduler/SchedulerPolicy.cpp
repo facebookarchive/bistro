@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -12,6 +12,12 @@
 #include "bistro/bistro/config/Config.h"
 
 namespace facebook { namespace bistro {
+
+JobWithNodes::JobWithNodes(
+    const JobPtr& job,
+    const std::unordered_map<int, NodeGroupResources>& nodeGroupToResources)
+    : job_(job),
+      nodeGroupToResources_(nodeGroupToResources) {}
 
 JobWithNodes::JobWithNodes(
     const Config& cfg,

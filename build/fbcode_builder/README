@@ -1,0 +1,12 @@
+This is a Python 2.6+ library designed to simplify continuous-integration
+(and other builds) of Facebook projects.
+
+The *.py files are fairly well-documented. You might want to peruse them
+in this order:
+ - shell_quoting.py
+ - fbcode_builder.py
+ - docker_builder.py
+ - make_docker_context.py
+
+This library also has an (unpublished) component targeting Facebook's
+internal continuous-integration platform using the same build-step DSL.

@@ -90,17 +90,17 @@ std::chrono::milliseconds Bistro::scheduleOnce(
     nodes,
     status_snapshot,
     [this, &status_snapshot, config]
-    (const JobPtr& job, const NodePtr& node) noexcept {
+    (const JobPtr& job, const Node& node) noexcept {
       // The lifetime of the inner callback is potentially very long, so
       // just copy and capture the data that it needs.
       const auto job_id = job->id();
-      const auto node_id = node->id();
+      const auto node_id = node.id();
       return taskRunner_->runTask(
         *config,
         job,
         node,
         // The previous status, if any.
-        status_snapshot.getPtr(job->id(), node->id()),
+        status_snapshot.getPtr(job->id(), node.id()),
         [this, job_id, node_id](
           const cpp2::RunningTask& running_task, TaskStatus&& status
         ) noexcept {
@@ -152,21 +152,14 @@ std::chrono::milliseconds Bistro::scheduleOnce(
       if (kill_time > time_since_epoch) {  // Kill later
         new_id_to_kill_time[std::move(id)] = kill_time;
       } else {  // Kill now
-        // Future: once killTask is non-blocking, making the kills here,
-        // synchronously, won't be so bad.  Future: use rt with its
-        // invocation ID to make sure we are killing the right instance of
-        // the task.  Future: Consider setting a delayed "kill time" for the
+        // Future: Consider setting a delayed "kill time" for the
         // just-killed task to ensure that we don't try to kill stubborn
         // tasks in *every* scheduling loop.
         try {
           taskRunner_->killTask(
-            rt.job,
-            rt.node,
-            // If the task chooses to be done, great. If not, don't treat this
-            // preemption as a failure, so as to avoid decreasing the task's
-            // retry counter.  If needed, we can instead introduce a special
-            // status bit for "preempted", or use "error without backoff".
-            cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE
+            rt,
+            jit != config->jobs.end()  // Fall back to the global kill request
+              ? jit->second->killRequest() : config->killRequest
           );
         } catch (const std::exception& ex) {
           LOG(WARNING) << "Failed to kill orphan task "

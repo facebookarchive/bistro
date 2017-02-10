@@ -107,7 +107,7 @@ class PeriodicPoller final : boost::noncopyable {
  */
 typedef std::function<bool (
   RawData* out_raw_data,
-  //
+  // default-initialized unless the previous refresh succeeded
   PollerState* state,
   // nullptr if the previous refresh had an exception, or in the 1st refresh
   std::shared_ptr<const ProcessedData> previous

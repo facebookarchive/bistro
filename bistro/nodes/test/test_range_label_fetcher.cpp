@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -26,9 +26,11 @@ TEST(TestRangeLabelFetcher, MissingParent) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", { "my_level" })
-      ("node_source", "range_label")
-      ("node_source_prefs", dynamic::object("start", "1")("end", "2"))
+      ("levels", dynamic::array("my_level"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "range_label")
+        ("prefs", dynamic::object("start", "1")("end", "2"))
+      ))
     )
   );
   Nodes nodes;
@@ -39,10 +41,13 @@ TEST(TestRangeLabelFetcher, InvalidParent) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", { "my_level" })
-      ("node_source", "range_label")
-      ("node_source_prefs",
-        dynamic::object("start", "1")("end", "2")("parent_level", "bork"))
+      ("levels", dynamic::array("my_level"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "range_label")
+        ("prefs",
+          dynamic::object("start", "1")("end", "2")("parent_level", "bork")
+        )
+      ))
     )
   );
   Nodes nodes;
@@ -53,10 +58,13 @@ TEST(TestRangeLabelFetcher, TooFewLevels) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {})
-      ("node_source", "range_label")
-      ("node_source_prefs",
-        dynamic::object("start", "1")("end", "2")("parent_level", "instance"))
+      ("levels", dynamic::array())
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "range_label")
+        ("prefs",
+          dynamic::object("start", "1")("end", "2")("parent_level", "instance")
+        )
+      ))
     )
   );
   Nodes nodes;
@@ -68,9 +76,11 @@ void check_simple(dynamic&& prefs, const vector<string>& exp_names) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", { "my_level" })
-      ("node_source", "range_label")
-      ("node_source_prefs", prefs)
+      ("levels", dynamic::array("my_level"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "range_label")
+        ("prefs", prefs)
+      ))
     )
   );
 
@@ -122,7 +132,7 @@ TEST(TestRangeLabelFetcher, EmptyRange) {
 
 Nodes fetch_two_levels(string s1, string e1, string s2, string e2) {
   Nodes nodes;
-  dynamic sources = {
+  dynamic sources = dynamic::array(
     dynamic::object
       ("source", "range_label")
       ("prefs", dynamic::object
@@ -133,12 +143,12 @@ Nodes fetch_two_levels(string s1, string e1, string s2, string e2) {
       ("prefs", dynamic::object
         ("start", s2)("end", e2)("parent_level", "mid_level")
         ("enabled", "false")
-      ),
-  };
+      )
+  );
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", { "mid_level", "bottom_level" })
+      ("levels", dynamic::array("mid_level", "bottom_level"))
       ("node_sources", sources)
     )
   );
@@ -156,7 +166,7 @@ TEST(TestRangeLabelFetcher, MultiLevel) {
   EXPECT_EQ(7, nodes.size());
 
   // Spot-check some nodes
-  vector<NodePtr> nodes_vec(nodes.begin(), nodes.end());
+  vector<std::shared_ptr<const Node>> nodes_vec(nodes.begin(), nodes.end());
   const auto& mid = nodes_vec[2], bottom = nodes_vec.back();
 
   EXPECT_EQ(1, mid->level());

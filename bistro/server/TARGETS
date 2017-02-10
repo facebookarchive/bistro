@@ -1,0 +1,41 @@
+cpp_library(
+    name = 'http_server_lib',
+    headers = [
+        'Connection.h',
+        'HTTPMonitor.h',
+        'HTTPMonitorServer.h',
+        'ThriftMonitor.h',
+    ],
+    srcs = [
+        'Connection.cpp',
+        'HTTPMonitor.cpp',
+        'HTTPMonitorServer.cpp',
+        'ThriftMonitor.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/thrift:conversion_lib',
+        '@/common/fb303/cpp:fb303',
+        '@/folly:folly',
+        '@/proxygen/httpserver:httpserver',
+    ],
+    external_deps = [
+        ('boost', None),
+        ('glog', None),
+        ('zlib', None, 'z'),
+    ],
+)
+
+cpp_binary(
+    name = 'bistro_scheduler',
+    srcs = ['main.cpp'],
+    deps = [
+        ':http_server_lib',
+        '@/bistro/bistro:bistro_lib',
+        '@/bistro/bistro/nodes:nodes_lib',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/runners:runners_lib',
+        '@/thrift/lib/cpp2:server',
+    ],
+)

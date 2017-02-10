@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -11,12 +11,13 @@
 
 #include <folly/experimental/TestUtil.h>
 
-#include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/config/Config.h"
-#include "bistro/bistro/statuses/SQLiteTaskStore.h"
-#include "bistro/bistro/utils/TemporaryFile.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
+#include "bistro/bistro/nodes/test/utils.h"
+#include "bistro/bistro/statuses/SQLiteTaskStore.h"
+#include "bistro/bistro/statuses/TaskStatuses.h"
+#include "bistro/bistro/utils/TemporaryFile.h"
 
 using namespace facebook::bistro;
 using namespace std;
@@ -32,14 +33,14 @@ cpp2::RunningTask makeRT(const string& job, const string& node) {
 
 dynamic c = dynamic::object
   ("nodes", dynamic::object
-    ("levels", {"host", "db"})
-    ("node_source", "manual")
-      ("node_source_prefs", dynamic::object
-        ("host", {"db1", "db2", "db3"})
-      )
-    )
+    ("levels", dynamic::array("host", "db"))
+    ("node_sources", dynamic::array(dynamic::object
+      ("source", "manual")
+      ("prefs", dynamic::object("host", dynamic::array("db1", "db2", "db3")))
+    ))
+  )
   ("resources", dynamic::object)
-  ("backoff", { "fail" })
+  ("backoff", dynamic::array("fail"))
 ;
 
 TEST(TestTaskStatuses, HandleTaskStore) {
@@ -52,9 +53,9 @@ TEST(TestTaskStatuses, HandleTaskStore) {
   auto nodes_ptr = make_shared<Nodes>();
   NodesLoader::_fetchNodesImpl(config_job1, nodes_ptr.get());
   const auto& job = config_job1.jobs["job1"];
-  const auto& db1 = nodes_ptr->getNodeVerySlow("db1");
-  const auto& db2 = nodes_ptr->getNodeVerySlow("db2");
-  const auto& db3 = nodes_ptr->getNodeVerySlow("db3");
+  const auto& db1 = getNodeVerySlow(*nodes_ptr, "db1");
+  const auto& db2 = getNodeVerySlow(*nodes_ptr, "db2");
+  const auto& db3 = getNodeVerySlow(*nodes_ptr, "db3");
 
   TemporaryDir db_dir;
   auto task_statuses = make_shared<TaskStatuses>(

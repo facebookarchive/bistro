@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -13,6 +13,7 @@
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
 #include "bistro/bistro/scheduler/Scheduler.h"
+#include "bistro/bistro/scheduler/SchedulerPolicies.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/statuses/TaskStore.h"
@@ -23,13 +24,15 @@ using namespace facebook::bistro;
 
 dynamic c = dynamic::object
   ("nodes", dynamic::object
-    ("levels", {"host", "db"})
-    ("node_source", "manual")
-      ("node_source_prefs", dynamic::object
-        ("host1", {"db11", "db12"})
-        ("host2", {"db21", "db22"})
+    ("levels", dynamic::array("host", "db"))
+    ("node_sources", dynamic::array(dynamic::object
+      ("source", "manual")
+      ("prefs", dynamic::object
+        ("host1", dynamic::array("db11", "db12"))
+        ("host2", dynamic::array("db21", "db22"))
       )
-    )
+    ))
+  )
   ("resources", dynamic::object
     ("host", dynamic::object
       ("host_concurrency", dynamic::object
@@ -47,13 +50,23 @@ dynamic c = dynamic::object
   ("scheduler", "ranked_priority")
 ;
 
+// CMake's ctest will run all these tests sequentially.
+bool test_registered_scheduler_policies = false;
+void testRegisterSchedulerPolicies() {
+  if (!test_registered_scheduler_policies) {
+    registerDefaultSchedulerPolicies();
+    test_registered_scheduler_policies = true;
+  }
+}
+
 TEST(TestDependencyScheduling, HandleInvalidDependency) {
+  testRegisterSchedulerPolicies();
   Config config(c);
   config.addJob(
     "job1",
     dynamic::object
       ("owner", "owner")
-      ("depends_on", {"job2"}),
+      ("depends_on", dynamic::array("job2")),
     nullptr
   );
 
@@ -73,13 +86,14 @@ TEST(TestDependencyScheduling, HandleInvalidDependency) {
 }
 
 TEST(TestDependencyScheduling, HandleAll) {
+  testRegisterSchedulerPolicies();
   Config config(c);
   config.addJob(
     "job1",
     dynamic::object
       ("owner", "owner")
       ("priority", 10.0)
-      ("depends_on", {"job2"}),
+      ("depends_on", dynamic::array("job2")),
     nullptr
   );
   config.addJob(

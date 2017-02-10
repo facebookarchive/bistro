@@ -1,0 +1,9 @@
+cpp_benchmark(
+    name = 'db_scraping_benchmark',
+    headers = [],
+    srcs = [ 'db_scraping_benchmark.cpp' ],
+    deps = [
+        '@/bistro/bistro:bistro_lib',
+        '@/folly:benchmark',
+    ],
+)

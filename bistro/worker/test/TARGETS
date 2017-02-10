@@ -1,0 +1,29 @@
+cpp_library(
+    name = 'bistro_worker_test_lib',
+    headers = [
+        'BistroWorkerTestThread.h',
+        'FakeBistroWorkerThread.h',
+    ],
+    srcs = [
+        'BistroWorkerTestThread.cpp',
+        'FakeBistroWorkerThread.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/test:test_lib',
+        '@/bistro/bistro/worker:bistro_worker_lib',
+        '@/thrift/lib/cpp/concurrency:numa2',
+        '@/thrift/lib/cpp/util:util',
+        '@/thrift/lib/cpp2/util:util',
+        '@/thrift/lib/cpp2:server',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_worker',
+    srcs = ['test_worker.cpp'],
+    deps = [
+        ':bistro_worker_test_lib',
+        '@/folly/experimental:test_util',
+        '@/bistro/bistro/server/test:thrift_monitor_test_thread_lib',
+    ],
+)

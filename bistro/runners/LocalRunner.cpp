@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,15 +9,11 @@
  */
 #include "bistro/bistro/runners/LocalRunner.h"
 
+#include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/hostname.h"
 #include "bistro/bistro/utils/LogWriter.h"
-
-DEFINE_bool(
-  use_soft_kill, true,
-  "To kill, send a task SIGTERM, wait, and only then SIGKILL"
-);
 
 namespace facebook { namespace bistro {
 
@@ -27,18 +23,26 @@ LocalRunner::LocalRunner(
     const boost::filesystem::path& cmd,
     const boost::filesystem::path& dir)
   // The default log filename matches BistroRemoteWorkerHandler
-  : taskQueue_(dir / "/task_logs.sql3", dir / "/pipes"),
+  : taskQueue_(std::make_unique<LogWriter>(dir / "/task_logs.sql3")),
     cmd_(cmd),
     jobsDir_(dir / "/jobs") {
 }
 
 TaskRunnerResponse LocalRunner::runTaskImpl(
   const std::shared_ptr<const Job>& job,
-  const std::shared_ptr<const Node>& node,
+  const Node&,
   cpp2::RunningTask& running_task,
   folly::dynamic& job_args,
   function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
 ) noexcept {
+  // From the point of view of cgroup reaping, all tasks of LocalRunner will
+  // get lumped into a single shard -- see more details in
+  // TaskSubprocessState::makeCGroupProcsPaths.  This is equivalent to
+  // saying "there should only be **one** LocalRunner per whatever your
+  // current cgroup namespace happens to be.  That's probably not what
+  // people want, but until a use case comes up, this is good enough.
+  running_task.workerShard = "local";
+
   // Since it runs locally, the task treats the instance node as the worker.
   auto instance_node = Nodes::getInstanceNodeName();
   job_args["worker_node"] = instance_node;
@@ -49,10 +53,13 @@ TaskRunnerResponse LocalRunner::runTaskImpl(
   cb(running_task, TaskStatus::running());
   taskQueue_.runTask(
     running_task,
-    {cmd_.native()},
-    folly::toJson(job_args).toStdString(),  // Job config argument
+    job->command().empty()
+      ? std::vector<std::string>{cmd_.native()} : job->command(),
+    folly::toJson(job_args),  // Job config argument
     jobsDir_ / running_task.job,  // Working directory for the task
-    cb
+    cb,
+    [](const cpp2::RunningTask&, cpp2::TaskPhysicalResources&&){},
+    job->taskSubprocessOptions()
   );
   return RanTask;
 }
@@ -63,7 +70,7 @@ LogLines LocalRunner::getJobLogs(
     const vector<string>& nodes,
     int64_t line_id,
     bool is_ascending,
-    const string& regex_filter) {
+    const string& regex_filter) const {
 
   return taskQueue_.getLogWriter()->getJobLogs(
     logtype,
@@ -77,15 +84,9 @@ LogLines LocalRunner::getJobLogs(
 }
 
 void LocalRunner::killTask(
-    const std::string& job,
-    const std::string& node,
-    cpp2::KilledTaskStatusFilter status_filter) {
-  taskQueue_.killTask(
-    job,
-    node,
-    FLAGS_use_soft_kill ? cpp2::KillMethod::SOFT : cpp2::KillMethod::HARD,
-    status_filter
-  );
+    const cpp2::RunningTask& rt,
+    const cpp2::KillRequest& req) {
+  taskQueue_.kill(rt, req);
 }
 
 }}

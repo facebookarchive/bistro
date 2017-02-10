@@ -7,7 +7,7 @@ https://bistro.io/ for a more structured introduction, and for the docs.
 
 Bistro is a toolkit for making distributed computation systems. It can
 schedule and run distributed tasks, including data-parallel jobs.  It
-enforces resource constraints for worker hosts and data-access bottlenecks. 
+enforces resource constraints for worker hosts and data-access bottlenecks.
 It supports remote worker pools, low-latency batch scheduling, dynamic
 shards, and a variety of other possibilities.  It has command-line and web
 UIs.
@@ -38,27 +38,22 @@ The CLI tools and web UI will be shipping shortly.
 
 ## Install the dependencies and build
 
-Bistro needs a 64-bit Linux, Folly, FBThrift, boost, and libsqlite3.
-Caveats: You need about 2GB of RAM to build, as well as GCC 4.8 or above. 
+Bistro needs a 64-bit Linux, Folly, FBThrift, Proxygen, boost, and
+libsqlite3.  You need 2-3GB of RAM to build, as well as GCC 4.9 or above.
 
-Check https://github.com/facebook/folly/tree/master/build for the 
-scripts available to install dependencies and build Bistro. For example,
-Travis CI builds Bistro as follows:
+`build/README.md` documents the usage of Docker-based scripts that build
+Bistro on Ubuntu 14.04, 16.04, and Debian 8.6.  You should be able to follow
+very similar steps on most modern Linux distributions.
 
-```
-./bistro/build/deps_ubuntu_12.04.sh  # builds folly & fbthrift
-./bistro/build/build.sh Debug runtests
-```
+If you run into dependency problems, look at `bistro/cmake/setup.cmake` for
+a full list of Bistro's external dependencies (direct and indirect).  We
+gratefully accept patches that improve Bistro's builds, or add support for
+various flavors of Linux and Mac OS.
 
-If you run into dependency problems, look at bistro/build/setup.cmake for a
-full list of Bistro's external dependencies.  We gratefully accept patches
-to install dependencies for, or to build on, various flavors of Linux and
-Mac OS.
-
-The binaries will be in bistro/build/{Debug,Release}.  Available build
+The binaries will be in bistro/cmake/{Debug,Release}.  Available build
 targets are explained here:
    http://cmake.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools
-The 'runtests' argument optionally runs Bistro's unit tests.
+You can start Bistro's unit tests by running `ctest` in those directories.
 
 ## Your first Bistro run
 
@@ -66,9 +61,9 @@ This is just one simple demo, but Bistro is a very flexible tool. Refer to
 https://bistro.io for more in-depth information.
 
 We are going to start a single Bistro scheduler talking to one 'remote'
-worker. 
+worker.
 
-Aside: The scheduler tracks jobs, and data shards on which to execute them. 
+Aside: The scheduler tracks jobs, and data shards on which to execute them.
 It also makes sure only to start new tasks when the required resources are
 available.  The remote worker is a module for executing centrally scheduled
 work on many machines.  The UI can aggregate many schedulers at once, so
@@ -93,19 +88,20 @@ Open two terminals, one for the scheduler, and one for the worker.
 # In both terminals
 cd bistro/bistro
 # Start the scheduler in one terminal
-./build/Debug/bistro_scheduler --server_port=6789 --http_server_port=6790 \
+./cmake/Debug/server/bistro_scheduler \
+  --server_port=6789 --http_server_port=6790 \
   --config_file=scripts/test_configs/simple --clean_statuses \
   --CAUTION_startup_wait_for_workers=1 --instance_node_name=scheduler
 # Start the worker in another
 mkdir /tmp/bistro_worker
-./build/Debug/bistro_worker --server_port=27182 --scheduler_host=:: \
+./cmake/Debug/worker/bistro_worker --server_port=27182 --scheduler_host=:: \
   --scheduler_port=6789 --worker_command="$HOME/demo_bistro_task.sh" \
   --data_dir=/tmp/bistro_worker
 ```
 
 You should be seeing some lively log activity on both terminals. In several
 seconds, the worker-scheduler negotiation should complete, and you should
-see messages like "Task ...  quit with status" and "Got status". 
+see messages like "Task ...  quit with status" and "Got status".
 
 Since we passed `--clean_statuses`, the scheduler will not persist any task
 completions that happened during this run.  The worker, on the other hand,
@@ -113,11 +109,12 @@ will keep a record of the task logs in `/tmp/bistro_worker/task_logs.sql3`.
 
 If you want task completions to persist across runs, tell Bistro where to
 put the SQLite database, via `--data_dir=/tmp/bistro_scheduler` and
-`--status_table=task_statuses`L
+`--status_table=task_statuses`
 
 ```
 mkdir /tmp/bistro_scheduler
-./build/Debug/bistro_scheduler --server_port=6789 --http_server_port=6790 \
+./cmake/Debug/server/bistro_scheduler \
+  --server_port=6789 --http_server_port=6790 \
   --config_file=scripts/test_configs/simple \
   --data_dir=/tmp/bistro_scheduler --status_table=task_statuses \
   --CAUTION_startup_wait_for_workers=1 --instance_node_name=scheduler
@@ -143,9 +140,10 @@ less scripts/test_configs/simple
 For debugging, we typically invoke the binaries like this:
 
 ```
-gdb build/Debug/bistro_worker --eval-command "r ..." 2>&1 | tee WORKER.txt
+gdb cmake/Debug/worker/bistro_worker -ex "r ..." 2>&1 | tee WORKER.txt
 ```
 
 When configuring a real deployment, be sure to carefully review the `--help`
 of the scheduler & worker binaries, as well as the documentation on
-https://bistro.io.
+https://bistro.io.  And don't hesitate to ask for help in the group:
+https://www.facebook.com/groups/bistro.scheduler

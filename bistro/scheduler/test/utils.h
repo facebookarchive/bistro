@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -20,8 +20,8 @@
 namespace facebook { namespace bistro {
 
 struct TaskCatcher {
-  TaskRunnerResponse operator()(const JobPtr& job, const NodePtr& node) {
-    tasks.push_back(make_pair(job->name(), node->name()));
+  TaskRunnerResponse operator()(const JobPtr& job, const Node& node) {
+    tasks.push_back(make_pair(job->name(), node.name()));
     return RanTask;
   }
 
@@ -37,8 +37,10 @@ template<class Scheduler>
 TaskCatcher mock_schedule(bool add_third_job = false) {
   Config config(folly::dynamic::object
     ("nodes", folly::dynamic::object
-      ("levels", { "host", "db" })
-      ("node_source", "range_label")
+      ("levels", folly::dynamic::array("host", "db"))
+      ("node_sources", folly::dynamic::array(
+        folly::dynamic::object("source", "range_label")
+      ))
     )
     ("resources", folly::dynamic::object
       ("host", folly::dynamic::object
@@ -77,43 +79,42 @@ TaskCatcher mock_schedule(bool add_third_job = false) {
         ("priority", 100.0)
         ("filters", folly::dynamic::object
           ("db", folly::dynamic::object
-            ("whitelist", { "db12" })
+            ("whitelist", folly::dynamic::array("db12"))
           )
         ),
       nullptr
     );
   }
 
-  NodePtr host1 = std::make_shared<Node>("host1", 0, true);
-  NodePtr host2 = std::make_shared<Node>("host2", 0, true);
-  NodePtr db11 = std::make_shared<Node>("db11", 1, true, host1.get());
-  NodePtr db12 = std::make_shared<Node>("db12", 1, true, host1.get());
-  NodePtr db21 = std::make_shared<Node>("db21", 1, true, host2.get());
-  NodePtr db22 = std::make_shared<Node>("db22", 1, true, host2.get());
+  auto host1 = std::make_shared<Node>("host1", 1, true);
+  host1->offset = 0;
+  auto host2 = std::make_shared<Node>("host2", 1, true);
+  host2->offset = 1;
+  Node db11("db11", 2, true, host1.get());
+  db11.offset = 0;
+  Node db12("db12", 2, true, host1.get());
+  db12.offset = 1;
+  Node db21("db21", 2, true, host2.get());
+  db21.offset = 2;
+  Node db22("db22", 2, true, host2.get());
+  db22.offset = 3;
 
-  const int m = std::numeric_limits<int>::max();
-  ResourcesByNodeType resources = {
-    { host1->id(), { 2, m } },
-    { host2->id(), { 2, m } },
-    { db11->id(), { m, 1 } },
-    { db12->id(), { m, 1 } },
-    { db21->id(), { m, 1 } },
-    { db22->id(), { m, 1 } },
+  NodeGroupToPackedResources resources = {
+    {1, {2, 2}},
+    {2, {1, 1, 1, 1}},
   };
 
-  typedef std::vector<NodePtr> NodePtrV;
   std::vector<JobWithNodes> jobs;
-  jobs.emplace_back(config.jobs["job1"], NodePtrV{ db11, db12, db21, db22 });
-  jobs.emplace_back(config.jobs["job2"], NodePtrV{ db11, db12, db21, db22 });
+  jobs.emplace_back(config, config.jobs["job1"], &resources);
+  jobs.back().nodes = {&db11, &db12, &db21, &db22};
+  jobs.emplace_back(config, config.jobs["job2"], &resources);
+  jobs.back().nodes = {&db11, &db12, &db21, &db22};
   if (add_third_job) {
-    jobs.emplace_back(config.jobs["job3"], NodePtrV{ db12 });
+    jobs.emplace_back(config, config.jobs["job3"], &resources);
+    jobs.back().nodes = {&db12};
   }
   TaskCatcher catcher;
-  catcher.numTasks = Scheduler().schedule(
-    jobs,
-    resources,
-    std::ref(catcher)
-  );
+  catcher.numTasks = Scheduler().schedule(jobs, std::ref(catcher));
   return catcher;
 }
 

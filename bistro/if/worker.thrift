@@ -146,6 +146,7 @@ service BistroWorker extends fb303.FacebookService {
     // response to a runTask transport failure, this should be rare enough
     // not to affect throughput.
     6: i64 notify_if_tasks_not_running_sequence_num,
+    7: common.TaskSubprocessOptions opts,
   ) throws (1: BistroWorkerException ex);
 
   /**
@@ -291,14 +292,13 @@ service BistroWorker extends fb303.FacebookService {
    */
   void killTask(
     1: common.RunningTask rt,
-    // When we kill a task, the SIGTERM gives it an opportunity to return a
-    // status string.  This filter allows us to modify the status handling.
-    2: common.KilledTaskStatusFilter status_filter,
+    // 2: DEPRECATED
     // Verifying these IDs is pretty redundant given the running task
     // invocation ID, but better safe than sorry, and it might anyhow be a
     // sensible thing to do if Bistro gets speculative execution.
     3: common.BistroInstanceID scheduler,
     4: common.BistroInstanceID worker,
+    5: common.KillRequest req,
   ) throws (1: BistroWorkerException ex);
 
   /**

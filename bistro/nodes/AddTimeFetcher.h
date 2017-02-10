@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,11 +9,9 @@
  */
 #pragma once
 
-#include <unordered_map>
-#include <unordered_set>
-
-#include "boost/date_time/local_time/local_time_types.hpp"
+#include <boost/date_time/local_time/local_time_types.hpp>
 #include <folly/json.h>
+#include <unordered_map>
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Node.h"
@@ -166,8 +164,8 @@ public:
     const auto& prefs = node_config.prefs;
     const auto& format_str =
       prefs.convert<string>("format", "{parent}:{time}");
-    const auto time_to_tags_and_enabled =
-      makeTimestampsToTagsAndEnabled(prefs.get("schedule", {}));
+    const auto time_to_tags_and_enabled = makeTimestampsToTagsAndEnabled(
+      prefs.get("schedule", folly::dynamic::array()));
 
     // Use the "parent_level" pref to get my parents and my level ID.
     const auto my_level_and_parents =
@@ -192,13 +190,13 @@ private:
 
   typedef std::unordered_map<
     int64_t,
-    std::pair<std::unordered_set<std::string>, bool>
+    std::pair<Node::TagSet, bool>
   > TimeToTagsAndEnabled;
 
   struct ScheduleItem {
     int64_t lifetime_;
     int64_t enabled_lifetime_;
-    std::unordered_set<std::string> tags_;
+    Node::TagSet tags_;
     std::unique_ptr<const CrontabItem> cron_;
 
     explicit ScheduleItem(const folly::dynamic& item_cfg)
@@ -217,7 +215,7 @@ private:
             throw BistroException("\"tags\" must be an array");
           }
           for (const auto &tag : p.second) {
-            tags_.emplace(tag.asString().toStdString());
+            tags_.insert(tag.asString());
           }
         } else if (p.first == "cron") {
           boost::local_time::time_zone_ptr system_tz;  // null == system tz

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -13,6 +13,7 @@
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
 #include "bistro/bistro/scheduler/Scheduler.h"
+#include "bistro/bistro/scheduler/SchedulerPolicies.h"
 #include "bistro/bistro/scheduler/test/utils.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/statuses/TaskStore.h"
@@ -44,24 +45,36 @@ string scheduleOne(const dynamic& d) {
   return catcher.tasks[0].second;
 }
 
+// CMake's ctest will run all these tests sequentially.
+bool test_registered_scheduler_policies = false;
+void testRegisterSchedulerPolicies() {
+  if (!test_registered_scheduler_policies) {
+    registerDefaultSchedulerPolicies();
+    test_registered_scheduler_policies = true;
+  }
+}
+
 TEST(TestLevelForTasks, InstanceNodeOnly) {
+  testRegisterSchedulerPolicies();
   EXPECT_EQ(getLocalHostName(), scheduleOne(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {})
-      ("node_sources", {dynamic::object("source", "empty")})
+      ("levels", dynamic::array())
+      ("node_sources", dynamic::array(dynamic::object("source", "empty")))
     )
   ));
 }
 
 TEST(TestLevelForTasks, CanSelectLevel) {
+  testRegisterSchedulerPolicies();
   dynamic d = dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"l1"})
-      ("node_sources", {dynamic::object
-        ("source", "manual")("prefs", dynamic::object("a_node", {}))
-      })
+      ("levels", dynamic::array("l1"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "manual")
+        ("prefs", dynamic::object("a_node", dynamic::array()))
+      ))
     );
   EXPECT_EQ("a_node", scheduleOne(d));
   d["level_for_tasks"] = "instance";

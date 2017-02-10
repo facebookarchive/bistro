@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -30,9 +30,11 @@ TEST(TestBenchmarkRunner, HandleTaskResult) {
   Config c(dynamic::object
     ("enabled", true)
     ("nodes", dynamic::object
-      ("levels", { "level1" , "level2" })
-      ("node_source", "range_label")
-      ("node_source_prefs", dynamic::object)
+      ("levels", dynamic::array("level1" , "level2"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "range_label")
+        ("prefs", dynamic::object)
+      ))
     )
     ("resources", dynamic::object)
   );
@@ -40,13 +42,13 @@ TEST(TestBenchmarkRunner, HandleTaskResult) {
     ("enabled", true)
     ("owner", "owner");
   auto job_ptr = make_shared<Job>(c, "invalid_job", job_d);
-  auto node_ptr = make_shared<Node>("instance_node", 0, true);
+  Node node("instance_node", 0, true);
 
   FLAGS_test_failure_rate = 0; // no failure
   runner.runTask(
     c,
     job_ptr,
-    node_ptr,
+    node,
     nullptr,  // no previous status
     [&status](const cpp2::RunningTask& rt, TaskStatus&& st) {
       status->update(rt, std::move(st));
@@ -61,7 +63,7 @@ TEST(TestBenchmarkRunner, HandleTaskResult) {
   runner.runTask(
     c,
     job_ptr,
-    node_ptr,
+    node,
     nullptr,  // no previous status
     [&status](const cpp2::RunningTask& rt, TaskStatus&& st) {
       status->update(rt, std::move(st));

@@ -35,28 +35,12 @@ std::string Nodes::getInstanceNodeName() {
   return name;
 }
 
-ShuffledRange<std::vector<NodePtr>::const_iterator> Nodes::shuffled() const {
-  return ShuffledRange<std::vector<NodePtr>::const_iterator>(
-    nodes_.begin(),
-    nodes_.end()
-  );
-}
-
 Nodes::LevelIterRange Nodes::iterateOverLevel(NodeLevel level) const {
   auto tester = detail::DoesNodeBelongToLevel(level);
   return Nodes::LevelIterRange(
     Nodes::LevelIter(tester, nodes_.begin(), nodes_.end()),
     Nodes::LevelIter(tester, nodes_.end(), nodes_.end())
   );
-}
-
-NodePtr Nodes::getNodeVerySlow(const std::string& name) const {
-  for (const auto& n : nodes_) {
-    if (n->name() == name) {
-      return n;
-    }
-  }
-  return nullptr;
 }
 
 }}

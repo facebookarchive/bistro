@@ -1,0 +1,42 @@
+cpp_library(
+    name = 'processes',
+    headers = [
+        'AsyncCGroupReaper.h',
+        'AsyncReadPipe.h',
+        'AsyncReadPipeRateLimiter.h',
+        'AsyncSubprocess.h',
+        'CGroupSetup.h',
+        'SubprocessOutputWithTimeout.h',
+        'TaskSubprocessQueue.h',
+    ],
+    srcs = [
+        'AsyncCGroupReaper.cpp',
+        'AsyncReadPipeRateLimiter.cpp',
+        'CGroupSetup.cpp',
+        'TaskSubprocessQueue.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/physical:physical_lib',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/utils:utils_lib',
+        '@/folly:subprocess',
+        '@/wangle:wangle',
+        ':subprocess_with_timeout',
+    ],
+)
+
+cpp_library(
+    name = 'subprocess_with_timeout',
+    headers = [
+        'AsyncReadPipe.h',
+        'AsyncSubprocess.h',
+        'SubprocessOutputWithTimeout.h',
+    ],
+    srcs = ['SubprocessOutputWithTimeout.cpp'],
+    deps = [
+        '@/folly:subprocess',
+        '@/folly/futures:futures',
+    ],
+    external_deps = ['libevent'],
+)

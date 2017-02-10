@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -33,7 +33,7 @@ namespace {
 map<LogTable, const char*> tables = {
   { LogTable::STDERR, "stderr" },
   { LogTable::STDOUT, "stdout" },
-  { LogTable::STATUSES, "statuses" },
+  { LogTable::EVENTS, "statuses" },
 };
 
 }
@@ -79,15 +79,15 @@ LogWriter::LogWriter(const boost::filesystem::path& db_file) : counter_(0) {
     LOG(INFO) << "Created table " << name;
   }
   if (FLAGS_log_prune_frequency > 0) {
-    runInBackgroundLoop([this](){
+    threads_.add([this]() {
       prune();
       return chrono::seconds(FLAGS_log_prune_frequency);
-    });
+    }, std::chrono::milliseconds(0));
   }
 }
 
 LogWriter::~LogWriter() {
-  stopBackgroundThreads();
+  threads_.stop();
 }
 
 void LogWriter::write(
@@ -111,7 +111,8 @@ void LogWriter::prune() noexcept {
   int32_t cutoff_time = time(nullptr) - FLAGS_log_retention;
   auto cutoff =
     LogLine::makeLineID(cutoff_time, numeric_limits<int32_t>::max());
-  folly::AutoTimer<> timer("Pruned logs with cutoff ", cutoff_time);
+  folly::AutoTimer<> timer(
+      folly::to<std::string>("Pruned logs with cutoff ", cutoff_time));
   SYNCHRONIZED(pruneStmts_) {
     for (auto& s : pruneStmts_) {
       s->exec(cutoff);
@@ -126,7 +127,7 @@ LogLines LogWriter::getJobLogs(
     int64_t line_id,
     bool is_ascending,
     int limit,
-    const std::string& regex_filter) {
+    const std::string& regex_filter) const {
 
   if (logtype != "stderr" && logtype != "stdout" && logtype != "statuses") {
     throw BistroException("Unknown table for logs: ", logtype);
@@ -188,7 +189,8 @@ LogLines LogWriter::getJobLogs(
   }
 
   // Run the query
-  folly::AutoTimer<>("Query: '", query, debug_where_args);
+  folly::AutoTimer<>(
+      folly::to<std::string>("Query: '", query, debug_where_args));
   LogLines res;
   // Assuming that micro-optimizing the "" case is pointless, but did not test.
   boost::regex re(regex_filter);

@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/iterator_facade.hpp>
-#include <boost/date_time/c_local_time_adjustor.hpp>
 #include <boost/date_time/gregorian/gregorian_types.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <stdexcept>
@@ -492,7 +491,7 @@ time_t findRewindTime(time_t a, time_t b, time_zone_ptr tz) {
   }
   auto first = boost::counting_iterator<time_t>(a);
   auto last = boost::counting_iterator<time_t>(b + 1);
-  auto rewind_t = *lower_bound(first, last, b, [tz](time_t test_t, time_t _b) {
+  auto rewind_t = *std::partition_point(first, last, [tz](time_t test_t) {
     return isTimeBeforeRewind(test_t, tz);
   });
   if (rewind_t > b) {

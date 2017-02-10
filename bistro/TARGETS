@@ -1,0 +1,17 @@
+cpp_library(
+    name = 'bistro_lib',
+    headers = [],
+    srcs = [
+        'Bistro.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+        '@/bistro/bistro/monitor:monitor_lib',
+        '@/bistro/bistro/nodes:nodes_lib',
+        '@/bistro/bistro/runners:runners_lib',
+        '@/bistro/bistro/scheduler:scheduler_lib',
+        '@/bistro/bistro/server:http_server_lib',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/utils:utils_lib',
+    ],
+)

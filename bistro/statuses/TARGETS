@@ -1,0 +1,22 @@
+cpp_library(
+    name = 'statuses_lib',
+    headers = [
+        'SQLiteTaskStore.h',
+        'TaskStatuses.h',
+        'TaskStatus.h',
+        'TaskStatusObserver.h',
+        'TaskStatusSnapshot.h',
+        'TaskStore.h',
+    ],
+    srcs = [
+        'TaskStatus.cpp',
+        'TaskStatusSnapshot.cpp',
+        'TaskStatuses.cpp',
+        'SQLiteTaskStore.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+        '@/bistro/bistro/sqlite:sqlite_lib',
+    ],
+    external_deps = [('boost', None, 'boost_filesystem')],
+)

@@ -1,0 +1,42 @@
+cpp_unittest(
+    name = 'test_async_read_pipe',
+    srcs = ['test_async_read_pipe.cpp'],
+    deps = ['@/bistro/bistro/processes:processes'],
+)
+
+cpp_unittest(
+    name = 'test_async_read_pipe_rate_limiter',
+    srcs = ['test_async_read_pipe_rate_limiter.cpp'],
+    deps = ['@/bistro/bistro/processes:processes'],
+)
+
+cpp_unittest(
+    name = 'test_async_subprocess',
+    srcs = ['test_async_subprocess.cpp'],
+    deps = ['@/bistro/bistro/processes:processes'],
+)
+
+cpp_unittest(
+    name = 'test_subprocess_output_with_timeout',
+    srcs = ['test_subprocess_output_with_timeout.cpp'],
+    deps = ['@/bistro/bistro/processes:subprocess_with_timeout'],
+)
+
+cpp_unittest(
+    name = 'test_task_subprocess_queue',
+    srcs = ['test_task_subprocess_queue.cpp'],
+    deps = [
+        '@/bistro/bistro/processes:processes',
+        '@/bistro/bistro/test:test_lib',
+        '@/folly/experimental:test_util',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_cgroup_setup',
+    srcs = ['test_cgroup_setup.cpp'],
+    deps = [
+        '@/bistro/bistro/processes:processes',
+        '@/folly/experimental:test_util',
+    ],
+)

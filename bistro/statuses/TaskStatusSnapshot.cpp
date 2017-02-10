@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -13,6 +13,7 @@
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/config/Config.h"
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/statuses/TaskStore.h"
 #include "bistro/bistro/utils/Exception.h"
 #include <folly/experimental/AutoTimer.h>
@@ -23,9 +24,7 @@ using namespace std;
 using apache::thrift::debugString;
 
 // Careful: this does not check isLoaded_, but your calling function should?
-inline TaskStatus& TaskStatusSnapshot::access(int j, int n) {
-  const int job_id = static_cast<int>(j);
-  const int node_id = static_cast<int>(n);
+inline TaskStatus& TaskStatusSnapshot::access(int job_id, int node_id) {
   if (job_id >= rows_.size()) {
     rows_.resize(job_id + 1);
   }
@@ -140,7 +139,40 @@ TaskStatus TaskStatusSnapshot::updateStatus(
   auto task_id = std::make_pair(job_id, node_id);
   auto it = runningTasks_.find(task_id);
   if (it != runningTasks_.end()) {
-    // Cannot happen, RemoteWorker::recordNonRunningTaskStatus checks this.
+    // Cannot happen normally -- RemoteWorker::recordNonRunningTaskStatus
+    // checks the invocation ID against the worker's invocation ID.
+    //
+    // One way to trip this involves a task taking so long to exit that the
+    // scheduler decides to start a new copy.  When the task eventually
+    // **does** exit, the scheduler learns that it has double-started a
+    // task, and will crash here.  To understand the mechanism, and to read
+    // about a "fix", see the test DeathDueToTaskThatTookTooLongToKill.
+    //
+    // When a task is lost, its backoff will be set to a high enough value
+    // that we should not normally start a task while the old one is still
+    // terminating.  However, this can still trip, in either of these rare
+    // circumstances:
+    //  - The worker is unable to kill the task in a timely fashion, due to
+    //    extreme system load / kernel bugs / uninterruptible + unkillable
+    //    sleep, worker bugs, or cosmic rays.
+    //  - The scheduler is restarted before the backoff expires, forgets
+    //    the backoff (since it is not persisted as of this writing),
+    //    has no way of discovering the up-but-suicidal worker, and
+    //    so starts
+    //
+    // Yet another way this can trip is if the remote worker's "task exited
+    // after a suicide" message takes a very long time to reach the
+    // scheduler.  It is possible to mitigate this scenario, but it doesn't
+    // seem worth the complexity.
+    //
+    // I'm leaving this as a crash, so that we learn if these occur in
+    // practice. If they do, possible mitigations include:
+    //  - Continue sending heartbeats while committing suicide (requires
+    //    a bit of thought to do right.
+    //  - Persist backoff expirations.
+    //  - Have notifyFinished() tag "after suicide" task exit statuses with
+    //    a special bit, so that they can be ERRORs, while still CHECKing
+    //    for other, buggier instances of two simultaneous task instances.
     CHECK(it->second.invocationID == rt.invocationID)
       << "Cannot updateStatus since the invocation IDs don't match, new task "
       << debugString(rt) << " vs current task " << debugString(it->second)
@@ -173,16 +205,34 @@ TaskStatus TaskStatusSnapshot::updateStatus(
   } else {  // The incoming status is not "running"
     // The previous status already wasn't "running"
     if (it == runningTasks_.end()) {
-      // Cannot happen, since RemoteWorker::recordNonRunningTaskStatus is
-      // supposed to filter out overwriteable statuses that would replace
-      // an existing "not running" status.
-      CHECK(!status.isOverwriteable());
+      // An overwritable status does not replace the current one.
+      //
+      // See TestRemoteRunner::TaskExitedRacesTaskLost for the one way
+      // to trigger this.  In short: in a rare race, a task completes
+      // **after** `updateState` decided the task got lost, but before
+      // `applyUpdate` managed to update TaskStatuses.
+      //
+      // Future: If possible, synchronize the RemoteWorker and TaskStatuses
+      // updates, and convert this to a CHECK.
+      //
+      // NB We never get here fromRemoteWorker::recordNonRunningTaskStatus,
+      // since it filters out overwriteable statuses that would replace an
+      // existing "not running" status.
+      if (status.isOverwriteable()) {
+        LOG(WARNING) << "This should be rare: storing the task status "
+          << status.toJson() << " from the worker won a race against "
+          << "marking the task as lost: " << stored_status.toJson()
+          << " for " << debugString(rt);
+        CHECK(!stored_status.isRunning());
+        return stored_status;
+      }
       // A overwriteable status is safe to replace with the new one, it just
       // means that a normal updateStatus arrived after loseRunningTasks, or
       // after a notifyIfTasksNotRunning reply.
       if (stored_status.isOverwriteable()) {
         LOG(INFO) << "Replacing overwriteable " << stored_status.toJson()
-          << " with a new status " << status.toJson();
+          << " with a new status " << status.toJson() << " for task "
+          << debugString(rt);
       } else {
         // Rarely. we will end up here due to the worker retrying
         // updateStatus after a "partial failure" -- the scheduler recording

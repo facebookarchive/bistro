@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -8,37 +8,49 @@
  *
  */
 #include <gtest/gtest.h>
+#include <map>
 
-#include "bistro/bistro/utils/LogLines.h"
-#include "bistro/bistro/utils/LogWriter.h"
 #include "bistro/bistro/sqlite/Database.h"
 #include "bistro/bistro/sqlite/Statement.h"
+#include "bistro/bistro/utils/LogLines.h"
+#include "bistro/bistro/utils/LogWriter.h"
+#include "bistro/bistro/utils/TemporaryFile.h"
 
 using namespace facebook;
 using namespace facebook::bistro;
-using namespace std;
 
 DECLARE_int32(log_retention);
 DECLARE_int32(log_prune_frequency);
 
 // Copypasta'd from LogWriter.cpp because C++ is too hard.
-map<LogTable, string> tables = {
-  { LogTable::STDERR, "stderr" },
-  { LogTable::STDOUT, "stdout" },
-  { LogTable::STATUSES, "statuses" },
+std::map<LogTable, std::string> tables = {
+    {LogTable::STDERR, "stderr"},
+    {LogTable::STDOUT, "stdout"},
+    {LogTable::EVENTS, "statuses"},
 };
 
 TEST(TestLogWriter, HandleAll) {
   FLAGS_log_prune_frequency = 0;
 
-  vector<tuple<LogTable, string, string, vector<string>>> inputs{
-    make_tuple(
-      LogTable::STDOUT, "job1", "node1", vector<string>{"line1", "line2"}),
-    make_tuple(
-      LogTable::STDERR, "job2", "node2", vector<string>{"line3", "line4"}),
-    make_tuple(
-      LogTable::STATUSES, "job3", "node3", vector<string>{"line5", "line6"}),
-  };
+  std::vector<
+      std::tuple<LogTable, std::string, std::string, std::vector<std::string>>>
+      inputs{
+          std::make_tuple(
+              LogTable::STDOUT,
+              "job1",
+              "node1",
+              std::vector<std::string>{"line1", "line2"}),
+          std::make_tuple(
+              LogTable::STDERR,
+              "job2",
+              "node2",
+              std::vector<std::string>{"line3", "line4"}),
+          std::make_tuple(
+              LogTable::EVENTS,
+              "job3",
+              "node3",
+              std::vector<std::string>{"line5", "line6"}),
+      };
 
   TemporaryFile db_file;
   LogWriter writer(db_file.getFilename());
@@ -74,7 +86,7 @@ TEST(TestLogWriter, HandleAll) {
   writer.prune();
   for (const auto& table : tables) {
     for (auto& row : db->prepare("SELECT * FROM " + table.second)->query()) {
-      FAIL();  // should have no rows
+      FAIL(); // should have no rows
     }
   }
 }

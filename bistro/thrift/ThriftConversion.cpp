@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2017, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,8 +9,11 @@
  */
 #include "bistro/bistro/thrift/ThriftConversion.h"
 
-#include "bistro/bistro/config/utils.h"
 #include <folly/json.h>
+#include <folly/experimental/DynamicParser.h>
+
+#include "bistro/bistro/config/Config.h"
+#include "bistro/bistro/config/parsing_common.h"
 
 namespace facebook { namespace bistro {
 
@@ -23,7 +26,7 @@ unordered_set<string> asSet(const dynamic* d) {
   unordered_set<string> s;
   if (d) {
     for (const auto& i : *d) {
-      s.insert(i.asString().toStdString());
+      s.insert(i.asString());
     }
   }
   return s;
@@ -58,9 +61,9 @@ cpp2::BistroJobConfigFilters toThrift(const dynamic& d) {
   return cpp2::BistroJobConfigFilters(
     apache::thrift::FRAGILE,
     asSet(d.get_ptr("whitelist")),
-    d.getDefault("whitelist_regex", "").asString().toStdString(),
+    d.getDefault("whitelist_regex", "").asString(),
     asSet(d.get_ptr("blacklist")),
-    d.getDefault("blacklist_regex", "").asString().toStdString(),
+    d.getDefault("blacklist_regex", "").asString(),
     d.getDefault("fraction_of_nodes", 1.0).asDouble(),
     asSet(d.get_ptr("tag_whitelist"))
   );
@@ -90,6 +93,9 @@ dynamic toDynamic(const cpp2::BistroJobConfig& c) {
   } else {
     config["kill_orphan_tasks_after_sec"] = false;
   }
+  config[kTaskSubprocess] =
+    taskSubprocessOptionsToDynamic(c.taskSubprocessOptions);
+  config[kKillSubprocess] = killRequestToDynamic(c.killRequest);
   if (c.versionID != -1) {
     config["version_id"] = c.versionID;
   }
@@ -103,7 +109,7 @@ dynamic toDynamic(const cpp2::BistroJobConfig& c) {
     config["resources"] = resources_obj;
   }
   if (!c.error.empty()) {
-    config["error"] = c.error;
+    config["errors"] = folly::parseJson(c.error);
   }
   if (!c.backoffValues.empty()) {
     config["backoff"] = dynamic(c.backoffValues.begin(), c.backoffValues.end());
@@ -121,65 +127,74 @@ dynamic toDynamic(const cpp2::BistroJobConfig& c) {
 }
 
 cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
+  // Defaults for "optional" fields are set by the .thrift file.
   cpp2::BistroJobConfig config;
   config.name = name;
-  config.enabled = d.getDefault("enabled", false).asBool();
-  config.owner = d.getDefault("owner", "").asString().toStdString();
-  config.priority = d.getDefault("priority", 1.0).asDouble();
-  config.config = folly::toJson(d.getDefault("config", "")).toStdString();
-  config.error = d.getDefault("error", "").asString().toStdString();
-  config.createTime = d.getDefault("create_time", 0).asInt();
-  config.modifyTime = d.getDefault("modify_time", 0).asInt();
-  config.levelForTasks =
-    d.getDefault("level_for_tasks", "").asString().toStdString();
-  if (auto* p = d.get_ptr("resources")) {
-    for (const auto& pair : p->items()) {
-      config.resources[pair.first.asString().toStdString()] =
-        pair.second.asInt();
-    }
-  }
-  if (auto* p = d.get_ptr("filters")) {
-    for (const auto& pair : p->items()) {
-      config.filters[pair.first.asString().toStdString()] =
-        toThrift(pair.second);
-    }
-  }
-  if (auto* p = d.get_ptr("kill_orphan_tasks_after_sec")) {
-    if (p->isBool()) {
-      config.__isset.killOrphanTasksAfterSec = p->asBool();
-      config.killOrphanTasksAfterSec = 0;
-    } else if (p->isNumber()) {
+  folly::DynamicParser p(folly::DynamicParser::OnError::RECORD, &d);
+  p.optional("enabled", [&](bool b) { config.enabled = b; });
+  p.optional("owner", [&](std::string&& s) { config.owner = std::move(s); });
+  p.optional("priority", [&](double p) { config.priority = p; });
+  config.config = "{}";  // No default in .thrift file :/
+  p.optional("config", [&]() { config.config = folly::toJson(p.value()); });
+  // Since this toThrift is meant to be used on the output of toDynamic, it
+  // is not an error to have something in "errors".
+  p.optional("errors", [&]() { config.error = folly::toJson(p.value()); });
+  p.optional("create_time", [&](int64_t n) { config.createTime = n; });
+  p.optional("modify_time", [&](int64_t n) { config.modifyTime = n; });
+  p.optional("level_for_tasks", [&](std::string&& s) {
+    config.levelForTasks = std::move(s);
+  });
+  p.optional("resources", [&]() {
+    p.objectItems([&](std::string&& name, int64_t amount) {
+      config.resources[name] = amount;
+    });
+  });
+  p.optional("filters", [&]() {
+    p.objectItems([&](std::string&& name, const folly::dynamic& v) {
+      config.filters[name] = toThrift(v);
+    });
+  });
+  {
+    folly::Optional<std::chrono::milliseconds> maybe_kill_ms;
+    parseKillOrphanTasksAfter(&p, &maybe_kill_ms);
+    if (maybe_kill_ms.hasValue()) {
       config.__isset.killOrphanTasksAfterSec = true;
-      config.killOrphanTasksAfterSec = p->asDouble();
+      config.killOrphanTasksAfterSec = 0.001 * maybe_kill_ms->count();
     } else {
-      throw std::runtime_error(folly::to<std::string>(
-        "Invalid kill_orphan_tasks_after_sec", folly::toJson(*p)
-      ));
+      config.__isset.killOrphanTasksAfterSec = false;
     }
   }
-  if (auto *p = d.get_ptr("version_id")) {
-    if (!p->isInt()) {
-      throw std::runtime_error("'version_id' must be an integer");
-    }
-    config.versionID = p->asInt();
-  }
-  config.levelForHostPlacement =
-    d.getDefault("level_for_host_placement", "").asString().toStdString();
-  config.hostPlacement =
-    d.getDefault("host_placement", "").asString().toStdString();
-  if (auto* p = d.get_ptr("backoff")) {
-    for (const auto& d : *p) {
-      if (d.isInt()) {
-        config.backoffValues.push_back(d.asInt());
-      } else if (d.isString() && d.asString() == "repeat") {
+  parseTaskSubprocessOptions(&p, &config.taskSubprocessOptions);
+  parseKillRequest(&p, &config.killRequest);
+  p.optional("version_id", [&](int64_t n) { config.versionID = n; });
+  p.optional("level_for_host_placement", [&](std::string&& s) {
+    config.levelForHostPlacement = std::move(s);
+  });
+  p.optional("host_placement", [&](std::string&& s) {
+    config.hostPlacement = std::move(s);
+  });
+  p.optional("backoff", [&]() {
+    p.arrayItems([&](const folly::dynamic& v) {
+      if (v.isInt()) {
+        config.backoffValues.push_back(v.asInt());
+      } else if (v.isString() && v.asString() == "repeat") {
         config.backoffRepeat = true;
+      } else if (!v.isString() || v.asString() != "fail") {
+        throw std::runtime_error("Unknown backoff value");
       }
-    }
-  }
-  if (auto *p = d.get_ptr("depends_on")) {
-    for (const auto& job_name : *p) {
-      config.dependsOn.push_back(job_name.asString().toStdString());
-    }
+    });
+  });
+  p.optional("depends_on", [&]() {
+    p.arrayItems([&](std::string&& dep_name) {
+      config.dependsOn.emplace_back(std::move(dep_name));
+    });
+  });
+  auto errors = p.releaseErrors();
+  if (!errors.empty()) {
+    // Should never happen:
+    throw BistroException(
+      "Failed to produce BistroJobConfig: ", folly::toJson(errors)
+    );
   }
   return config;
 }

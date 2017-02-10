@@ -9,7 +9,6 @@
  */
 #include <gtest/gtest.h>
 
-#include <glog/logging.h>
 #include <string>
 #include <vector>
 

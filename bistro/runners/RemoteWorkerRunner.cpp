@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,7 +9,10 @@
  */
 #include "bistro/bistro/runners/RemoteWorkerRunner.h"
 
+#include <cmath>
+
 #include <folly/experimental/AutoTimer.h>
+#include <folly/gen/Base.h>
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Job.h"
@@ -27,15 +30,6 @@
 #include "bistro/bistro/if/gen-cpp2/BistroWorker_custom_protocol.h"
 #include "bistro/bistro/flags/Flags.h"
 
-DEFINE_int32(
-  CAUTION_startup_wait_for_workers, -1,
-  "At startup, the scheduler has to wait for workers to connect, so that "
-  "we do not accidentally re-start tasks that are already running elsewhere. "
-  "The default of -1 computes a 'minimum safe wait' from your healthcheck "
-  "and worker loss timeouts. CAUTION: If you reduce these timeouts from one "
-  "scheduler run to the next, the new default wait may not be long enough. "
-);
-
 namespace facebook { namespace bistro {
 
 using namespace std;
@@ -45,19 +39,56 @@ using namespace apache::thrift;
 RemoteWorkerRunner::RemoteWorkerRunner(
     shared_ptr<TaskStatuses> task_statuses,
     std::shared_ptr<Monitor> monitor)
-  : workerLevel_(StringTable::NotFound),
+  : TaskRunner(),  // Initializes schedulerID_
+    workers_(folly::construct_in_place, time(nullptr), schedulerID_),
+    workerLevel_(StringTable::NotFound),
     taskStatuses_(task_statuses),
-    eventBase_(new TEventBase()),
-    eventBaseThread_(bind(&TEventBase::loopForever, eventBase_.get())),
+    eventBase_(new folly::EventBase()),
+    eventBaseThread_(bind(&folly::EventBase::loopForever, eventBase_.get())),
     inInitialWait_(true),
-    startTime_(time(nullptr)),
     monitor_(monitor) {
 
   // Monitor the workers: send healthchecks, mark them (un)healthy / lost, etc
   runInBackgroundLoop([this](){
+    auto config = config_.copy();
+    bool log_manually_exit_initial_wait = false;
     RemoteWorkerUpdate update;
-    workers_->updateState(&update);
-    checkInitialWait(update);  // Must be called **after** updateState
+    SYNCHRONIZED(workers_) {
+      workers_.updateState(&update);
+      if (!update.initialWaitMessage().empty()
+          && config  // Can be nullptr before the first updateConfig
+          && config->exitInitialWaitBeforeTimestamp > update.curTime()) {
+        workers_.manuallyExitInitialWait();
+        update.setInitialWaitMessage(std::string());
+        // Log below to minimize the workers_ lock time.
+        log_manually_exit_initial_wait = true;
+      }
+    }
+
+    // This cannot be in applyUpdate, since initial wait is only computed in
+    // updateState() and not in processHeartbeat().
+    //
+    // It is safe to end the initial wait before doing anything else, since we
+    // update TaskStatuses immediately after initializeRunningTasks().  I.e.,
+    // if we think that all workers have connected, then the scheduler is also
+    // aware of all their running tasks by this point.
+    DEFINE_MONITOR_ERROR(monitor_, error, "RemoteWorkerRunner initial wait");
+    if (update.initialWaitMessage().empty()) {
+      if (log_manually_exit_initial_wait) {
+        LOG(WARNING) << "Exiting initial wait due to a MANUAL override via "
+          << "the config key '" << kExitInitialWaitBeforeTimestamp << "', "
+          << "which is set to " << config->exitInitialWaitBeforeTimestamp
+          << ", while the current time is " << update.curTime()
+          << ". DANGER: Do not overuse this, since accidentally exiting "
+          << "initial wait when there are tasks running on live workers "
+          << "***WILL*** cause you to double-start tasks.";
+      }
+      inInitialWait_.store(false, std::memory_order_relaxed);
+      // No call to 'error' clears the "intial wait" errors from the UI.
+    } else {
+      LOG(WARNING) << error.report(update.initialWaitMessage());
+    }
+
     applyUpdate(&update);
     return chrono::seconds(RemoteWorkerState::workerCheckInterval());
   });
@@ -69,6 +100,44 @@ RemoteWorkerRunner::~RemoteWorkerRunner() {
   eventBaseThread_.join();
 }
 
+namespace {
+// Clamp to the range of the physical output.
+template <typename T>
+void clampPhysical(T* phys, double unclamped, const cpp2::Resource& r) {
+  if (unclamped < 0) {  // Resources are unsigned, even if Thrift won't let us.
+    *phys  = 0;
+  } else if (unclamped > std::numeric_limits<T>::max()) {
+    *phys = std::numeric_limits<T>::max();
+  } else {
+    *phys = unclamped;
+    return;
+  }
+  LOG(WARNING) << "Clamping physical value of " << r.name << " from "
+    << unclamped << " to limit " << *phys;
+}
+
+template <typename T>
+void logicalToIntPhysicalResource(
+    T* phys,
+    const cpp2::PhysicalResourceConfig& p,
+    const cpp2::Resource& r) {
+  clampPhysical(phys, ::round(p.multiplyLogicalBy * r.amount), r);
+}
+
+folly::Optional<int> physicalToLogicalResource(
+    const cpp2::PhysicalResourceConfig& c,
+    double physical) {
+  // At present, physical resources set to 0 are "not available", so let
+  // them go as defaults.
+  if (physical == 0) {
+    return folly::none;
+  }
+  auto r = ::trunc((physical - c.physicalReserveAmount) / c.multiplyLogicalBy);
+  return r < 0 ? 0 : r;
+}
+}  // anonymous namespace
+
+
 void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
   folly::AutoTimer<> timer;
   DEFINE_MONITOR_ERROR(monitor_, error, "RemoteWorkerRunner resource update");
@@ -76,9 +145,11 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
   // Memoize these two values to be used by the next runTask
   workerLevel_ = config->levels.lookup("worker");
   CHECK(workerLevel_ != config->levels.NotFound);
-  config_ = config;
+  SYNCHRONIZED(config_) {
+    config_ = config;
+  }
 
-  const auto& resources = config->resourcesByLevel[workerLevel_];
+  const auto& def_resources = config->resourcesByLevel[workerLevel_];
   // Always lock workerResources_ first, then workers_
   SYNCHRONIZED(workerResources_) { SYNCHRONIZED_CONST(workers_) {
     workerResources_.clear();
@@ -87,9 +158,58 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
     // RemoteWorkerRunner::runTaskImpl() gets to mark the task running in
     // the scheduler *BEFORE* the next updateWorkerResources().  So, there
     // would be no savings by releasing the lock before we are done here.
-    for (const auto& wconn : workers_) {
+    for (const auto& wconn : workers_.workerPool()) {
       const auto& w = wconn.second->getBistroWorker();
-      // Try for hostport, and fallback to hostname
+
+      auto& w_res = workerResources_[w.shard];
+      w_res = def_resources;  // Start with the defaults.
+
+      // Apply any known physical resources.
+      for (const auto& prc : config->physicalResourceConfigs) {
+        // Apply CPU, RAM, # of GPU cards.
+        if (const auto val = [&]() -> folly::Optional<int> {
+          switch (prc.physical) {
+            case cpp2::PhysicalResource::RAM_MBYTES:
+              return
+                physicalToLogicalResource(prc, w.usableResources.memoryMB);
+            case cpp2::PhysicalResource::CPU_CORES:
+              return
+                physicalToLogicalResource(prc, w.usableResources.cpuCores);
+            case cpp2::PhysicalResource::GPU_CARDS:
+              return
+                physicalToLogicalResource(prc, w.usableResources.gpus.size());
+            default:
+              return folly::none;
+          }
+        }()) {
+          CHECK_GE(prc.logicalResourceID, 0);
+          CHECK_LT(prc.logicalResourceID, w_res.size());
+          w_res[prc.logicalResourceID] = *val;
+        }
+        // If the user configured special resources for GPU card models,
+        // populate them too.
+        if (prc.physical == cpp2::PhysicalResource::GPU_CARDS) {
+          for (const auto& gpu : w.usableResources.gpus) {
+            auto r_name = "GPU: " + gpu.name;
+            auto rid = config->resourceNames.lookup(r_name);
+            if (rid != StringTable::NotFound) {
+              CHECK_GE(rid, 0);
+              if (rid >= w_res.size()
+                  || w_res[rid] == numeric_limits<int>::max()) {
+                // Ok to logspam, since it's probably a misconfiguration.
+                LOG(WARNING) << "Resource " << r_name << " exists, but is "
+                  << "not a worker resource. Ignoring.";
+              } else {
+                // Let's hope these resources have default limits of 0 :)
+                ++w_res[rid];
+              }
+            }
+          }
+        }
+      }
+
+      // Apply manual worker resource overrides.
+      // Try for hostport, and fallback to hostname, then shard name
       auto it = config->workerResourcesOverride.find(
         folly::to<string>(w.machineLock.hostname, ':', w.machineLock.port)
       );
@@ -97,9 +217,15 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
         it = config->workerResourcesOverride.find(w.machineLock.hostname);
       }
       if (it == config->workerResourcesOverride.end()) {
-        workerResources_[w.shard] = resources;
-      } else {
-        workerResources_[w.shard] = it->second;
+        // I added the shard-name lookup for TestBusiestSelector, but it
+        // seems like a reasonable idea in general.
+        it = config->workerResourcesOverride.find(w.shard);
+      }
+
+      if (it != config->workerResourcesOverride.end()) {
+        for (const auto& p : it->second) {
+          w_res[p.first] = p.second;
+        }
       }
     }
 
@@ -151,7 +277,19 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
   }
 }
 
-LogLines RemoteWorkerRunner::getJobLogs(
+namespace {
+/**
+ * This helper is separate from RemoteWorkerRunner::getJobLogs to
+ * make it clear that it does not use any member variables (i.e.
+ * it's effectively a pure function).
+ *
+ * Importantly, it must not access the current thread's EventBase, since
+ * this is typically called from an EventBase handler, and event_base_loop()
+ * is not reentrant.
+ */
+LogLines getJobLogsThreadAndEventBaseSafe(
+    const std::string& unqueried_workers,
+    const std::vector<cpp2::ServiceAddress>& services,
     const string& logtype,
     const vector<string>& jobs,
     const vector<string>& nodes,
@@ -163,6 +301,121 @@ LogLines RemoteWorkerRunner::getJobLogs(
   res.nextLineID = LogLine::kNotALineID;
   time_t cur_time = time(nullptr);  // timestamp for any errors
 
+  if (!unqueried_workers.empty()) {
+    auto err = folly::to<string>(
+      "Warning: some workers are unhealthy, so we cannot return logs from "
+      "them. If your task ever ran on any of the following workers, these "
+      "results may be incomplete -- ", unqueried_workers
+    );
+    LOG(WARNING) << err;
+    res.lines.emplace_back("", "", cur_time, err, LogLine::kNotALineID);
+  }
+
+  // Manages a bunch of concurrent requests to get the logs from the workers.
+  // DANGER: Do not replace by getEventBase(), see the docstring.
+  folly::EventBase eb;
+
+  auto resultsx = folly::collectAll(
+      folly::gen::from(services)
+      | folly::gen::mapped([&](auto const& addr) {
+        return folly::makeFutureWith([&]{
+          auto client =
+            getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(&eb, addr);
+          return client->future_getJobLogsByID(
+              logtype,
+              jobs,
+              nodes,
+              line_id,
+              is_ascending,
+              // at least 100 lines per worker, but try to stay under 5000
+              // lines total
+              max(5000 / int(services.size()), 100),
+              regex_filter);
+        })
+        .onError([&](folly::exception_wrapper&& ew) {
+          auto const service_id = debugString(addr);
+          // Logging is done here so that errors are emitted as they happen,
+          // rather than all at once at the end.
+          auto const err = folly::to<string>(
+            "Failed to fetch logs from worker ", service_id, ", this may be ",
+            "transient -- but if it is not, report it: ", ew.what()
+          );
+          LOG(ERROR) << err;
+          res.lines.emplace_back("", "", cur_time, err, LogLine::kNotALineID);
+          return folly::makeFuture<cpp2::LogLines>(std::move(ew));
+        });
+      })
+      | folly::gen::as<std::vector>())
+    .getVia(&eb);
+
+  auto const results = folly::gen::from(resultsx)
+    | folly::gen::filter([](auto const& _) { return _.hasValue(); })
+    | folly::gen::mapped([](auto& _) { return _.value(); })
+    | folly::gen::move
+    | folly::gen::as<std::vector>();
+
+  // Find the most restrictive nextLineID among all hosts
+  for (const auto& log : results) {
+    if (
+      // This value marks "no more lines" in LogWriter, so exclude it.
+      (log.nextLineID != LogLine::kNotALineID) && (
+        // This line only matches initially due to the previous comparison
+        (res.nextLineID == LogLine::kNotALineID) ||
+        ((res.nextLineID > log.nextLineID) == is_ascending)
+      )
+    ) {
+      res.nextLineID = log.nextLineID;
+    }
+  }
+
+  // Merge log lines, dropping those beyond the selected nextLineID.
+  //
+  // This means that the client is guaranteed log lines that are truly
+  // sequential in line_id, making for an API that's easy to use
+  // correctly.  In principle, this filtering could be done on the
+  // client-side, and the non-sequential lines could be displayed
+  // separately, but this seems too confusing for casual users.
+  for (const auto& log : results) {
+    for (const cpp2::LogLine& l : log.lines) {
+      if (
+        // If we are on the last page of results on all hosts, drop nothing.
+        (res.nextLineID == LogLine::kNotALineID) ||
+        ((l.lineID < res.nextLineID) == is_ascending)
+      ) {
+        res.lines.emplace_back(
+          l.jobID, l.nodeID, l.time, l.line, l.lineID
+        );
+      }
+    }
+  }
+
+  // Sort the merged results from all the workers.
+  if (is_ascending) {
+    sort(
+      res.lines.begin(),
+      res.lines.end(),
+      [](const LogLine& a, const LogLine& b) { return a.lineID < b.lineID; }
+    );
+  } else {
+    sort(
+      res.lines.begin(),
+      res.lines.end(),
+      [](const LogLine& a, const LogLine& b) { return a.lineID > b.lineID; }
+    );
+  }
+
+  return res;
+}
+}  // anonymous namespace
+
+LogLines RemoteWorkerRunner::getJobLogs(
+    const string& logtype,
+    const vector<string>& jobs,
+    const vector<string>& nodes,
+    int64_t line_id,
+    bool is_ascending,
+    const string& regex_filter) const {
+
   // We are going to query all the workers. This is wasteful, but it makes
   // it much easier to find logs for tasks, because:
   //  1) Multiple workers can have logs for different iterations of a task
@@ -172,7 +425,7 @@ LogLines RemoteWorkerRunner::getJobLogs(
   std::vector<std::string> unhealthy_workers;
   std::vector<std::string> lost_workers;
   SYNCHRONIZED_CONST(workers_) {
-    for (const auto& wconn : workers_) {
+    for (const auto& wconn : workers_.workerPool()) {
       const auto& w = wconn.second->getBistroWorker();
       // Instead of trying to fetch logs from unhealthy workers, which can
       // be slow, and degrade the user experience, display a "transient"
@@ -211,109 +464,29 @@ LogLines RemoteWorkerRunner::getJobLogs(
     }
   }
 
-  if (!unqueried_workers.empty()) {
-    auto err = folly::to<string>(
-      "Warning: some workers are unhealthy, so we cannot return logs from "
-      "them. If your task ever ran on any of the following workers, these "
-      "results may be incomplete -- ", unqueried_workers
-    );
-    LOG(WARNING) << err;
-    res.lines.emplace_back("", "", cur_time, err, LogLine::kNotALineID);
-  }
-
-  // Use this thread's EventBase so that we can loopForever() to wait.
-  auto* event_base =
-    apache::thrift::async::TEventBaseManager::get()->getEventBase();
-
-  // Query all the workers for their logs
-  fanOutRequestToServices<cpp2::BistroWorkerAsyncClient, cpp2::LogLines>(
-    event_base,
-    resolve_callback(&cpp2::BistroWorkerAsyncClient::getJobLogsByID),
-    &cpp2::BistroWorkerAsyncClient::recv_getJobLogsByID,
-    // Handle exceptions for individual hosts by inserting "error" log lines
-    // into the output, so that the client still gets some partial results.
-    [&res, cur_time](exception_ptr ex, const string& service_id) {
-      try {
-        std::rethrow_exception(ex);  // ex is guaranteed to be non-null
-      } catch(const std::exception& e) {
-        auto err = folly::to<string>(
-          "Failed to fetch logs from worker ", service_id, ", this may be ",
-          "transient -- but if it is not, report it: ", e.what()
-        );
-        LOG(ERROR) << err;
-        res.lines.emplace_back("", "", cur_time, err, LogLine::kNotALineID);
-      }
-    },
-    // FinishFunc: a callback for when all workers have been processed.
-    [is_ascending, line_id, &res](
-      vector<unique_ptr<cpp2::LogLines>>&& results,
-      apache::thrift::async::TEventBase* evb
-    ) {
-      // Find the most restrictive nextLineID among all hosts
-      for (const auto& log : results) {
-        if (
-          // This value marks "no more lines" in LogWriter, so exclude it.
-          (log->nextLineID != LogLine::kNotALineID) && (
-            // This line only matches initially due to the previous comparison
-            (res.nextLineID == LogLine::kNotALineID) ||
-            ((res.nextLineID > log->nextLineID) == is_ascending)
-          )
-        ) {
-          res.nextLineID = log->nextLineID;
-        }
-      }
-      // Merge log lines, dropping those beyond the selected nextLineID.
-      //
-      // This means that the client is guaranteed log lines that are truly
-      // sequential in line_id, making for an API that's easy to use
-      // correctly.  In principle, this filtering could be done on the
-      // client-side, and the non-sequential lines could be displayed
-      // separately, but this seems too confusing for casual users.
-      for (const auto& log : results) {
-        for (const cpp2::LogLine& l : log->lines) {
-          if (
-            // If we are on the last page of results on all hosts, drop nothing.
-            (res.nextLineID == LogLine::kNotALineID) ||
-            ((l.lineID < res.nextLineID) == is_ascending)
-          ) {
-            res.lines.emplace_back(
-              l.jobID, l.nodeID, l.time, l.line, l.lineID
-            );
-          }
-        }
-      }
-      evb->terminateLoopSoon();
-    },
+  return getJobLogsThreadAndEventBaseSafe(
+    unqueried_workers,
     services,
     logtype,
     jobs,
     nodes,
     line_id,
     is_ascending,
-    // at least 10 lines per worker, but try to stay under 5000 lines total
-    max(5000 / (int)services.size(), 10),
     regex_filter
   );
-
-  event_base->loopForever();  // Execute scheduled work, and wait for finish_fn
-
-  // Sort the merged results from all the workers
-  sort(
-    res.lines.begin(),
-    res.lines.end(),
-    [is_ascending](const LogLine& a, const LogLine& b) {
-      return (!is_ascending) ^ (a.lineID < b.lineID);
-    }
-  );
-
-  return res;
 }
 
 cpp2::SchedulerHeartbeatResponse RemoteWorkerRunner::processWorkerHeartbeat(
     const cpp2::BistroWorker& worker,
-    RemoteWorkerUpdate update) {
+    const cpp2::WorkerSetID& worker_set_id,
+    RemoteWorkerUpdate update,
+    std::function<void()> unit_test_cob) {
 
-  auto r = workers_->processHeartbeat(&update, worker);
+  // Throws on protocol version mismatch, does not add worker to pool.
+  auto r = workers_->processHeartbeat(&update, worker, worker_set_id);
+  // In TaskExitedRacesTaskLost, we need to inject logic between making the
+  // update and applying it.
+  unit_test_cob();
   // This will often result in the healthcheck or getRunningTasks arriving
   // before the heartbeat response does (meaning the worker does not yet
   // know the scheduler).  As a result, "new worker" healthchecks are
@@ -363,7 +536,7 @@ void RemoteWorkerRunner::remoteUpdateStatus(
 
 TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   const std::shared_ptr<const Job>& job,
-  const std::shared_ptr<const Node>& node,
+  const Node& node,
   cpp2::RunningTask& rt,
   folly::dynamic& job_args,
   function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
@@ -371,11 +544,16 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   if (inInitialWait_.load(std::memory_order_relaxed)) {
     return DoNotRunMoreTasks;
   }
+  auto config = config_.copy();
+  CHECK(config) << "Cannot runTask before updateConfig";
 
   // Make a copy so we don't have to lock workers_ while waiting for Thrift.
   cpp2::BistroWorker worker;
   // unused initialization to hush a Clang warning:
   int64_t did_not_run_sequence_num = 0;
+  // These will modify the task's cgroupOptions if we find a worker.
+  int16_t cgroup_cpu_shares = 0;
+  int64_t cgroup_memory_limit_in_bytes = 0;
   // Always lock workerResources_ first, then workers_
   SYNCHRONIZED(workerResources_) {
     SYNCHRONIZED(workers_) {
@@ -388,10 +566,11 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         // stale, but that's no big deal.  We need the stale config anyway,
         // since its worker level ID is the correct index into
         // workerResources_.
-        config_->remoteWorkerSelectorType
+        config->remoteWorkerSelectorType
       )->findWorker(
+        config.get(),
         *job,
-        *node,
+        node,
         workerLevel_,  // Needed for checking worker-level job filters.
         monitor_.get(),
         &workerResources_,
@@ -407,21 +586,45 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       job_args["worker_host"] = worker.machineLock.hostname;
 
       // Add worker resources to rt **before** recording this task as running.
+      // Future: support this in LocalRunner mode as well.
       auto& resources_by_node = job_args["resources_by_node"];
       CHECK(resources_by_node.find(rt.workerShard)
             == resources_by_node.items().end())
         << "Cannot have both a node and a worker named: " << rt.workerShard
         << " -- if you are running a worker and the central scheduler on the "
         << "same host, you should specify --instance_node_name global.";
-      addNodeResourcesToRunningTask(
+      if (const auto* nr = addNodeResourcesToRunningTask(
         &rt,
         &resources_by_node,
         // This config is stale, but it's consistent with workerResources_.
-        *config_,
+        *config,
         rt.workerShard,
         workerLevel_,
         job->resources()
-      );
+      )) {
+        for (const auto& r : nr->resources) {
+          auto phys_it = config->logicalToPhysical.find(r.name);
+          if (phys_it != config->logicalToPhysical.end()) {
+            const auto& p =  // at() is like CHECK, since this is `noexcept`
+              config->physicalResourceConfigs.at(phys_it->second);
+            if (
+              p.physical == cpp2::PhysicalResource::RAM_MBYTES
+              && p.enforcement == cpp2::PhysicalResourceEnforcement::HARD
+            ) {
+              logicalToIntPhysicalResource(
+                &cgroup_memory_limit_in_bytes, p, r
+              );
+            } else if (
+              p.physical == cpp2::PhysicalResource::CPU_CORES
+              && p.enforcement == cpp2::PhysicalResourceEnforcement::SOFT
+            ) {
+              logicalToIntPhysicalResource(&cgroup_cpu_shares, p, r);
+              // Multiply by 2 here since cgroup cpu.shares must be >= 2.
+              clampPhysical(&cgroup_cpu_shares, 2*cgroup_cpu_shares, r);
+            }
+          }
+        }
+      }
 
       // Mark the task 'running' before we unlock workerResources_, because
       // otherwise an intervening updateConfig() could free the resources we
@@ -436,7 +639,10 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       );
       workers_.mutableWorkerOrAbort(worker.shard)
         ->recordRunningTaskStatus(rt, status);
-      // IMPORTANT: Update TaskStatuses **inside** the workers_ lock
+      // IMPORTANT: Update TaskStatuses **inside** the workers_ lock,
+      // otherwise e.g.  a worker could get lost before cb runs, failing the
+      // TaskStatusSnapshot::updateStatus() check for "when a task is not
+      // running, the received status is not overwritable".
       cb(rt, std::move(status));
     }
   }
@@ -445,22 +651,27 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   // get marked unhealthy or even lost, since workers_ is now unlocked, but
   // we just have to try our luck.
   eventBase_->runInEventBaseThread([
-      cb, this, rt, job_args, worker, did_not_run_sequence_num]() noexcept {
-
+      cb, this, job, rt, job_args, worker, did_not_run_sequence_num,
+      cgroup_cpu_shares, cgroup_memory_limit_in_bytes
+    ]() noexcept {
     try {
       shared_ptr<cpp2::BistroWorkerAsyncClient>
         client{getWorkerClient(worker)};
+      auto task_subproc_opts = job->taskSubprocessOptions();
+      task_subproc_opts.cgroupOptions.cpuShares = cgroup_cpu_shares;
+      task_subproc_opts.cgroupOptions.memoryLimitInBytes =
+        cgroup_memory_limit_in_bytes;
       client->runTask(
         unique_ptr<RequestCallback>(new FunctionReplyCallback(
           [this, cb, client, rt, worker, did_not_run_sequence_num](
               ClientReceiveState&& state) noexcept {
-
             // TODO(#5025478): Convert this, and the other recv_* calls in
             // this file to use recv_wrapped_*.
             try {
               client->recv_runTask(state);
             } catch (const cpp2::BistroWorkerException& e) {
-              LOG(ERROR) << "Worker never started task: " << e.message;
+              LOG(ERROR) << "Worker never started task "
+                << debugString(rt) << ": " << e.message;
               // Okay to mark the task "not running" since we know for sure
               // that the worker received & processed our request, and
               // decided not to run it.
@@ -475,8 +686,9 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
               // The task may or may not be running, so do NOT invoke the
               // callback, or the scheduler might schedule duplicate tasks,
               // exceed resource limits, etc.
-              LOG(ERROR) << "The runTask request hit an error, will have to "
-                "poll to find if the task is running: " << e.what();
+              LOG(ERROR) << "The runTask request hit an error on "
+                << debugString(rt) << ", will have to poll to find if the "
+                "task is running: " << e.what();
               SYNCHRONIZED(workers_) {
                 workers_.mutableWorkerOrAbort(worker.shard)
                   ->addUnsureIfRunningTask(rt);
@@ -485,13 +697,15 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
           }
         )),
         rt,
-        folly::toJson(job_args).toStdString(),
-        vector<string>{},  // Use the default worker command
+        folly::toJson(job_args),
+        job->command().empty()
+          ? std::vector<std::string>{/*--worker_command*/} : job->command(),
         schedulerID_,
         worker.id,
         // The real sequence number may have been incremented after we found
         // the worker, but this is okay, the worker simply rejects the task.
-        did_not_run_sequence_num
+        did_not_run_sequence_num,
+        std::move(task_subproc_opts)
       );
     } catch (const exception& e) {
       // We can get here if client creation failed (e.g. TAsyncSocket could
@@ -515,58 +729,6 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   return RanTask;
 }
 
-// Must be called after "update" is populated by updateState.
-void RemoteWorkerRunner::checkInitialWait(const RemoteWorkerUpdate& update) {
-  DEFINE_MONITOR_ERROR(monitor_, error, "RemoteWorkerRunner initial wait");
-  if (!inInitialWait_.load(std::memory_order_relaxed)) {
-    return;  // Clear the "intial wait" errors from the UI.
-  }
-
-  time_t min_safe_wait =
-    RemoteWorkerState::maxHealthcheckGap() +
-    RemoteWorkerState::loseUnhealthyWorkerAfter() +
-    RemoteWorkerState::workerCheckInterval();  // extra safety gap
-  time_t min_start_time = time(nullptr);
-  if (FLAGS_CAUTION_startup_wait_for_workers < 0) {
-    min_start_time -= min_safe_wait;
-  } else {
-    min_start_time -= FLAGS_CAUTION_startup_wait_for_workers;
-    if (RemoteWorkerState::maxHealthcheckGap()
-        > FLAGS_CAUTION_startup_wait_for_workers) {
-      LOG(ERROR) << error.report(
-        "DANGER! DANGER! Your --CAUTION_startup_wait_for_workers ",
-        "of ", FLAGS_CAUTION_startup_wait_for_workers,
-        " is lower than the max healthcheck gap of ",
-        RemoteWorkerState::maxHealthcheckGap(), ", which makes it very ",
-        "likely that you will start second copies of tasks that are ",
-        "already running (unless your heartbeat interval is much smaller) "
-      );
-    } else if (min_safe_wait > FLAGS_CAUTION_startup_wait_for_workers) {
-      LOG(WARNING) << error.report(
-        "Your custom --CAUTION_startup_wait_for_workers is ",
-        "less than the minimum safe value of ", min_safe_wait,
-        " -- this increases the risk of starting second copies of tasks ",
-        "that were already running."
-      );
-    }
-  }
-
-  // If, after the initial wait time expired, we are still querying running
-  // tasks, then the scheduler may have restarted, and one of the workers,
-  // while slow, is running tasks we do not know about.  To be safe, stay in
-  // initial wait until all getRunningTasks succeed.
-  if (min_start_time < startTime_) {
-    LOG(INFO) << error.report("Waiting for all workers to connect");
-  } else if (update.newWorkers().empty()) {
-    inInitialWait_.store(false, std::memory_order_relaxed);
-  } else {
-    LOG(ERROR) << error.report(
-      "Initial wait time expired, but not all workers' running tasks were "
-      "fetched; not allowing tasks to start until all are fetched."
-    );
-  }
-}
-
 ///
 /// Thrift helpers
 ///
@@ -585,6 +747,18 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
     const cpp2::BistroWorker& w, bool is_new_worker) noexcept {
 
   eventBase_->runInEventBaseThread([this, w, is_new_worker]() noexcept {
+    // Healthchecks distribute the latest cgroup configuration to the
+    // workers.  This has some mild side effects, but overall they are good,
+    // since health-checks will run in a similar setup to normal user jobs.
+    //
+    // Future: it might be a good idea to make `healthcheck` a proper
+    // job, so that this can be configured specially.
+    cpp2::TaskSubprocessOptions task_subprocess_opts;
+    SYNCHRONIZED(config_) {
+      if (config_) {
+        task_subprocess_opts = config_->taskSubprocessOptions;
+      }
+    }
     try {
       shared_ptr<cpp2::BistroWorkerAsyncClient> client{getWorkerClient(w)};
       // Make a barebones RunningTask; only job, startTime & shard are be used.
@@ -594,8 +768,9 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
       // worker healthchecks.
       rt.node = is_new_worker ? kHealthcheckTaskNewWorkerNode : "";
       rt.invocationID.startTime = time(nullptr);
-      // .rand is ignored for healthchecks
+      // Leaving .rand == 0 for healthchecks makes their cgroups easy to find.
       rt.workerShard = w.shard;
+      // .nextBackoffDuration is not applicable
       client->runTask(
         unique_ptr<RequestCallback>(new FunctionReplyCallback(
           [client, w](ClientReceiveState&& state) {
@@ -625,7 +800,8 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
         },
         schedulerID_,
         w.id,
-        0  // healtchecks don't use "notifyIfTasksNotRunning"
+        0,  // healtchecks don't use "notifyIfTasksNotRunning"
+        task_subprocess_opts
       );
     } catch (const exception& e) {
       LOG(ERROR) << "Error sending health-check to " << debugString(w)
@@ -674,7 +850,8 @@ void RemoteWorkerRunner::requestWorkerSuicide(
 void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
   // Suicide first, in case a worker also has a healthcheck.
   if (size_t num = update->suicideWorkers().size()) {
-    folly::AutoTimer<> timer("Requested suicide from ", num, " workers");
+    folly::AutoTimer<> timer(
+        folly::to<std::string>("Requested suicide from ", num, " workers"));
     for (const auto& shard_and_worker : update->suicideWorkers()) {
       requestWorkerSuicide(shard_and_worker.second);
       // We assume that RemoteWorker also issued 'lost tasks' for all of the
@@ -684,7 +861,8 @@ void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
 
   // Send out healthchecks
   if (size_t num = update->workersToHealthcheck().size()) {
-    folly::AutoTimer<> timer("Sent healthchecks to ", num, " workers");
+    folly::AutoTimer<> timer(
+        folly::to<std::string>("Sent healthchecks to ", num, " workers"));
     auto new_workers = update->newWorkers();
     for (const auto& shard_and_worker : update->workersToHealthcheck()) {
       sendWorkerHealthcheck(
@@ -704,23 +882,63 @@ void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
 
   // Process lost tasks before processing new ones, in case some are replaced.
   if (size_t num = update->lostRunningTasks().size()) {
-    folly::AutoTimer<> timer("Updated statuses for ", num, " lost tasks");
+    folly::AutoTimer<> timer(
+        folly::to<std::string>("Updated statuses for ", num, " lost tasks"));
     for (const auto& id_and_task : update->lostRunningTasks()) {
-      // Note: This **will** decrease the retry count. This makes more sense
-      // than neverStarted() since the worker might have crashed **because**
-      // of this task.
-      auto status = TaskStatus::errorBackoff("Remote worker lost (crashed?)");
-      // Ensure that application-specific statuses (if they arrive while
-      // the worker is MUST_DIE but still associated) can overwrite the
-      // 'lost' status, but the 'lost' status cannot overwrite a real
-      // status that arrived between loseRunningTasks and this call.
-      status.markOverwriteable();
+      const auto& original_rt = id_and_task.second;
+      // When the scheduler loses a worker, the worker **should** also time
+      // out and try to kill all its task ASAP, even if there is a network
+      // partition.  However, its "suicide" handler uses a TERM-wait-KILL
+      // policy, leaving a short delay to let the tasks exit gracefully.
+      //
+      // Therefore, the scheduler cannot safely start a new instance of a
+      // lost task until this delay has elapsed.  "Backoff" is the normal
+      // way of specifying this in the scheduler.  However, this means the
+      // scheduler sets a higher effective backoff than what was set by the
+      // task's policy.  Then, `workerLost()` undergoes some contortions to
+      // save the policy-configured task backoff, so that the next task
+      // instance correctly computes the `getNext()` backoff.
+      //
+      // We add an extra safety margin because even with a SIGKILL, task
+      // death is not instant, and the "task finished" message may take some
+      // more time to travel from the worker to the scheduler.
+      //
+      // This does not deal with scenarios where the scheduler goes down and
+      // loses the backoff state.  This also does not handle situations
+      // where task termination or worker status delivery is so slow that
+      // the timeouts below are grossly violated.  Setting a high enough
+      // value of --CAUTION_worker_suicide_backoff_safety_margin_sec should
+      // help mitigate this.
+      //
+      // Future: If TaskSubprocessOpts were a member of RunningTask, it
+      // would be best to also add 10 * rt.subprocessOpts.pollMs here
+      // (this assumses that the EventBase threads aren't *too* backed up.
+      auto tweaked_rt = id_and_task.second;
+      const int32_t kSafeBackoffSec =
+        RemoteWorkerState::workerSuicideBackoffSafetyMarginSec()
+          + (tweaked_rt.workerSuicideTaskKillWaitMs == 0
+              ? RemoteWorkerState::workerSuicideTaskKillWaitMs()
+              : tweaked_rt.workerSuicideTaskKillWaitMs) / 1000
+          + 1;  // a lazy way of rounding up, same as in my "initial wait" math
+      if (kSafeBackoffSec > original_rt.nextBackoffDuration.seconds) {
+        // This safe value will be used even if `noMoreBackoffs` is true,
+        // and the task is forgiven -- `TaskStatus::forgive()` makes a
+        // special provision for this.
+        tweaked_rt.nextBackoffDuration.seconds = kSafeBackoffSec;
+      }
       // IMPORTANT: Do not call recordFailedTask here because the lost tasks
       // are automatically recorded by RemoteWorker::loseRunningTasks.  See
       // its code for an explanation of how we maintain status consistency
       // between RemoteWorker & TaskStatuses, even though the two updates
       // are not atomic.
-      taskStatuses_->updateStatus(id_and_task.second, std::move(status));
+      taskStatuses_->updateStatus(tweaked_rt, TaskStatus::workerLost(
+        original_rt.workerShard,
+        // Save the unmodified nextBackoffDuration value, since this is the
+        // job-configured backoff value the status would have had **after**
+        // the update().  Storing it before the update() is hacky, but who's
+        // watching?
+        original_rt.nextBackoffDuration.seconds
+      ));
     }
   }
   // This may change the state of a worker from NEW to UNHEALTHY. For
@@ -811,14 +1029,7 @@ void RemoteWorkerRunner::fetchRunningTasksForNewWorkers(
               );
               // Atomically update RemoteWorker & TaskStatuses
               SYNCHRONIZED(workers_) {
-                auto worker = workers_.mutableWorkerOrAbort(w.shard);
-                // applyUpdate in another thread could have won (#5176536)
-                if (worker->getState() != RemoteWorkerState::State::NEW) {
-                  LOG(WARNING) << "Ignoring running tasks for non-new "
-                    << w.shard;
-                  return;
-                }
-                worker->initializeRunningTasks(running_tasks);
+                workers_.initializeRunningTasks(w, running_tasks);
                 // IMPORTANT: Update TaskStatuses **inside** the workers_ lock
                 for (const auto& rt : running_tasks) {
                   taskStatuses_->updateStatus(rt, TaskStatus::running());
@@ -840,40 +1051,28 @@ void RemoteWorkerRunner::fetchRunningTasksForNewWorkers(
 }
 
 void RemoteWorkerRunner::killTask(
-    const std::string& job,
-    const std::string& node,
-    cpp2::KilledTaskStatusFilter status_filter) {
-
-  // Look up the running task
-  const Job::ID job_id(Job::JobNameTable.asConst()->lookup(job));
-  const Node::ID node_id(Node::NodeNameTable.asConst()->lookup(node));
-  auto maybe_rt = taskStatuses_->copyRunningTask(job_id, node_id);
-  if (!maybe_rt.hasValue()) {
-    throw BistroException("Unknown running task ", job, ", ", node);
-  }
+    const cpp2::RunningTask& rt,
+    const cpp2::KillRequest& req) {
 
   // Look up the worker for the task
   folly::Optional<cpp2::BistroWorker> maybe_worker;
   SYNCHRONIZED(workers_) {
-    auto* worker_ptr = workers_.getWorker(maybe_rt->workerShard);
+    auto* worker_ptr = workers_.getWorker(rt.workerShard);
     if (worker_ptr != nullptr) {
       maybe_worker = worker_ptr->getBistroWorker();
     }
   }
   if (!maybe_worker.hasValue()) {
-    throw BistroException("Could not get worker for ", debugString(*maybe_rt));
+    throw BistroException("Could not get worker for ", debugString(rt));
   }
 
   // Make a synchronous kill request so that the client knows when the kill
   // succeeds or fails.  This can take 10 seconds or more.
-  apache::thrift::async::TEventBase evb;
+  folly::EventBase evb;
   getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(
     &evb,
-    maybe_worker->addr,
-    0,  // default connect timeout
-    0,  // default send timeout
-    300000  // 5 minute receive timeout
-  )->sync_killTask(*maybe_rt, status_filter, schedulerID_, maybe_worker->id);
+    maybe_worker->addr
+  )->sync_killTask(rt, schedulerID_, maybe_worker->id, req);
 }
 
 }}

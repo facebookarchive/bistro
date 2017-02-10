@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -44,7 +44,7 @@ TEST(TestJobFilters, HandleNoFilters) {
 }
 
 TEST(TestJobFilters, HandleWhitelist) {
-  JobFilters filters(dynamic::object("whitelist", {"abc"}));
+  JobFilters filters(dynamic::object("whitelist", dynamic::array("abc")));
   DOES_PASS(filters, "abc");
   DOESNT_PASS(filters, "dbs.123");
 }
@@ -57,7 +57,7 @@ TEST(TestJobFilters, HandleWhitelistRegex) {
 }
 
 TEST(TestJobFilters, HandleBlacklist) {
-  JobFilters filters(dynamic::object("blacklist", {"abc"}));
+  JobFilters filters(dynamic::object("blacklist", dynamic::array("abc")));
   DOESNT_PASS(filters, "abc");
   DOES_PASS(filters, "dbs.123");
   DOES_PASS(filters, "dbs.456");
@@ -71,11 +71,14 @@ TEST(TestJobFilters, HandleBlacklistRegex) {
 }
 
 TEST(TestJobFilters, HandleTagWhitelist) {
-  JobFilters filters(dynamic::object("tag_whitelist", {"abc", "car"}));
+  JobFilters filters(dynamic::object
+    ("tag_whitelist", dynamic::array("abc", "car"))
+  );
   Node no_tags("no_tags");
-  Node one_tag("one_tag", 0, false, nullptr, {"abc"});
-  Node two_tags("two_tags", 0, false, nullptr, {"abc", "car"});
-  Node three_tags("three_tags", 0, false, nullptr, {"abc", "car", "ah"});
+  Node one_tag("one_tag", 0, false, nullptr, Node::TagSet{"abc"});
+  Node two_tags("two_tags", 0, false, nullptr, Node::TagSet{"abc", "car"});
+  Node three_tags("three_tags", 0, false, nullptr,
+    Node::TagSet{"abc", "car", "ah"});
 
   EXPECT_FALSE(filters.doesPass("", no_tags));
   EXPECT_TRUE(filters.doesPass("", one_tag));
@@ -124,11 +127,11 @@ TEST(TestJobFilters, HandleDifferentSalts) {
 
 TEST(TestJobFilters, HandleComparison) {
   dynamic d = dynamic::object
-    ("whitelist", {"abc", "xyz"})
+    ("whitelist", dynamic::array("abc", "xyz"))
     ("whitelist_regex", "f.*")
-    ("blacklist", {"moo"})
+    ("blacklist", dynamic::array("moo"))
     ("blacklist_regex", "y.*")
-    ("tag_whitelist", {"bah"})
+    ("tag_whitelist", dynamic::array("bah"))
     ("fraction_of_nodes", 0.75)
   ;
   JobFilters f1(d), f2(d);
@@ -138,20 +141,20 @@ TEST(TestJobFilters, HandleComparison) {
 TEST(TestJobFilters, TestEqualityOperator) {
   JobFilters empty_filters;
   dynamic d = dynamic::object
-    ("whitelist", { "abc", "def" })
+    ("whitelist", dynamic::array("abc", "def"))
     ("whitelist_regex", "cat")
-    ("blacklist", { "dog" })
+    ("blacklist", dynamic::array("dog"))
     ("blacklist_regex", "foo_dog")
-    ("tag_whitelist", { "baah" })
+    ("tag_whitelist", dynamic::array("baah"))
     ("fraction_of_nodes", 0.5)
   ;
 
   dynamic d2 = dynamic::object
-    ("whitelist", { "abc" })
+    ("whitelist", dynamic::array("abc"))
     ("whitelist_regex", "cat2")
-    ("blacklist", { "dog2" })
+    ("blacklist", dynamic::array("dog2"))
     ("blacklist_regex", "foo_dog2")
-    ("tag_whitelist", { "baah2" })
+    ("tag_whitelist", dynamic::array("baah2"))
     ("fraction_of_nodes", 0.75)
   ;
 

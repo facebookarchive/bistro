@@ -22,7 +22,7 @@ TEST(TestSettingsMap, HandleAll) {
 
   EXPECT_TRUE(t.get("foo").isString());
   EXPECT_TRUE(t.get("invalid_key").empty());
-  EXPECT_EQ(2, t.get("invalid_key", {1, 2}).size());
+  EXPECT_EQ(2, t.get("invalid_key", folly::dynamic::array(1, 2)).size());
   EXPECT_THROW(t.require("invalid_key"), runtime_error);
 
   EXPECT_TRUE(t.get("object").isObject());

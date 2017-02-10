@@ -1,0 +1,70 @@
+cpp_unittest(
+    name = 'test_job_filters',
+    srcs = [
+        'test_job_filters.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_job',
+    srcs = [
+        'test_job.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+        '@/folly/experimental:test_util',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_node',
+    srcs = [
+        'test_node.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_config',
+    srcs = [
+        'test_config.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_backoff',
+    srcs = [
+        'test_backoff.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_file_config_loader',
+    srcs = [
+        'test_file_config_loader.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_task_placement',
+    srcs = [
+        'test_task_placement.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+    ],
+)

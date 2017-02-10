@@ -1,0 +1,27 @@
+cpp_library(
+    name = 'physical_lib',
+    headers = [
+        'AllTasksPhysicalResourceMonitor.h',
+        'CGroupPaths.h',
+        'CGroupResources.h',
+        'TaskPhysicalResourceFetcher.h',
+        'UsablePhysicalResourceFetcher.h',
+        'UsablePhysicalResourceMonitor.h',
+        'utils.h',
+    ],
+    srcs = [
+        'AllTasksPhysicalResourceMonitor.cpp',
+        'CGroupResources.cpp',
+        'TaskPhysicalResourceFetcher.cpp',
+        'UsablePhysicalResourceFetcher.cpp',
+        'UsablePhysicalResourceMonitor.cpp',
+        'utils.cpp',
+    ],
+    deps = [
+        '@/folly:folly',
+        '@/bistro/bistro/if:common-cpp2',
+        '@/bistro/bistro/processes:subprocess_with_timeout',
+        '@/bistro/bistro/utils:utils_lib',
+    ],
+    external_deps=[('boost', None, 'boost_filesystem')],
+)

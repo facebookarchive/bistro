@@ -17,16 +17,14 @@
 namespace facebook { namespace bistro {
 
 class Connection;
-typedef std::shared_ptr<Connection> ConnectionPtr;
 
 typedef std::function<std::string(const std::string&)> RequestProcessor;
 
-class Connection : public std::enable_shared_from_this<Connection> {
-
+class Connection {
 public:
   Connection(
     boost::asio::ip::tcp::socket socket,
-    std::function<void(ConnectionPtr)> stop_callback,
+    std::function<void(Connection*)> destroy_cob,
     RequestProcessor process_callback
   );
 
@@ -34,11 +32,13 @@ public:
 
   void start();
 
-  void stop();
-
 private:
   boost::asio::ip::tcp::socket socket_;
-  std::function<void(ConnectionPtr)> stopCallback_;
+  // IMPORTANT: The lifetime semantics of Connection are simple and
+  // dangerous: it is owned externally, and once its job is done, calls
+  // destroyCallback_ to tell its owner to destroy it.  So, it is crucial
+  // never to access `this` after a call that potentially destroys `this`.
+  std::function<void(Connection*)> destroyCallback_;
   RequestProcessor processCallback_;
   // this works with gcc, but not with clang:dev
   boost::array<char, 8192> buffer_;
@@ -49,7 +49,6 @@ private:
   void read();
   void write();
   bool parseRequest();
-
 };
 
 }}

@@ -21,13 +21,13 @@ folly::Synchronized<StringTable> Node::NodeNameTable =
 using namespace std;
 
 Node::Node(
-    const string& n,
-    const int l,
-    const bool e,
+    std::string n,
+    int l,
+    bool e,
     const Node* p,
-    const unordered_set<string>& tags)
-  : id_(NodeNameTable->insert(n)), name_(n), level_(l),
-    enabled_(e), parent_(p), tags_(tags) {
+    Node::TagSet tags)
+  : id_(NodeNameTable->insert(n)), name_(std::move(n)), level_(l),
+    enabled_(e), parent_(p), tags_(std::move(tags)) {
 }
 
 boost::iterator_range<detail::NodeParentIterator> Node::traverseUp() const {
@@ -42,11 +42,11 @@ vector<string> Node::getPathToNode() const {
     return vector<string>{name_};
   }
   vector<string> v(parent_->getPathToNode());
-  v.push_back(name_);
+  v.emplace_back(name_);
   return v;
 }
 
-bool Node::hasTags(const unordered_set<string>& tags) const {
+bool Node::hasTags(const vector<string>& tags) const {
   for (const auto& t : tags) {
     if (tags_.count(t)) {
       return true;

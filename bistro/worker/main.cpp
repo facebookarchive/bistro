@@ -17,12 +17,16 @@
 #include "bistro/bistro/utils/service_clients.h"
 #include "bistro/bistro/utils/server_socket.h"
 #include "bistro/bistro/worker/BistroWorkerHandler.h"
+#include "bistro/bistro/worker/StopWorkerOnSignal.h"
 
 // TODO: It would be useful to periodically re-read this host:port from a
 // file to ensure your scheduler can survive machine failures.
 DEFINE_string(scheduler_host, "", "Scheduler's hostname.");
 DEFINE_int32(scheduler_port, 0, "Scheduler's thrift port.");
 DEFINE_string(worker_command, "", "Command to run for the worker.");
+DEFINE_string(
+  data_dir, "/data/bistro", "Where to create status pipes and job directories"
+);
 
 static const bool scheduler_host_validator = google::RegisterFlagValidator(
   &FLAGS_scheduler_host,
@@ -54,7 +58,14 @@ int main(int argc, char* argv[]) {
   auto my_socket_and_addr = getServerSocketAndAddress();
   auto server = std::make_shared<apache::thrift::ThriftServer>();
   auto handler = std::make_shared<BistroWorkerHandler>(
-    [server, scheduler_addr](folly::EventBase* event_base) {
+    server,  // The handler calls server->stop() on suicide.
+    FLAGS_data_dir,
+    [](const char*, const cpp2::BistroWorker&, const cpp2::RunningTask*) {
+      // Do not log state transitions. This would be a good place to hook up
+      // a popular OSS tool for collecting operational charts.
+    },
+    [scheduler_addr](folly::EventBase* event_base) {
+      // Future: add plugins to poll various discovery mechanisms here.
       return getAsyncClientForAddress<cpp2::BistroSchedulerAsyncClient>(
         event_base,
         scheduler_addr
@@ -64,8 +75,14 @@ int main(int argc, char* argv[]) {
     my_socket_and_addr.second,  // Could change in the presence of proxies
     my_socket_and_addr.second.port  // Actual local port the worker has locked
   );
+  StopWorkerOnSignal signal_handler(
+    folly::EventBaseManager::get()->getEventBase(),
+    {SIGTERM, SIGINT, SIGQUIT, SIGHUP},
+    handler
+  );
 
   server->useExistingSocket(std::move(my_socket_and_addr.first));
   server->setInterface(std::move(handler));
   server->serve();
+  return 1;  // Exit means we got a signal, suicide request, etc.
 }

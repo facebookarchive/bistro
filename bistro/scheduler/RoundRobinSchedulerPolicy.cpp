@@ -19,7 +19,6 @@ using namespace std;
 
 int RoundRobinSchedulerPolicy::schedule(
     vector<JobWithNodes>& jobs,
-    ResourcesByNodeType& resources_by_node,
     TaskRunnerCallback cb) {
 
   int scheduled_tasks = 0;
@@ -29,16 +28,9 @@ int RoundRobinSchedulerPolicy::schedule(
         job_it = jobs.erase(job_it);
         continue;
       }
-      const JobPtr& job = job_it->job;
       while (!job_it->nodes.empty()) {
-        NodePtr node = job_it->nodes.back();
+        const auto ret = try_to_schedule(*job_it->nodes.back(), *job_it, cb);
         job_it->nodes.pop_back();
-        const auto ret = try_to_schedule(
-          resources_by_node,
-          node,
-          job,
-          cb
-        );
         if (ret == TaskRunnerResponse::RanTask) {
           ++scheduled_tasks;
           break;

@@ -1,0 +1,13 @@
+cpp_library(
+    name = 'monitor_lib',
+    headers = ['Monitor.h'],
+    srcs = ['Monitor.cpp'],
+    deps = [
+        '@/folly:folly',
+        '@/bistro/bistro/config:config_lib',
+        '@/bistro/bistro/utils:utils_lib',
+        '@/bistro/bistro/nodes:nodes_lib',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/flags:flags_lib',
+    ],
+)

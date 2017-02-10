@@ -9,13 +9,11 @@
  */
 #include "bistro/bistro/utils/hostname.h"
 
-#include <arpa/inet.h>
 #include <glog/logging.h>
 #include <iomanip>
 #include <limits.h>
 #include <netdb.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 namespace facebook { namespace bistro {

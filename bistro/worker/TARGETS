@@ -1,0 +1,22 @@
+cpp_library(
+    name = 'bistro_worker_lib',
+    headers = ['BistroWorkerHandler.h'],
+    srcs = ['BistroWorkerHandler.cpp'],
+    deps = [
+        '@/common/fb303/cpp:fb303',
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/if:worker_if-cpp2',
+        '@/bistro/bistro/processes:processes',
+        # for enforceWorkerSchedulerProtocolVersion()
+        '@/bistro/bistro/remote:remote_lib',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/utils:utils_lib',
+        '@/thrift/lib/cpp2:server',
+    ],
+)
+
+cpp_binary(
+    name = 'bistro_worker',
+    srcs = ['main.cpp'],
+    deps = [':bistro_worker_lib'],
+)

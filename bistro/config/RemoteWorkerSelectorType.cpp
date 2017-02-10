@@ -16,15 +16,13 @@
 namespace facebook { namespace bistro {
 
 namespace {
-  std::unordered_map<folly::fbstring, RemoteWorkerSelectorType> type_map = {
+  std::unordered_map<std::string, RemoteWorkerSelectorType> type_map = {
     { "roundrobin", RemoteWorkerSelectorType::RoundRobin },
     { "busiest", RemoteWorkerSelectorType::Busiest },
   };
 }
 
-RemoteWorkerSelectorType getRemoteWorkerSelectorType(
-    const folly::fbstring& s) {
-
+RemoteWorkerSelectorType getRemoteWorkerSelectorType(const std::string& s) {
   auto it = type_map.find(s);
   if (it == type_map.end()) {
     throw BistroException("Unknown remote_worker_selector type: ", s);

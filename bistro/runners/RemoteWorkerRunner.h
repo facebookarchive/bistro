@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -13,7 +13,7 @@
 #include <folly/Synchronized.h>
 #include <memory>
 #include <thread>
-#include <thrift/lib/cpp/async/TEventBase.h>
+#include <folly/io/async/EventBase.h>
 
 #include "bistro/bistro/remote/RemoteWorkers.h"
 #include "bistro/bistro/runners/TaskRunner.h"
@@ -68,19 +68,17 @@ public:
     int64_t line_id,  // min if is_ascending, max otherwise
     bool is_ascending,
     const std::string& regex_filter
-  ) override;
+  ) const override;
 
   bool canKill() override { return true; }
 
-  void killTask(
-    const std::string& job,
-    const std::string& node,
-    cpp2::KilledTaskStatusFilter status_filter
-  ) override;
+  void killTask(const cpp2::RunningTask&, const cpp2::KillRequest&) override;
 
   cpp2::SchedulerHeartbeatResponse processWorkerHeartbeat(
     const cpp2::BistroWorker&,
-    RemoteWorkerUpdate update = RemoteWorkerUpdate()  // for unit test
+    const cpp2::WorkerSetID&,
+    RemoteWorkerUpdate update = RemoteWorkerUpdate(),  // for unit test
+    std::function<void()> unit_test_cob = []() {}
   ) override;
 
   void remoteUpdateStatus(
@@ -95,29 +93,24 @@ public:
     return schedulerID_;
   }
 
+  std::unordered_map<std::string, ResourceVector> copyResourcesForUnitTest() {
+    return workerResources_.copy();
+  }
+
+  bool inInitialWaitForUnitTest() const { return inInitialWait_.load(); }
+
 // TODO: Make this private once we don't have an FB-specific class
 // inheriting from this.
 protected:
  TaskRunnerResponse runTaskImpl(
      const std::shared_ptr<const Job>& job,
-     const std::shared_ptr<const Node>& node,
+     const Node& node,
      cpp2::RunningTask& rt,
      folly::dynamic& job_args,
      std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)>
          cb) noexcept override;
 
 private:
-  /**
-   * At startup, the scheduler has to wait for workers to connect, and to
-   * report their running tasks, so that we do not accidentally re-start
-   * tasks that are already running elsewhere.
-   *
-   * Should only be used from the background thread, **after** update is
-   * populated by RemoteWorkers::updateState.  Other places should use
-   * inInitialWait_.load(std::memory_order_relaxed).
-   */
-  void checkInitialWait(const RemoteWorkerUpdate& update);
-
   // Thrift helpers
   std::shared_ptr<cpp2::BistroWorkerAsyncClient> getWorkerClient(
     const cpp2::BistroWorker& w
@@ -150,7 +143,9 @@ private:
     workerResources_;
   // Memoized: the copy we got from the last updateConfig. For consistency,
   // we should never use any other Config together with workerResources_.
-  std::shared_ptr<const Config> config_;
+  //
+  // Must be synchronized since it is accessed from the worker-check thread.
+  folly::Synchronized<std::shared_ptr<const Config>> config_;
   // Micro-optimization: which config level has the worker resources & filters?
   // Memoized so that we don't pull it from Config for each task we run.
   int workerLevel_;
@@ -163,7 +158,7 @@ private:
   // used to queue and process "fire and forget" async communications with
   // the workers, i.e.  runTask, healthcheck, requestSuicide.  In contrast,
   // getJobLogs runs synchronously in the request handler's thread.
-  std::unique_ptr<apache::thrift::async::TEventBase> eventBase_;
+  std::unique_ptr<folly::EventBase> eventBase_;
   std::thread eventBaseThread_;
 
   // When the scheduler restarts, don't start running tasks right away,
@@ -171,8 +166,6 @@ private:
   // only experiences one write, true => false, it's fine to use
   // std::memory_order_relaxed with all accesses.
   std::atomic<bool> inInitialWait_;
-  // Used to enforce the initial wait.
-  time_t startTime_;
 
   // Used to report errors to the UI, can be null.
   std::shared_ptr<Monitor> monitor_;

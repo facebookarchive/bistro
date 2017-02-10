@@ -9,41 +9,47 @@
  */
 #pragma once
 
-#include "bistro/bistro/if/gen-cpp2/BistroWorker.h"
-#include "bistro/bistro/if/gen-cpp2/common_types.h"
-#include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
-#include "bistro/bistro/remote/RemoteWorkerState.h"
-#include "bistro/bistro/statuses/TaskStatus.h"
-#include "bistro/bistro/utils/BackgroundThreadMixin.h"
-#include "bistro/bistro/utils/SubprocessTaskQueue.h"
-#include "common/fb303/cpp/FacebookBase2.h"
+#include <boost/filesystem/path.hpp>
 #include <folly/MPMCQueue.h>
 #include <folly/Synchronized.h>
-
-#include <boost/filesystem/path.hpp>
 #include <memory>
 #include <string>
 
-namespace apache { namespace thrift {
-  class TEventBaseManager;
-} }
+#include "bistro/bistro/if/gen-cpp2/BistroWorker.h"
+#include "bistro/bistro/if/gen-cpp2/common_types.h"
+#include "bistro/bistro/if/gen-cpp2/scheduler_types.h"
+#include "bistro/bistro/processes/TaskSubprocessQueue.h"
+#include "bistro/bistro/remote/RemoteWorkerState.h"
+#include "bistro/bistro/statuses/TaskStatus.h"
+#include "bistro/bistro/utils/BackgroundThreadMixin.h"
+#include "common/fb303/cpp/FacebookBase2.h"
+
+namespace apache { namespace thrift { class ThriftServer; }}
 
 namespace facebook { namespace bistro {
 
 namespace cpp2 {
   class BistroSchedulerAsyncClient;
 }
+class UsablePhysicalResourceMonitor;
 
 class BistroWorkerHandler : public cpp2::BistroWorkerSvIf,
                             public fb303::FacebookBase2,
                             BackgroundThreadMixin {
-
+public:
+  // Must be thread-safe.
   typedef std::function<std::shared_ptr<cpp2::BistroSchedulerAsyncClient>(
     folly::EventBase* event_base
   )> SchedulerClientFn;
+  // IMPORTANT: This logger MUST be thread-safe, noexcept, and fast.
+  typedef std::function<
+    void (const char*, const cpp2::BistroWorker&, const cpp2::RunningTask*)
+  > LogStateTransitionFn;
 
-public:
   BistroWorkerHandler(
+    std::weak_ptr<apache::thrift::ThriftServer>,
+    const boost::filesystem::path& data_dir,
+    LogStateTransitionFn,  // Must be thread-safe, noexcept, and fast
     SchedulerClientFn,
     const std::string& worker_command,
     // How can external clients connect to this worker?
@@ -69,7 +75,8 @@ public:
     const std::vector<std::string>& command,
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker,
-    int64_t notify_if_tasks_not_running_sequence_num
+    int64_t notify_if_tasks_not_running_sequence_num,
+    const cpp2::TaskSubprocessOptions& opts
   ) override;
 
   void notifyIfTasksNotRunning(
@@ -79,6 +86,8 @@ public:
     int64_t notify_if_tasks_not_running_sequence_num
   ) override;
 
+  // Instead of blocking until the request succeeds, schedules the
+  // time-consuming work on the current thread's EventBase thread.
   void requestSuicide(
     const cpp2::BistroInstanceID& scheduler,
     const cpp2::BistroInstanceID& worker
@@ -86,9 +95,9 @@ public:
 
   void killTask(
     const cpp2::RunningTask& rt,
-    cpp2::KilledTaskStatusFilter status_filter,
     const cpp2::BistroInstanceID& scheduler,
-    const cpp2::BistroInstanceID& worker
+    const cpp2::BistroInstanceID& worker,
+    const cpp2::KillRequest&
   ) override;
 
   void getJobLogsByID(
@@ -103,7 +112,18 @@ public:
   ) override;
 
   /**
-   * Functions below are used in unit test only
+   * The implementation of 'requestSuicide': worker stops accepting new
+   * tasks, kills existing tasks, and tells its Thrift server to stop
+   * serving.
+   *
+   * Rationale: It is exposed for the signal handler. Doing this seems
+   * better than the janky requestSuicide(getSchedulerID() getWorker().id),
+   * which would then generate "server requested suicide" logging.
+   */
+  void killTasksAndStop() noexcept;
+
+  /**
+   * The functions below are used in unit tests only
    */
   RemoteWorkerState getState() const {
     return state_.copy();
@@ -120,6 +140,7 @@ private:
   // worker, use it in RunningTask, etc.  (job, node are required)
   typedef std::pair<std::string, std::string> TaskID;
 
+  LogStateTransitionFn logStateTransitionFn_;
   SchedulerClientFn schedulerClientFn_;
   const std::string workerCommand_;
 
@@ -133,8 +154,7 @@ private:
     ) : taskID(std::move(task_id)), status(std::move(status)) {}
   };
 
-  // Worker stops to accept new tasks, kills existing tasks, and quits.
-  void suicide();
+  void throwIfSuicidal();  // Used to disable thrift calls when shutting down.
 
   // Don't run Thrift calls for another worker or from the wrong scheduler.
   void throwOnInstanceIDMismatch(
@@ -143,13 +163,16 @@ private:
     const cpp2::BistroInstanceID& worker
   ) const;
 
+  // Helper for heartbeat & healthcheck -- state_ must be locked.
+  void setState(RemoteWorkerState*, RemoteWorkerState::State, time_t);
+
   // Background threads
   std::chrono::seconds notifyFinished() noexcept;
   std::chrono::seconds notifyNotRunning() noexcept;
   std::chrono::seconds heartbeat() noexcept;
   std::chrono::seconds healthcheck() noexcept;
 
-  SubprocessTaskQueue taskQueue_;
+  TaskSubprocessQueue taskQueue_;
   folly::MPMCQueue<std::unique_ptr<NotifyData>> notifyFinishedQueue_;
   folly::MPMCQueue<cpp2::RunningTask> notifyNotRunningQueue_;
 
@@ -202,6 +225,26 @@ private:
   // prevents us from sending the heartbeat before the worker's Thrift
   // server is up.
   bool canConnectToMyself_;  // Used only by the heartbeat() thread.
+
+  // Flipped from true to false when the scheduler starts to commit suicide.
+  // While the worker kill its tasks, this has the effect of blocking new
+  // tasks from running.
+  std::atomic_bool committingSuicide_{false};
+
+  // This monitor is created and updated from `runTask()`, but is accessed
+  // from the heartbeat thread, so it should be synchronized.
+  struct UsablePhysicalResources {
+    // null until the first healtcheck is received.
+    std::unique_ptr<UsablePhysicalResourceMonitor> monitor_;
+    // These options describe the current monitor. They should change
+    // rarely.  When they do, we update the monitor.
+    cpp2::CGroupOptions cgroupOpts_;
+  };
+  folly::Synchronized<UsablePhysicalResources> usablePhysicalResources_;
+
+  // To suicide gracefully, the handler needs to be able to stop its server.
+  // Must be a weak_ptr to avoid a circular server<->handler dependency.
+  std::weak_ptr<apache::thrift::ThriftServer> server_;
 };
 
 }}

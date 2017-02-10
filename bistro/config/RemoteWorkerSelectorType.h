@@ -9,7 +9,7 @@
  */
 #pragma once
 
-#include <folly/FBString.h>
+#include <string>
 
 namespace facebook { namespace bistro {
 
@@ -18,6 +18,6 @@ enum class RemoteWorkerSelectorType {
   Busiest
 };
 
-RemoteWorkerSelectorType getRemoteWorkerSelectorType(const folly::fbstring& s);
+RemoteWorkerSelectorType getRemoteWorkerSelectorType(const std::string& s);
 
 }}

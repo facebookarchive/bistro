@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -25,6 +25,7 @@ struct ManualNodeState {
   int maxLevel_;
   Nodes* allNodes_;
   unordered_map<string, vector<string>> parentToChildren_;
+  unordered_set<fbstring> isDisabled_;
 
   void recursiveAdd(const string& name, const Node* parent, int level) const {
     if (level > maxLevel_) {
@@ -33,7 +34,9 @@ struct ManualNodeState {
          maxLevel_
       );
     }
-    const Node* node_ptr = allNodes_->add(name, level, true, parent);
+    const Node* node_ptr = allNodes_->add(
+      name, level, isDisabled_.count(name) == 0, parent
+    );
     auto it = parentToChildren_.find(name);
     if (it != parentToChildren_.end()) {
       for (const auto& child_name : it->second) {
@@ -53,17 +56,26 @@ void ManualFetcher::fetch(
   ManualNodeState state;
   state.allNodes_ = all_nodes;
   state.maxLevel_ = config.getNumConfiguredLevels();
-
   unordered_set<string> has_parent;
-  for (const auto& parent_and_kids : node_config.prefs) {
-    auto& child_names = state.parentToChildren_[parent_and_kids.first];
-    if (parent_and_kids.second.isString()) {  // A string is a single node name
+  for (const auto& pair : node_config.prefs) {
+    auto& child_names = state.parentToChildren_[pair.first];
+
+    if (pair.second.isString()) {  // A string is a single node name
       child_names.emplace_back(
-        parent_and_kids.second.asString().toStdString()
+        pair.second.asString()
       );
+    } else if (pair.second.isObject()) {
+      if (auto* children = pair.second.get_ptr("children")) {
+        for (const auto& kid_name : *children) {
+          child_names.emplace_back(kid_name.asString());
+        }
+      }
+      if (pair.second.get_ptr("disabled")) {
+        state.isDisabled_.insert(pair.first);
+      }
     } else {  // Otherwise it's a list of child names
-      for (const auto& kid_name : parent_and_kids.second) {
-        child_names.emplace_back(kid_name.asString().toStdString());
+      for (const auto& kid_name : pair.second) {
+        child_names.emplace_back(kid_name.asString());
       }
     }
     for (const auto& child : child_names) {

@@ -13,6 +13,8 @@
 #include <boost/iterator/indirect_iterator.hpp>
 #include <iterator>
 #include <numeric>
+#include <folly/Random.h>
+
 
 namespace facebook { namespace bistro {
 
@@ -26,7 +28,7 @@ public:
     : order_(std::distance(begin, end)) {
 
     std::iota(order_.begin(), order_.end(), begin);
-    std::random_shuffle(order_.begin(), order_.end());
+    std::shuffle(order_.begin(), order_.end(), folly::ThreadLocalPRNG());
   }
 
   ShuffledRange(ShuffledRange&&) = default;

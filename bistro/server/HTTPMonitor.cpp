@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -10,8 +10,9 @@
 #include "bistro/bistro/server/HTTPMonitor.h"
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <folly/experimental/AutoTimer.h>
+#include <folly/json.h>
 #include <glog/logging.h>
-#include <zlib.h>
 
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/ConfigLoader.h"
@@ -24,11 +25,6 @@
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/utils/Exception.h"
-#include <folly/experimental/AutoTimer.h>
-#include <folly/json.h>
-
-DEFINE_int32(http_server_port, 8080, "Port to run HTTP server on");
-DEFINE_string(http_server_address, "::", "Address to bind to");
 
 namespace facebook { namespace bistro {
 
@@ -45,30 +41,18 @@ HTTPMonitor::HTTPMonitor(
     nodesLoader_(nodes_loader),
     taskStatuses_(task_statuses),
     taskRunner_(task_runner),
-    monitor_(monitor),
-    server_(
-      FLAGS_http_server_port,
-      FLAGS_http_server_address,
-      bind(&HTTPMonitor::handleRequest, this, placeholders::_1)
-    ),
-    serverThread_([this](){ server_.run(); }) {
-  LOG(INFO) << "Launched HTTP Monitor on port " << FLAGS_http_server_port;
+    monitor_(monitor) {
 }
 
-string HTTPMonitor::handleRequest(const string& request) {
+fbstring HTTPMonitor::handleRequest(const fbstring& request) {
   LOG(INFO) << "HTTPMonitor request: " << request;
   folly::AutoTimer<> timer("Handled HTTP monitor request");
   dynamic ret = dynamic::object;
-  bool zlib_compress = false;
   try {
     dynamic d(parseJson(request));
     if (const auto* prefs = d.get_ptr("prefs")) {
-      if (auto* zlib = prefs->get_ptr("zlib_compress")) {
-        zlib_compress = zlib->asBool();
-      }
       d.erase("prefs");  // Don't interpret this key as a handler.
     }
-    // This can throw, so parse out 'zlib_compress' first
     std::shared_ptr<const Config> c = configLoader_->getDataOrThrow();
     for (const auto& pair : d.items()) {
       try {
@@ -80,48 +64,29 @@ string HTTPMonitor::handleRequest(const string& request) {
     }
   } catch (const std::exception& e) {
     LOG(ERROR) << "Error handling monitor request: " << e.what();
-    ret = e.what();  // zlib_compress would be ignored with "return"
+    ret = e.what();
   }
-  auto json(folly::toJson(ret));
-  if (zlib_compress) {
-    string output;
-    // Output buffer must be 0.1% large + 12 bytes?
-    output.resize(json.size() + (json.size() / 1000) + 12);
-    uLongf resultLen = output.size();
-    int res = compress(
-      (Bytef*)&output[0],
-      &resultLen,
-      (const Bytef*)json.data(),
-      json.size()
-    );
-    if (res != Z_OK) {
-      LOG(ERROR) << "Error when compressing: " << res;
-      return "Unable to gzcompress data";
-    }
-    return output;
-  } else {
-    return json.toStdString();
-  }
+  return folly::toJson(ret);
 }
 
 namespace {
 
 /**
  * Validates the requested jobs against the current jobs.  If no jobs are
- * requested, returns all jobs.
+ * requested, returns all jobs. Ignores unknown jobs.
  *
  * handleSingle() cannot call this eagerly, because the "task_logs" handler
  * requires different semantics for the "jobs" field, which would throw here.
  */
 vector<const Job*> getRequestedJobs(const Config& c, const dynamic& d) {
   vector<const Job*> jobs;
-  if (auto* p = d.get_ptr("jobs")) {
+  auto* p = d.get_ptr("jobs");
+  if (p && !p->empty()) {
     for (const auto& j : *p) {
-      auto it = c.jobs.find(j.asString().toStdString());
-      if (it == c.jobs.end()) {
-        throw BistroException("Unknown job: ", j.asString());
+      auto it = c.jobs.find(j.asString());
+      if (it != c.jobs.end()) {
+        jobs.emplace_back(it->second.get());
       }
-      jobs.emplace_back(it->second.get());
     }
   } else {
     for (const auto& pair : c.jobs) {
@@ -150,7 +115,7 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
     return handleJobs(c, getRequestedJobs(c, d));
   }
   if (handler == "sorted_node_names") {
-    return handleNodes(c);
+    return handleSortedNodeNames(c);
   }
   // TODO: deprecate this in favor of running_tasks
   if (handler == "job_node_runtime") {
@@ -170,45 +135,42 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
     return handleTaskLogs(c, d);
   }
   if (handler == "delete_job") {
-    configLoader_->deleteJob(d["job_id"].asString().toStdString());
+    configLoader_->deleteJob(d["job_id"].asString());
     return "deleted";
   }
   if (handler == "save_job") {
-    configLoader_->saveJob(d["job_id"].asString().toStdString(), d["job"]);
+    configLoader_->saveJob(d["job_id"].asString(), d["job"]);
     return "saved";
   }
   if (handler == "forgive_jobs") {
     if (auto* p = d.get_ptr("jobs")) {
       for (const auto& j : *p) {
-        taskStatuses_->forgiveJob(j.asString().toStdString());
+        taskStatuses_->forgiveJob(j.asString());
       }
     }
     return "forgiven";
   }
+  if (handler == "nodes") {
+    return handleNodes(c, d);
+  }
   if (handler == "kill_task") {
-    auto status_filter_str = d.getDefault(
-      "status_filter", "force_done_or_failed"
-    ).asString().toStdString();
-    cpp2::KilledTaskStatusFilter status_filter;
-    if (status_filter_str == "force_done_or_failed") {
-      status_filter = cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_FAILED;
-    } else if (status_filter_str == "force_done_or_incomplete_backoff") {
-      status_filter =
-        cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE_BACKOFF;
-    } else if (status_filter_str == "force_done_or_incomplete") {
-      status_filter = cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE;
-    } else if (status_filter_str == "none") {
-      status_filter = cpp2::KilledTaskStatusFilter::NONE;
-    } else {
-      throw BistroException("Unknown status_filter: ", status_filter_str);
+    // Ignore d["status_filter"], since that option is now deprecated.
+    auto job = d["job_id"].asString();
+    auto node = d["node_id"].asString();
+    // Look up the job
+    auto jit = c.jobs.find(job);
+    if (jit == c.jobs.end()) {
+      throw BistroException("Unknown job ", job);
     }
-    // Throws on failure
-    taskRunner_->killTask(
-      d["job_id"].asString().toStdString(),
-      d["node_id"].asString().toStdString(),
-      status_filter
-    );
-    return "killed";
+    // Look up the running task
+    const Job::ID job_id(Job::JobNameTable.asConst()->lookup(job));
+    const Node::ID node_id(Node::NodeNameTable.asConst()->lookup(node));
+    auto maybe_rt = taskStatuses_->copyRunningTask(job_id, node_id);
+    if (!maybe_rt.hasValue()) {
+      throw BistroException("Unknown running task ", job, ", ", node);
+    }
+    taskRunner_->killTask(*maybe_rt, jit->second->killRequest());
+    return "signaled";
   }
   throw BistroException("Unknown handler: ", handler);
 }
@@ -283,26 +245,26 @@ dynamic HTTPMonitor::handleTaskLogs(const Config& c, const dynamic& d) {
   }
 
   auto log = taskRunner_->getJobLogs(
-    d["log_type"].asString().toStdString(),
+    d["log_type"].asString(),
     job_ids,
     node_ids,
     line_id,
     is_ascending,
     // Server-side regex filtering of retrieved lines -- may cause 0 lines
     // to be returned, but nextLineID will still be correct.
-    d.getDefault("regex_filter", "").asString().toStdString()
+    d.getDefault("regex_filter", "").asString()
   );
 
   // Compose the output JSON
-  dynamic lines = {};
+  dynamic lines = dynamic::array;
   for (const LogLine& l : log.lines) {
-    lines.push_back({  // No emplace for dynamic???
+    lines.push_back(dynamic::array(  // No emplace for dynamic???
       l.jobID,
       l.nodeID,
       l.time,
       l.line,
       folly::to<string>(l.lineID)  // JS has no int64
-    });
+    ));
   }
   dynamic res = dynamic::object
     ("next_line_id", folly::to<string>(log.nextLineID))  // JS has no int64
@@ -320,13 +282,102 @@ dynamic HTTPMonitor::handleJobs(
   return ret;
 }
 
-dynamic HTTPMonitor::handleNodes(const Config& c) {
+/**
+ * Input: {
+ *   "nodes": ["array", "of", "node", "ids"],  // all nodes if empty or missing
+ *   "fields": ["resources", "disabled"],  // all resources if empty or missing
+ * }
+ * Output: {
+ *   "results" : {
+ *     "level_name_0" : {...},
+ *     "level_name_1" : {
+ *       "node1": {
+ *         "resources" : {
+ *           "r1" : {"default": w, "limit": x, "weight": y, "override": z},
+ *           ...
+ *         }
+ *         "disabled" : true
+ *       },
+ *       ...
+ *     },
+ *     ...
+ *   }
+ * }
+ *
+ * "disabled" describes whether the node / worker is healthy or not.
+ * Even when requested, disabled will be omitted if node / worker is healthy to
+ * minimize response size.
+ * Response doesn't include workers at this point (TODO t7757044).
+ */
+
+dynamic HTTPMonitor::handleNodes(const Config& c, const dynamic& request) {
+  dynamic responses = dynamic::object("results", dynamic::object());
+
+  bool no_node_filter =
+    request.getDefault("nodes", dynamic::array()).empty();
+  std::unordered_set<folly::fbstring> do_this_node;
+  if (!no_node_filter) {
+    for (auto name : request["nodes"]) {
+      do_this_node.insert(name.asString());
+    }
+  }
+
+  bool field_disabled = true, field_resources = true;
+  if (!request.getDefault("fields", dynamic::array()).empty()) {
+    field_disabled = field_resources = false;
+    for (const auto& field : request["fields"]) {
+      const auto& fieldName = field.asString();
+      if (fieldName == "resources") {
+        field_resources = true;
+      } else if (fieldName == "disabled") {
+        field_disabled = true;
+      } else {
+        throw BistroException("Unknown field name: ", fieldName);
+      }
+    }
+  }
+
+  // Iterate over all nodes instead of accessing only those requested.
+  auto& results = responses["results"];
+  for (const auto& node : *(nodesLoader_->getDataOrThrow())) {
+    const auto& node_name = node->name();
+    if (no_node_filter || do_this_node.count(node_name) > 0) {
+      // Add level to response if it isn't there yet.
+      const int level = node->level();
+      auto levelString = c.levels.lookup(level);
+      auto& d_level = results.setDefault(levelString);
+      auto& res = (d_level[node_name] = dynamic::object);
+
+      if (field_resources) {
+        auto& resources = (res["resources"] = dynamic::object);
+        for (auto r_id : c.levelIDToResourceID[level]) {
+          const auto& r_name = c.resourceNames.lookup(r_id);
+          auto& resource = (resources[r_name] = dynamic::object
+            ("default", c.defaultJobResources[r_id])
+            ("limit", c.resourcesByLevel[level][r_id])
+          );
+          const auto weight = c.resourceIDToWeight[r_id];
+          if (weight > 0) {
+            resource["weight"] = weight;
+          }
+        }
+      }
+
+      if (field_disabled && !node->enabled()) {
+        res["disabled"] = true;
+      }
+    }
+  }
+  return responses;
+}
+
+dynamic HTTPMonitor::handleSortedNodeNames(const Config& c) {
   // Returns a dict of level => list of node names
   dynamic ret = dynamic::object;
   auto nodes = nodesLoader_->getDataOrThrow();
   for (const auto& n : *nodes) {
     const auto& level = c.levels.lookup(n->level());
-    ret.setDefault(level, dynamic({})).push_back(n->name());
+    ret.setDefault(level, dynamic::array()).push_back(n->name());
   }
   return ret;
 }
@@ -337,7 +388,7 @@ unordered_set<string> getJobNameSet(const dynamic& d) {
   unordered_set<string> job_names;
   if (auto* p = d.get_ptr("jobs")) {
     for (const auto& j : *p) {
-      job_names.emplace(j.asString().toStdString());
+      job_names.emplace(j.asString());
     }
   }
   return job_names;
@@ -426,10 +477,6 @@ dynamic HTTPMonitor::handleHistograms(
     ret["samples"] = samples;
   }
   return ret;
-}
-
-void HTTPMonitor::wait() {
-  serverThread_.join();
 }
 
 }}

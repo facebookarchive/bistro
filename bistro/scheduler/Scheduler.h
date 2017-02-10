@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -15,7 +15,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/runners/TaskRunner.h"
 
 namespace facebook { namespace bistro {
@@ -27,7 +26,6 @@ class Node;
 class Nodes;
 class TaskStatusSnapshot;
 
-typedef std::shared_ptr<const Node> NodePtr;
 typedef std::shared_ptr<const Job> JobPtr;
 
 class Scheduler : boost::noncopyable {

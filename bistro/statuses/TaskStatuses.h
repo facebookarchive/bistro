@@ -25,7 +25,6 @@ class Job;
 class Node;
 class JobBackoffSettings;
 typedef std::shared_ptr<const Job> JobPtr;
-typedef std::shared_ptr<const Node> NodePtr;
 class TaskStore;
 class TaskStatusObserver;
 namespace cpp2 {

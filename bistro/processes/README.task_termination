@@ -1,0 +1,105 @@
+== READ THIS FIRST ==
+
+This was written before Bistro got its CGroup-based termination support, so
+this is much less critical now, since an appropriately configured Bistro
+worker can reliably reap its children without external help.  
+
+Post-Bistro-CGroups, one possible improvement would be to write a
+`fry_taskreaper` to reap tasks even when `bistro_worker` is gone by:
+ - Adding AsyncCGroupReaper support (killing self last -- do use
+   `cgroup.procs`, do **not** use `cgroup.tasks`), and
+ - Adding a TERM-wait-KILL option upon receipt of only SIGTERM.
+
+When used in such a setup, Bistro would set its PARENT_DEATH_SIGNAL to
+SIGTERM (or similar), and would use TERM-only killing, thereby delegating
+all KILL authority to `fry_taskreaper`.
+
+== Bistro signal handling ==
+
+Imagine a Bistro worker starting tasks, which in turn start some of their
+own subprocesses.  It is important to carefully handle termination signals
+in this pyramid, for two reasons:
+
+ - To avoid orphaning tasks: Any user code that keeps running when Bistro 
+   is not aware of it is a liability. It ruins our resource tracking, and is
+   very likely to cause Bistro to start a second copy of the same task --
+   which might even cause data corruption.
+
+ - If a person wants to manually end a task, pkill & kill should work as 
+   expected.
+
+This note explores the design space, and gives the rationale for the current
+defaults.
+
+
+== Design for least surprise ==
+
+There are many signal-handling behaviors possible. This design aims to
+satisfy the following high-level constraints:
+
+1) Terminating the parent should terminate all descendants.  In other words,
+terminating any process in the hierarchy should not leave orphans.
+
+ * When a Bistro scheduler or worker exits, so should all its tasks.
+ * SIGKILL should trigger as much descendant cleanup as feasible, via
+   PARENT_DEATH_SIGNAL.
+
+2) SIGKILLing a process should trigger a best effort to terminate all its
+descendants.
+
+3) Interactive behavior in a terminal should be as expected. Ctrl-Z and
+Ctrl-C should work.
+
+Unfortunately, is not possible to adhere to these perfectly, so we just do
+our best.  The defaults below are meant to be a good compromise when CGroups
+are disabled (otherwise, there's not much to worry about).
+
+
+== Bistro scheduler / worker choices ==
+
+a) PARENT_DEATH_SIGNAL for tasks:
+
+ - None: Let children run if the parent is killed.
+ - TERM: If (b) is Yes, this enables the child to do a careful cleanup of
+   its own children.  Can leak the child if it has poor signal handling.
+ - KILL: **Default**, because (b) defaults to No, making it impossible for
+   to forward the SIGTERM to all descendands without CGroups support.  Great
+   when tasks do not spawn other subprocesses, or when they properly set
+   their descendants' PARENT_DEATH_SIGNAL (otherwise, descendants *will* get
+   orphaned due to this KILL).
+
+b) Make each child a process group leader? 
+
+ - No: **Default**, to make Ctrl-C and Ctrl-Z work as expected in an
+   interactive setting.  Specifically:
+    - With a process group per task, Bistro tasks will continue running
+      even if you Ctrl-Z the worker. Surprising, but not terrible.
+    - The worker will carefully reap its tasks when terminating due to
+      SIGTERM/INT/QUIT, so no problems here.
+    - When used with Local Runner, Ctrl-C or other signals *will* leak
+      the tasks on exit. Once we fix this, it would be best to default to
+      "all tasks are process group leaders"
+ - Yes: Great in non-interactive environments, since this lets Bistro
+   terminate multi-process tasks pretty well even without CGroup support.
+
+c) What signals should "killTask" send? (see the "kill_subprocess" config)
+
+ - TERM: **Default** Gives the child a chance to clean up, and return some
+   status.  Safest without CGroups, since broken tasks might fail to quit,
+   rather than quit, and leak their descendants.   
+ - TERM, wait some seconds, then KILL: Risks leaking descendants, see KILL. 
+ - KILL: Faster when no cleanup is needed. WARNING: without CGroups and
+   without PARENT_DEATH_SIGNAL settings on all descendant subprocesses, this
+   will result in the task's subprocesses being orphaned.
+
+d) Destination for the "killTask" signals:
+
+ - Only the child process: **Default**, because (b) defaults to No. 
+ - The child process's group: If (b) is Yes, lets us soft-kill all
+   descendants of a task, giving them a chance to clean up.  
+
+e) SIGTERM/SIGQUIT/SIGINT handler:
+
+ - Bistro worker has one, and reaps all its tasks.
+ - TODO: Bistro scheduler + local runner needs to reuse this logic, but
+   currently does not. Once this happens, update (b)'s default.

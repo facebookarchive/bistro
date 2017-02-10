@@ -1,0 +1,25 @@
+cpp_library(
+    name = 'sqlite_lib',
+    headers = [
+        'Database.h',
+        'Statement.h',
+    ],
+    srcs = [
+        'Database.cpp',
+        'Statement.cpp',
+    ],
+    deps = [
+        '@/folly:base',
+    ],
+    external_deps = [
+        ('boost', None, 'boost_filesystem'),
+        'glog',
+        'sqlite',
+    ],
+)
+
+cpp_unittest(
+    name = 'test_sqlite',
+    srcs = ['test_sqlite.cpp'],
+    deps = [':sqlite_lib'],
+)

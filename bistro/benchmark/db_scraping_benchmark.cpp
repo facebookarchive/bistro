@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -32,8 +32,8 @@ using namespace facebook::bistro;
 
 dynamic c = dynamic::object
   ("nodes", dynamic::object
-    ("levels", {"host", "db"})
-    ("node_sources", {
+    ("levels", dynamic::array("host", "db"))
+    ("node_sources", dynamic::array(
       dynamic::object
         ("prefs", dynamic::object
           ("parent_level", "instance")
@@ -50,7 +50,7 @@ dynamic c = dynamic::object
           ("end", FLAGS_num_shards_per_host)
         )
         ("source", "range_label")
-    })
+    ))
   )
   ("resources", dynamic::object
     ("host", dynamic::object

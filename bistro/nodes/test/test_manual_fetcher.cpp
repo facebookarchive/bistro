@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -26,13 +26,12 @@ TEST(TestManualFetcher, HandleNoSources) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"level1", "level2"})
-      ("node_source", "manual")
-      ("node_source_prefs", dynamic::object
+      ("levels", dynamic::array("level1", "level2"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "manual")
         // Neither node can be a source, since they're each other's children.
-        ("node1", "node2")
-        ("node2", "node1")
-      )
+        ("prefs", dynamic::object("node1", "node2")("node2", "node1"))
+      ))
     )
   );
   Nodes nodes;
@@ -43,12 +42,11 @@ TEST(TestManualFetcher, HandleNotEnoughLevels) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"level1", "level2"})
-      ("node_source", "manual")
-      ("node_source_prefs", dynamic::object
-        ("node1", "node2")
-        ("node2", "node3")
-      )
+      ("levels", dynamic::array("level1", "level2"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "manual")
+        ("prefs", dynamic::object("node1", "node2")("node2", "node3"))
+      ))
     )
   );
   Nodes nodes;
@@ -59,29 +57,31 @@ TEST(TestManualFetcher, HandleValid) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"level1", "level2", "level3"})
-      ("node_source", "manual")
-      ("node_source_prefs", dynamic::object
-        ("node11", {"node111", "node112"})
-        ("node1", {"node11", "node12"})
-        ("node2", {"node21", "node22"})
-      )
+      ("levels", dynamic::array("level1", "level2", "level3"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "manual")
+        ("prefs", dynamic::object
+          ("node11", dynamic::array("node111", "node112"))
+          ("node1", dynamic::array("node11", "node12"))
+          ("node2", dynamic::array("node21", "node22"))
+        )
+      ))
     )
   );
   Nodes nodes;
   NodesLoader::_fetchNodesImpl(config, &nodes);
 
   auto instance = nodes.getInstance();
-  auto node1 = nodes.getNodeVerySlow("node1");
+  auto node1 = getNodeVerySlow(nodes, "node1");
   ASSERT_EQ(instance, node1->parent());
 
-  auto node2 = nodes.getNodeVerySlow("node2");
+  auto node2 = getNodeVerySlow(nodes, "node2");
   ASSERT_EQ(instance, node2->parent());
 
-  auto node11 = nodes.getNodeVerySlow("node11");
+  auto node11 = getNodeVerySlow(nodes, "node11");
   ASSERT_EQ(node1.get(), node11->parent());
 
-  auto node112 = nodes.getNodeVerySlow("node112");
+  auto node112 = getNodeVerySlow(nodes, "node112");
   ASSERT_EQ(node11.get(), node112->parent());
 }
 
@@ -89,11 +89,11 @@ TEST(TestManualFetcher, HandleOneLevel) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"level1"})
-      ("node_source", "manual")
-      ("node_source_prefs", dynamic::object
-        ("node1", {})
-      )
+      ("levels", dynamic::array("level1"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "manual")
+        ("prefs", dynamic::object("node1", dynamic::array()))
+      ))
     )
   );
   Nodes nodes;
@@ -107,4 +107,37 @@ TEST(TestManualFetcher, HandleOneLevel) {
   ASSERT_EQ("node1", (*it)->name());
   ++it;
   ASSERT_EQ(it, nodes.end());
+}
+
+TEST(TestManualFetcher, HandleDisabledAndChildren) {
+  Config config(dynamic::object
+    ("resources", dynamic::object)
+    ("nodes", dynamic::object
+      ("levels", dynamic::array("level1", "level2"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "manual")
+        ("prefs", dynamic::object
+          ("node1", dynamic::object
+            ("children", dynamic::array("node11", "node12"))
+            ("disabled", true)
+          )
+          ("node12", dynamic::object("disabled", true))
+        )
+      ))
+    )
+  );
+  Nodes nodes;
+  NodesLoader::_fetchNodesImpl(config, &nodes);
+
+  auto node1 = getNodeVerySlow(nodes, "node1");
+  ASSERT_FALSE(node1->enabled());
+  ASSERT_EQ(nodes.getInstance(), node1->parent());
+
+  auto node11 = getNodeVerySlow(nodes, "node11");
+  ASSERT_TRUE(node11->enabled());
+  ASSERT_EQ(node1.get(), node11->parent());
+
+  auto node12 = getNodeVerySlow(nodes, "node12");
+  ASSERT_FALSE(node12->enabled());
+  ASSERT_EQ(node1.get(), node12->parent());
 }

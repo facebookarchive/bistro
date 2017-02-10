@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -75,7 +75,7 @@ std::shared_ptr<const Config> FileConfigLoader::parseConfigFile(
   auto config = std::make_shared<Config>(*s);
 
   for (const auto& pair : d.items()) {
-    const string& key = pair.first.asString().toStdString();
+    const string& key = pair.first.asString();
     if (!boost::starts_with(key, kJobPrefix) || !pair.second.isObject()) {
       continue;
     }

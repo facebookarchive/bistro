@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -13,7 +13,6 @@
 #include <vector>
 #include <unordered_map>
 
-#include "bistro/bistro/config/SchedulerType.h"
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/scheduler/ResourceVector.h"
@@ -21,36 +20,54 @@
 
 namespace facebook { namespace bistro {
 
-struct JobWithNodes {
-  JobPtr job;
-  std::vector<NodePtr> nodes;
+class Config;
 
-  JobWithNodes() {}
-  JobWithNodes(JobPtr j, std::vector<NodePtr> n)
-    : job(std::move(j)), nodes(std::move(n)) {}
+// Available resource amounts for each node in this NodeGroup, concatenated
+// together.  Offsets 0 through (#resources in node group - 1) are the first
+// node, etc.  A given node's resources can be found via Node::offset.
+using PackedResources = std::vector<int>;
+// The NodeGroup ID was formerly known as `level`.
+using NodeGroupToPackedResources = std::unordered_map<int, PackedResources>;
+
+class JobWithNodes {
+public:
+  // Precompute job & node packed resources once, subtract many times.
+  struct NodeGroupResources {
+    explicit NodeGroupResources(PackedResources* nodes) : nodes_(nodes) {}
+    // This job's requirements in this NodeGroup. Has just one entry for
+    // each resource.
+    PackedResources job_;
+    // Stores a pointer into the scheduler's NodeGroupToPackedResources.
+    // This saves us a hash-map lookup in the inner loop.
+    PackedResources* nodes_;  // Non-const since try_to_schedule modifies it.
+  };
+
+  /**
+   * WARNING: Stores pointers into the NodeGroupToPackedResources.
+   * Therefore, that structure must outlive all JobWithNodes.
+   */
+  JobWithNodes(const Config&, JobPtr, NodeGroupToPackedResources*);
 
   JobWithNodes(JobWithNodes&&) = default;
   JobWithNodes& operator=(JobWithNodes&&) = default;
   JobWithNodes(const JobWithNodes&) = delete;
   JobWithNodes& operator=(const JobWithNodes&) = delete;
+
+  inline const JobPtr& job() const { return job_; }
+  inline const std::unordered_map<int, NodeGroupResources>&
+    nodeGroupResources() const { return nodeGroupToResources_; }
+
+  // Exposed because the policies are expected to mutate this list as they go.
+  std::vector<const Node*> nodes;
+
+private:
+  JobPtr job_;
+  std::unordered_map<int, NodeGroupResources> nodeGroupToResources_;
 };
 
-typedef std::unordered_map<Node::ID, ResourceVector> ResourcesByNodeType;
-
-class SchedulerPolicy {
-
-public:
-  virtual int schedule(
-    std::vector<JobWithNodes>& jobs,
-    ResourcesByNodeType& resources_by_node,
-    TaskRunnerCallback cb
-  ) = 0;
-
+struct SchedulerPolicy {
   virtual ~SchedulerPolicy();
-
-  static SchedulerPolicy* getSingleton(SchedulerType type);
-
+  virtual int schedule(std::vector<JobWithNodes>&, TaskRunnerCallback) = 0;
 };
 
-
-}}
+}}  // namespace facebook::bistro

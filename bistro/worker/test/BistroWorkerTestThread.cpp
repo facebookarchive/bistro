@@ -13,13 +13,9 @@
 #include <thrift/lib/cpp2/async/HeaderClientChannel.h>
 #include <thrift/lib/cpp/async/TAsyncSocket.h>
 
-#include "bistro/bistro/server/test/ThriftMonitorTestThread.h"
-#include "bistro/bistro/worker/BistroWorkerHandler.h"
 #include "bistro/bistro/utils/server_socket.h"
 #include "bistro/bistro/utils/service_clients.h"
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
-
-DECLARE_string(data_dir);
 
 namespace facebook { namespace bistro {
 
@@ -28,33 +24,42 @@ using namespace std;
 using namespace apache::thrift;
 
 BistroWorkerTestThread::BistroWorkerTestThread(
-  ThriftMonitorTestThread* scheduler) {
-  // TODO 5437837 uses separate directories so we can start multiple workers
-  FLAGS_data_dir = dataDir_.getPath().native();
+    BistroWorkerHandler::SchedulerClientFn scheduler_client_fn,
+    StateTransitionCob state_transition_cob) {
 
+  auto ts = make_shared<ThriftServer>();
   auto socket_and_addr = getServerSocketAndAddress();
   workerPtr_ = make_shared<BistroWorkerHandler>(
-    bind(
-      &ThriftMonitorTestThread::getClient,
-      scheduler,
-      std::placeholders::_1
-    ),
+    ts,
+    dataDir_.getPath().native(),  // each worker runs in its own directory
+    [this, state_transition_cob](
+      const char* m, const cpp2::BistroWorker& w, const cpp2::RunningTask* rt
+    ) {
+      // Make it easy to wait for events using waitForRegexOnFd()
+      if (!rt) {
+        LOG(INFO) << "worker state change: " << m;
+      } else {
+        LOG(INFO) << "worker task state change: " << m
+          << " - " << rt->job << " / " << rt->node;
+      }
+      state_transition_cob(this, m);
+    },
+    std::move(scheduler_client_fn),
     "",
     socket_and_addr.second,
     socket_and_addr.second.port
   );
-
-  auto ts = make_shared<ThriftServer>();
   ts->setInterface(workerPtr_);
   ts->useExistingSocket(std::move(socket_and_addr.first));
   sst_.start(std::move(ts));
 }
 
-shared_ptr<cpp2::BistroWorkerAsyncClient> BistroWorkerTestThread::getClient() {
+shared_ptr<cpp2::BistroWorkerAsyncClient> BistroWorkerTestThread::getClient(
+    folly::EventBase* evb) {
   return make_shared<cpp2::BistroWorkerAsyncClient>(
     HeaderClientChannel::newChannel(
       async::TAsyncSocket::newSocket(
-        EventBaseManager::get()->getEventBase(),
+        evb ? evb : EventBaseManager::get()->getEventBase(),
         *sst_.getAddress()
       )
     )
@@ -64,7 +69,8 @@ shared_ptr<cpp2::BistroWorkerAsyncClient> BistroWorkerTestThread::getClient() {
 cpp2::RunningTask BistroWorkerTestThread::runTask(
   const string& job,
   const string& node,
-  const vector<string>& cmd
+  const vector<string>& cmd,
+  cpp2::TaskSubprocessOptions subproc_opts
 ) {
   cpp2::RunningTask rt;
   rt.job = job;
@@ -76,7 +82,8 @@ cpp2::RunningTask BistroWorkerTestThread::runTask(
     cmd,
     getSchedulerID(),
     getWorker().id,
-    0
+    0,
+    std::move(subproc_opts)
   );
   return rt;
 }

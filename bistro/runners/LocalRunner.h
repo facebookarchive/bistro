@@ -12,8 +12,8 @@
 #include <boost/filesystem.hpp>
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
+#include "bistro/bistro/processes/TaskSubprocessQueue.h"
 #include "bistro/bistro/runners/TaskRunner.h"
-#include "bistro/bistro/utils/SubprocessTaskQueue.h"
 
 namespace facebook { namespace bistro {
 
@@ -40,27 +40,23 @@ public:
     int64_t line_id,
     bool is_ascending,
     const std::string& regex_filter
-  ) override;
+  ) const override;
 
   bool canKill() override { return true; }
 
-  void killTask(
-    const std::string& job,
-    const std::string& node,
-    cpp2::KilledTaskStatusFilter status_filter
-  ) override;
+  void killTask(const cpp2::RunningTask&, const cpp2::KillRequest&) override;
 
 protected:
  TaskRunnerResponse runTaskImpl(
      const std::shared_ptr<const Job>& job,
-     const std::shared_ptr<const Node>& node,
+     const Node& node,
      cpp2::RunningTask& rt,
      folly::dynamic& job_args,
      std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)>
          cb) noexcept override;
 
 private:
-  SubprocessTaskQueue taskQueue_;
+  TaskSubprocessQueue taskQueue_;
   boost::filesystem::path cmd_;
   boost::filesystem::path jobsDir_;
 };

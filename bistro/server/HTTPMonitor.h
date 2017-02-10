@@ -9,11 +9,9 @@
  */
 #pragma once
 
+#include <folly/dynamic.h>
 #include <string>
 #include <thread>
-
-#include "bistro/bistro/server/HTTPServer.h"
-#include <folly/dynamic.h>
 
 namespace facebook { namespace bistro {
 
@@ -36,16 +34,25 @@ public:
     std::shared_ptr<TaskRunner> task_runner,
     std::shared_ptr<Monitor> monitor
   );
-  void wait();
+
+  HTTPMonitor(const HTTPMonitor&) = delete;
+  HTTPMonitor(HTTPMonitor&&) = delete;
+  HTTPMonitor& operator=(const HTTPMonitor&) = delete;
+  HTTPMonitor& operator=(HTTPMonitor&&) = delete;
+
+  // Public only for unit tests
+  folly::dynamic handleNodes(const Config& c, const folly::dynamic& request);
+
+  folly::fbstring handleRequest(const folly::fbstring& request);
 
 private:
-  std::string handleRequest(const std::string& request);
   folly::dynamic handleSingle(const Config&, const folly::dynamic& d);
   folly::dynamic handleJobs(
     const Config& c,
     const std::vector<const Job*>& jobs
   );
-  folly::dynamic handleNodes(const Config& c);
+
+  folly::dynamic handleSortedNodeNames(const Config& c);
   folly::dynamic handleTaskRuntime(const folly::dynamic& d);
   folly::dynamic handleRunningTasks(const folly::dynamic& d);
   folly::dynamic handleHistograms(
@@ -55,15 +62,13 @@ private:
   );
   folly::dynamic handleTaskLogs(const Config&, const folly::dynamic& d);
 
+  // We assume all of these are thread safe themselves, so we don't do any
+  // locking in the HTTPMonitor itself.
   std::shared_ptr<ConfigLoader> configLoader_;
   std::shared_ptr<NodesLoader> nodesLoader_;
   std::shared_ptr<TaskStatuses> taskStatuses_;
   std::shared_ptr<TaskRunner> taskRunner_;
   std::shared_ptr<Monitor> monitor_;
-
-  HTTPServer server_;
-  std::thread serverThread_;
-
 };
 
 }}

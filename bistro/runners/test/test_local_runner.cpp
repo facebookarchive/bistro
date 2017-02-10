@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,6 +9,7 @@
  */
 #include <gtest/gtest.h>
 
+#include <folly/Synchronized.h>
 #include <thread>
 
 #include "bistro/bistro/config/Config.h"
@@ -17,49 +18,59 @@
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/hostname.h"
 #include "bistro/bistro/utils/TemporaryFile.h"
-#include <folly/Synchronized.h>
 
 using namespace facebook::bistro;
-using namespace folly;
-using namespace std;
+using folly::dynamic;
 
 DECLARE_int32(log_prune_frequency);
 
 const Config kConfig(dynamic::object
   ("enabled", true)
   ("nodes", dynamic::object
-    ("levels", { "level1" , "level2" })
-    ("node_source", "range_label")
-    ("node_source_prefs", dynamic::object)
+    ("levels", dynamic::array("level1" , "level2"))
+    ("node_sources", dynamic::array(dynamic::object
+      ("source", "range_label")
+      ("prefs", dynamic::object)
+    ))
   )
   ("resources", dynamic::object)
+  // Need to make leaders for the signal to reach the `sleep` child process.
+  ("task_subprocess", dynamic::object("process_group_leader", true))
 );
 const dynamic kJob = dynamic::object
   ("enabled", true)
   ("owner", "owner")
-  ("backoff", {"fail"})  // Test the weird "no backoff" default backoff.
+  // Test the weird "no backoff" default backoff.
+  ("backoff", dynamic::array("fail"))
 ;
 
-TEST(TestLocalRunner, HandleAll) {
-  FLAGS_log_prune_frequency = 0;
+struct TestLocalRunner : public ::testing::Test {
+  TestLocalRunner() : cmdFile_(tmpDir_.createFile()) {
+    FLAGS_log_prune_frequency = 0;
+  }
+  TemporaryDir tmpDir_;
+  TemporaryFile cmdFile_;
+};
 
-  TemporaryDir tmp_dir;
-  TemporaryFile cmdFile(tmp_dir.createFile());
-  cmdFile.writeString(
-    "#!/bin/sh\n"
-    "echo -n \"this is my stdout\"\n"
-    "echo -n \"this is my stderr\" 1>&2\n"
-    "echo \"done\" >$2"
-  );
-  PCHECK(chmod(cmdFile.getFilename().c_str(), 0700) == 0);
-  LocalRunner runner(cmdFile.getFilename(), tmp_dir.getPath());
+void checkLogsEq(const std::vector<std::string>& lines, const LogLines& log) {
+  ASSERT_EQ(lines.size(), log.lines.size());
+  for (size_t i = 0; i < lines.size(); ++i) {
+    ASSERT_EQ(lines[i], log.lines[i].line);
+  }
+}
 
-  auto job = make_shared<Job>(kConfig, "foo_job", kJob);
-  auto node = make_shared<Node>("test_node");
+void checkDoneTaskAndLogs(
+    LocalRunner* runner,
+    const folly::dynamic& d_job,
+    std::vector<std::string> stdout,
+    std::vector<std::string> stderr) {
+
+  auto job = std::make_shared<Job>(kConfig, "foo_job", d_job);
+  Node node("test_node");
 
   auto start_time = time(nullptr);
-  Synchronized<TaskStatus> status;
-  runner.runTask(
+  folly::Synchronized<TaskStatus> status;
+  runner->runTask(
     kConfig,
     job,
     node,
@@ -71,60 +82,103 @@ TEST(TestLocalRunner, HandleAll) {
   ASSERT_TRUE(status->isRunning());
 
   while (status->isRunning()) {
-    this_thread::sleep_for(chrono::milliseconds(100));
+    /* sleep override */
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   ASSERT_TRUE(status->isDone());
 
-  for (const auto& logtype : vector<string>{"stdout", "stderr", "statuses"}) {
+  for (const auto& logtype : std::vector<std::string>{
+    "stdout", "stderr", "statuses"
+  }) {
     // A very basic log test of log retrieval, does not check most features.
-    auto log = runner.getJobLogs(
+    auto log = runner->getJobLogs(
       logtype,
-      vector<string>{job->name()},
-      vector<string>{node->name()},
+      std::vector<std::string>{job->name()},
+      std::vector<std::string>{node.name()},
       0,  // line_id
       true,  // is_ascending
       ".*.*"  // a match-all regex filter
     );
-    if (logtype != "statuses") {
-      ASSERT_EQ(1, log.lines.size());
-      ASSERT_EQ("this is my " + logtype, log.lines.back().line);
-    } else {
-      ASSERT_EQ(3, log.lines.size());
+    if (logtype == "stdout") {
+      checkLogsEq(stdout, log);
+    } else if (logtype == "stderr") {
+      checkLogsEq(stderr, log);
+    } else if (logtype == "statuses") {
+      ASSERT_EQ(4, log.lines.size());
       ASSERT_LE(start_time, log.lines[0].time);
       ASSERT_EQ(job->name(), log.lines[0].jobID);
-      ASSERT_EQ(node->name(), log.lines[0].nodeID);
+      ASSERT_EQ(node.name(), log.lines[0].nodeID);
       EXPECT_EQ(
-        dynamic(dynamic::object
-          ("result", "running")
-          ("data", dynamic::object("worker_host", getLocalHostName()))),
-        parseJson(log.lines[0].line)
+        "running", folly::parseJson(log.lines[0].line)["event"].asString()
       );
-      ASSERT_EQ("exited", log.lines[1].line);
-      ASSERT_EQ("done", log.lines[2].line);
+      int proc_exit_idx = 2;
+      if (folly::parseJson(log.lines[1].line)["event"]
+          != "task_pipes_closed") {
+        proc_exit_idx = 1;
+        ASSERT_EQ(
+          "task_pipes_closed",
+          folly::parseJson(log.lines[2].line)["event"].asString()
+        );
+      }
+      ASSERT_EQ(
+        "process_exited",
+        folly::parseJson(log.lines[proc_exit_idx].line)["event"].asString()
+      );
+      auto j = folly::parseJson(log.lines[3].line);
+      ASSERT_EQ("got_status", j["event"].asString());
+      ASSERT_EQ("done", j["raw_status"].asString());
+    } else {
+      FAIL() << "Unknown log type: " << logtype;
     }
     ASSERT_LE(start_time, log.lines.back().time);
     ASSERT_EQ(job->name(), log.lines.back().jobID);
-    ASSERT_EQ(node->name(), log.lines.back().nodeID);
+    ASSERT_EQ(node.name(), log.lines.back().nodeID);
     ASSERT_EQ(LogLine::kNotALineID, log.nextLineID);
   }
 }
 
-TEST(TestLocalRunner, HandleKill) {
-  FLAGS_log_prune_frequency = 0;
-
-  TemporaryDir tmp_dir;
-  TemporaryFile cmdFile(tmp_dir.createFile());
-  cmdFile.writeString(
+TEST_F(TestLocalRunner, HandleDoneTaskAndLogs) {
+  cmdFile_.writeString(
     "#!/bin/sh\n"
-    "sleep 100\n"
+    "echo -n \"this is my stdout\"\n"
+    "echo -n \"this is my stderr\" 1>&2\n"
+    "echo \"done\" > $2"
+  );
+  PCHECK(chmod(cmdFile_.getFilename().c_str(), 0700) == 0);
+  LocalRunner runner(cmdFile_.getFilename(), tmpDir_.getPath());
+  checkDoneTaskAndLogs(
+    &runner, kJob, {"this is my stdout"}, {"this is my stderr"}
+  );
+}
+
+TEST_F(TestLocalRunner, CustomCommand) {
+  cmdFile_.writeString(
+    "#!/bin/sh\n"
+    "echo $1\n"
+    "echo $2 1>&2\n"
+    "echo \"done\" > $4"
+  );
+  PCHECK(chmod(cmdFile_.getFilename().c_str(), 0700) == 0);
+  LocalRunner runner("/bad/worker_command", tmpDir_.getPath());
+  auto d_job = kJob;
+  d_job[kCommand] =
+    dynamic::array(cmdFile_.getFilename().native(), "o", "e");
+  checkDoneTaskAndLogs(&runner, d_job, {"o\n"}, {"e\n"});
+}
+
+TEST_F(TestLocalRunner, HandleKill) {
+  cmdFile_.writeString(
+    "#!/bin/sh\n"
+    "sleep 10000\n"
     "echo \"done\" >$2"
   );
-  PCHECK(chmod(cmdFile.getFilename().c_str(), 0700) == 0);
-  LocalRunner runner(cmdFile.getFilename(), tmp_dir.getPath());
+  PCHECK(chmod(cmdFile_.getFilename().c_str(), 0700) == 0);
+  LocalRunner runner(cmdFile_.getFilename(), tmpDir_.getPath());
 
-  auto job = make_shared<Job>(kConfig, "job", kJob);
+  auto job = std::make_shared<Job>(kConfig, "job", kJob);
   const size_t kNumNodes = 5;
-  Synchronized<std::vector<TaskStatus>> status_seqs[kNumNodes];
+  folly::Synchronized<std::vector<TaskStatus>> status_seqs[kNumNodes];
+  folly::Synchronized<cpp2::RunningTask> rts[kNumNodes];
 
   auto assertTaskOnNode = [&](
       int node_num,
@@ -147,13 +201,16 @@ TEST(TestLocalRunner, HandleKill) {
   };
 
   for (size_t i = 0; i < kNumNodes; ++i) {
-    auto node = make_shared<Node>(to<string>("node", i));
+    Node node(folly::to<std::string>("node", i));
     runner.runTask(
       kConfig,
       job,
       node,
       nullptr,  // no previous status
-      [&status_seqs, i](const cpp2::RunningTask& rt, TaskStatus&& st) {
+      [&status_seqs, i, &rts](const cpp2::RunningTask& rt, TaskStatus&& st) {
+        SYNCHRONIZED(last_rt, rts[i]) {
+          last_rt = rt;
+        }
         SYNCHRONIZED(status_seq, status_seqs[i]) {
           if (!status_seq.empty()) {
             // Copy and update lets us examine the whole status sequence.
@@ -180,61 +237,28 @@ TEST(TestLocalRunner, HandleKill) {
     | TaskStatusBits::UsesBackoff
     | TaskStatusBits::DoesNotAdvanceBackoff;
 
-  const auto assertTaskKilledNoFilter = [&](int n) {
-    ASSERT_EQ(2, status_seqs[n]->size());
-    assertTaskOnNode(n, 1, "incomplete_backoff", [](const TaskStatus& status) {
-      return status.bits() == kIncompleteBackoffBits
-        && status.backoffDuration().seconds == 60 // See JobBackoffSettings.cpp
-        && status.data()
-        && status.data()->at("exception") == "Task killed, no status returned";
-    });
-  };
-
-  runner.killTask("job", "node0", cpp2::KilledTaskStatusFilter::NONE);
-  assertTaskKilledNoFilter(0);
-  assertTasksRunningFromNode(1);  // Other tasks are unaffected.
-
-  runner.killTask(
-    "job", "node1",
-    cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE_BACKOFF
-  );
-  ASSERT_EQ(2, status_seqs[1]->size());
-  assertTaskOnNode(1, 1, "incomplete_backoff", [](const TaskStatus& status) {
-    return status.bits() == kIncompleteBackoffBits
-      && status.backoffDuration().seconds == 60  // See JobBackoffSettings.cpp
-      && status.data()
-      && status.data()->count("actual_status")
-      && !status.data()->count("exception")
-      && status.data()->at("message")
-        == "Killed & coerced to 'incomplete_backoff' since task was not done";
-  });
-  assertTasksRunningFromNode(2);  // Other tasks are unaffected.
-
-  runner.killTask(
-    "job", "node2", cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_INCOMPLETE
-  );
-  // Even though it's "incomplete", it will not respawn since we aren't
-  // running a real scheduling loop here.
-  ASSERT_EQ(2, status_seqs[2]->size());
-  assertTaskOnNode(2, 1, "incomplete", [](const TaskStatus& status) {
-    return status.bits() == TaskStatusBits::Incomplete;
-  });
-  assertTasksRunningFromNode(3);  // Other tasks are unaffected.
-
-  // All remaining running tasks get killed
-  for (size_t i = 3; i < kNumNodes; ++i) {
-    runner.killTask(
-      "job", folly::to<std::string>("node", i),
-      cpp2::KilledTaskStatusFilter::FORCE_DONE_OR_FAILED
-    );
+  // Kill all tasks.
+  for (size_t i = 0; i < kNumNodes; ++i) {
+    cpp2::RunningTask rt;
+    SYNCHRONIZED(last_rt, rts[i]) {
+      ASSERT_EQ("job", last_rt.job);  // Was it even set?
+      rt = last_rt;
+    }
+    runner.killTask(rt, cpp2::KillRequest());
+    // Wait for the task to die
+    while (status_seqs[i]->size() < 2) {
+      /* sleep override */
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
     ASSERT_EQ(2, status_seqs[i]->size());
-    assertTaskOnNode(i, 1, "failed", [](const TaskStatus& s) {
-      return s.isFailed();
+    assertTaskOnNode(i, 1, "incomplete_backoff", [](const TaskStatus& status) {
+      return status.bits() == kIncompleteBackoffBits
+        // Third value from the default backoff in JobBackoffSettings.cpp
+        && status.configuredBackoffDuration().seconds == 60
+        && status.dataThreadUnsafe()
+        && status.dataThreadUnsafe()->at("exception")
+          == "Task killed, no status returned";
     });
+    assertTasksRunningFromNode(i + 1);  // Other tasks are unaffected.
   }
-
-  // But a task that wasn't running remains in backoff. Note: Since it may
-  // run again, this is probably not what the user wants.  We should make
-  // this better?
-  assertTaskKilledNoFilter(0);
 }

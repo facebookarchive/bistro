@@ -13,7 +13,9 @@
 #include <folly/json.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
+#include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 #include "bistro/bistro/remote/RemoteWorkerUpdate.h"
+#include "bistro/bistro/remote/WorkerSetID.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 #include "bistro/bistro/utils/Exception.h"
 
@@ -50,18 +52,42 @@ namespace {
 using apache::thrift::debugString;
 using namespace std;
 
+bool checkWorkerSchedulerProtocolVersion(int16_t worker, int16_t scheduler) {
+  // In the future, this check can allow some limited backward/forward
+  // compatibility for specific versions (as needed).
+  return worker == scheduler;
+}
+
+void enforceWorkerSchedulerProtocolVersion(int16_t worker, int16_t scheduler) {
+  if (!checkWorkerSchedulerProtocolVersion(worker, scheduler)) {
+    throw std::runtime_error(folly::to<std::string>(
+      "Worker-scheduler protocol version mismatch: ", worker,
+      " is not compatible with ", scheduler
+    ));
+  }
+}
+
 folly::Optional<cpp2::SchedulerHeartbeatResponse>
 RemoteWorker::processHeartbeat(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& w_new) {
+    const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id,
+    bool consensus_permits_becoming_healthy) {
 
+  // We should never get here (since that means the worker is already added
+  // to our pool), so CHECK instead of throwing.
+  CHECK(checkWorkerSchedulerProtocolVersion(
+    w_new.protocolVersion, cpp2::common_constants::kProtocolVersion()
+  )) << "Worker & scheduler protocol mismatch: " << w_new.protocolVersion
+    << " vs " << cpp2::common_constants::kProtocolVersion();
   const auto& w_cur = worker_;
   // We'll have to kill the old worker, unless the new process is running on
   // the same machine and listening on the same port as the old.
   if (w_cur.machineLock != w_new.machineLock) {
     // Bump the current worker if it's unhealthy or "must die".
-    auto cur_state = computeState(update->curTime());
-    if (cur_state == RemoteWorkerState::State::MUST_DIE) {
+    auto state_and_disallowed =
+      computeState(update->curTime(), consensus_permits_becoming_healthy);
+    if (state_and_disallowed.first == RemoteWorkerState::State::MUST_DIE) {
       // The worker may not yet have been marked MUST_DIE by updateState, so
       // this suicide request is necessary.  At worst, it's a no-op.
       update->requestSuicide(w_cur, "Current lost worker was replaced");
@@ -70,8 +96,13 @@ RemoteWorker::processHeartbeat(
       FLAGS_allow_bump_unhealthy_worker
       // Also bumps RemoteWorkerState::State::NEW workers, in case, e.g. a
       // NEW worker is stuck in failing to report its running tasks.
-      && cur_state != RemoteWorkerState::State::HEALTHY
+      && state_and_disallowed.first != RemoteWorkerState::State::HEALTHY
     ) {
+      if (state_and_disallowed.second) {
+        LOG(INFO) << "Current worker " << w_cur.shard << " is unhealthy "
+          << "solely because it lacks WorkerSetID consensus. It will be "
+          << "replaced by a new worker";
+      }
       update->requestSuicide(w_cur, "Current unhealthy worker was replaced");
       // Fall through to updateNewWorker()
     } else {
@@ -95,7 +126,8 @@ RemoteWorker::processHeartbeat(
       update->requestSuicide(w_new, "The old worker is still okay");
       return folly::none;
     }
-    updateNewWorker(update, w_new);
+    // Ignore consensus_permits_becoming_healthy since it's not relevant.
+    updateNewWorker(update, w_new, worker_set_id);
   // A new worker instance at the same IP & port. Easy to handle, since
   // we're pretty sure that the current one is dead -- no need to check
   // health, or tell anyone to commit suicide.
@@ -112,24 +144,35 @@ RemoteWorker::processHeartbeat(
         << w_cur.id.startTime << " but different rands: " << w_cur.id.rand
         << ", " << w_new.id.rand;
     }
-    updateNewWorker(update, w_new);
+    // Ignore consensus_permits_becoming_healthy since it's not relevant.
+    updateNewWorker(update, w_new, worker_set_id);
   // It's the same worker instance as before, just update the metadata.
   } else {
     // Got a heartbeat from a MUST_DIE worker -- re-request suicide
     if (state_.state_ == RemoteWorkerState::State::MUST_DIE) {
       update->requestSuicide(w_cur, "Current worker was already lost");
     }
-    updateCurrentWorker(update, w_new);
+    updateCurrentWorker(
+      update, w_new, worker_set_id, consensus_permits_becoming_healthy
+    );
   }
   return state_.getHeartbeatResponse();
 }
 
-void RemoteWorker::updateState(RemoteWorkerUpdate* update) {
+void RemoteWorker::updateState(
+    RemoteWorkerUpdate* update,
+    bool consensus_permits_becoming_healthy) {
   // MUST_DIE means we don't check health, and ignore state changes.
   if (state_.state_ == RemoteWorkerState::State::MUST_DIE) {
     return;  // Don't request suicide here since we updateState very often
   }
-  auto new_state = computeState(update->curTime());
+  auto new_state_and_disallowed =
+    computeState(update->curTime(), consensus_permits_becoming_healthy);
+  auto new_state = new_state_and_disallowed.first;
+  if (new_state_and_disallowed.second) {
+    LOG(INFO) << "Worker " << worker_.shard << " can be healthy but lacks "
+      << "WorkerSetID consensus";
+  }
   // Careful: RemoteWorkerRunner::checkInitialWait relies on the fact that
   // this check populates addNewWorker **every** updateState.
   if (new_state == RemoteWorkerState::State::NEW) {
@@ -150,15 +193,16 @@ void RemoteWorker::updateState(RemoteWorkerUpdate* update) {
     // Send a suicide request the moment we declare the worker lost (and
     // also on any heartbeat we receive from it thereafter).
     update->requestSuicide(worker_, "Current worker just became lost");
+    deadWorkerCob_(*this);
     loseRunningTasks(update);
-    state_.state_ = RemoteWorkerState::State::MUST_DIE;
+    setState(RemoteWorkerState::State::MUST_DIE);
     return;
   }
   if (state_.state_ != RemoteWorkerState::State::HEALTHY
       && new_state == RemoteWorkerState::State::HEALTHY) {
     LOG(INFO) << "Worker " << worker_.shard << " became healthy";
   }
-  state_.state_ = new_state;
+  setState(new_state);
   // Send out a new healtcheck if we are due.
   if (update->curTime() >= timeLastHealthcheckSent_
       + max(1, FLAGS_healthcheck_period)) {
@@ -199,7 +243,7 @@ void RemoteWorker::recordFailedTask(
     const cpp2::RunningTask& rt,
     const TaskStatus& status) noexcept {
 
-   CHECK(!status.isRunning() && !status.isDone());
+  CHECK(!status.isRunning() && !status.isDone());
   // DO: Consider CHECKing that the task is currently in 'runningTasks_'?
   // DO: Maybe also CHECK that the task is not in unsureIfRunningTasks_?
   CHECK(recordNonRunningTaskStatusImpl(rt, status));
@@ -323,23 +367,99 @@ bool RemoteWorker::recordNonRunningTaskStatusImpl(
 // since it would be spammy in the "same host, same port, new worker" case.
 void RemoteWorker::updateNewWorker(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& w_new) {
+    const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id) {
 
+  if (state_.state_ != RemoteWorkerState::State::MUST_DIE) {
+    deadWorkerCob_(*this);
+  }
   // Any previous worker would have been killed, so make sure to lose those
   // running tasks (in the pathological case where the new worker has some
   // of the same running tasks, this logs "lost" followed by "running").
   loseRunningTasks(update);
-  *this = RemoteWorker(update->curTime(), w_new);
-  updateState(update);
+  *this = RemoteWorker(
+    update->curTime(),
+    w_new,
+    worker_set_id,
+    std::move(schedulerID_),
+    std::move(newWorkerCob_),
+    std::move(deadWorkerCob_),
+    std::move(workerSetIDChangeCob_)
+  );
+  // Read the 'This should never happen' comment in updateCurrentWorker.
+  if (worker_set_id.schedulerID == schedulerID_) {
+    LOG(ERROR) << "The scheduler ID of the initial WorkerSetID of "
+      << debugString(worker_) << " is the same as the current scheduler: "
+      << debugString(worker_set_id);
+  }
+  state_.timeLastHeartbeatReceived_ = update->curTime();
+  updateState(update, /*the consensus computation wasn't yet done: */ false);
 }
 
 void RemoteWorker::updateCurrentWorker(
     RemoteWorkerUpdate* update,
-    const cpp2::BistroWorker& w_new) {
+    const cpp2::BistroWorker& w_new,
+    const cpp2::WorkerSetID& worker_set_id,
+    bool consensus_permits_becoming_healthy) {
 
   worker_ = w_new;
+  // The scheduler might get a stale heartbeat containing a WorkerSetID from
+  // before this worker adopted this scheduler's worker set versioning.
+  // This would wreak havoc, so avoid it.
+  //
+  // NB: This isn't called from BistroWorkerHandler, so no worries about that.
+  if (worker_set_id.schedulerID == schedulerID_) {
+    // This should never happen, but I cannot quite rule it out. Roughly
+    // speaking, this means that the first time this worker instance
+    // connected (as far as the scheduler is concerned), it was already
+    // associated with this scheduler.  In this case, logging and doing
+    // nothing matches the behavior of the updateNewWorker() code path.  In
+    // particular, that means we preserve the invariant that workerSetID_ is
+    // always a later version than initialWorkerSetID_, and always contains
+    // the present worker.
+    if (worker_set_id.schedulerID == initialWorkerSetID_.schedulerID
+        && !WorkerSetIDEarlierThan()(
+          initialWorkerSetID_.version, worker_set_id.version
+        )) {
+      LOG(ERROR) << "The scheduler ID of the initial WorkerSetID of "
+        << debugString(worker_) << " is the same as the current scheduler: "
+        << debugString(initialWorkerSetID_) << " -- ignoring the current "
+        << "WorkerSetID since it is not later than the initial: "
+        << debugString(worker_set_id);
+    // Only increase the version, since the worker only increases its
+    // internal versions.  A decrease means out-of-order arrival.
+    //
+    // NB: This criterion could be used to discard all such heartbeats, but
+    // the extra complexity isn't worth the dubious gain.
+    } else if (!workerSetID_.hasValue() || WorkerSetIDEarlierThan()(
+      workerSetID_->version, worker_set_id.version
+    )) {
+      workerSetIDChangeCob_(*this, worker_set_id);
+      if (!firstAssociatedWorkerSetID_.hasValue()) {
+        CHECK(!workerSetID_.hasValue());
+        CHECK(initialWorkerSetID_ != worker_set_id)
+          << debugString(initialWorkerSetID_) << " == "
+          << debugString(worker_set_id);
+        firstAssociatedWorkerSetID_ = worker_set_id;
+      }
+      workerSetID_ = worker_set_id;
+    } else if (workerSetID_->version == worker_set_id.version) {
+      CHECK(*workerSetID_ == worker_set_id)
+        << debugString(*workerSetID_) << " != " << debugString(worker_set_id);
+    } else {  // This can happen occasionally (e.g. under heavy load).
+      LOG(WARNING) << "Ignoring out-of-order WorkerSetID -- current: "
+        << debugString(*workerSetID_) << ", new: "
+        << debugString(worker_set_id);
+    }
+  // This equality will hold just after the RemoteWorker was first created,
+  // but any other kind of mismatch should not happen, so log those.
+  } else if (worker_set_id != initialWorkerSetID_) {
+    LOG(ERROR) << "Scheduler " << debugString(schedulerID_) << " got "
+      << "a heartbeat with a WorkerSetID whose schedulerID does not match: "
+      << debugString(w_new) << " / " << debugString(worker_set_id);
+  }
   state_.timeLastHeartbeatReceived_ = update->curTime();
-  updateState(update);
+  updateState(update, consensus_permits_becoming_healthy);
 }
 
 void RemoteWorker::initializeRunningTasks(
@@ -364,10 +484,10 @@ void RemoteWorker::initializeRunningTasks(
   }
 
   // Exit the "NEW" state; the true state will be computed by the periodic
-  // thread that calls updateState.  DO: It would be nicer to call
-  // updateState immediately in the casller, but then one also has to apply
-  // the resulting update, which increases the code complexity a lot.
-  state_.state_ = RemoteWorkerState::State::UNHEALTHY;
+  // thread that calls updateState.  DO: It could be nicer to immediately
+  // trigger updateState in the caller, but then one also has to apply the
+  // resulting update, which increases the code complexity a lot.
+  setState(RemoteWorkerState::State::UNHEALTHY);
 }
 
 void RemoteWorker::loseRunningTasks(RemoteWorkerUpdate* update) {
@@ -385,7 +505,8 @@ void RemoteWorker::loseRunningTasks(RemoteWorkerUpdate* update) {
   //
   // Since the two states are out of sync in (b), that's the only place
   // where problems can arise.  When a worker is lost, its state becomes
-  // either MUST_DIE or NEW.  The only way to leave these states is through
+  // either MUST_DIE or NEW (if the old worker dies and is replaced by a new
+  // invocation).  The only way to leave these states is through
   // fetchRunningTasksForNewWorkers, which runs after lost running tasks
   // processing in applyUpdate, which means that when we change states, we
   // are surely in (c).  This is the synchronization mechanism that ensures

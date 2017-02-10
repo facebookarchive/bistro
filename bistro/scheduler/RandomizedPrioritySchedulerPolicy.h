@@ -15,9 +15,7 @@ namespace facebook { namespace bistro {
 
 class RandomizedPrioritySchedulerPolicy : public SchedulerPolicy {
 public:
- int schedule(std::vector<JobWithNodes>& jobs,
-              ResourcesByNodeType& resources_by_node,
-              TaskRunnerCallback cb) override;
+  int schedule(std::vector<JobWithNodes>&, TaskRunnerCallback) override;
 };
 
 }}

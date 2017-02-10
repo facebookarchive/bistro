@@ -1,0 +1,6 @@
+python_library(
+    name = 'py',
+    base_module = 'facebook.bistro',
+    srcs = util.files('./**/*.py'),
+    external_deps = [('python-requests', 'any')],
+)

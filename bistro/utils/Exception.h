@@ -22,4 +22,6 @@ std::runtime_error BistroException(Args&&... args) {
     std::runtime_error(folly::to<std::string>(std::forward<Args>(args)...));
 }
 
+std::string strError();
+
 }}

@@ -17,26 +17,26 @@
 #include <vector>
 
 #include "bistro/bistro/config/Node.h"
-#include "bistro/bistro/utils/ShuffledRange.h"
 
 namespace facebook { namespace bistro {
 
 namespace detail {
 struct DoesNodeBelongToLevel {
   explicit DoesNodeBelongToLevel(NodeLevel level) : level_(level) {}
-  bool operator()(const NodePtr& node) { return node->level() == level_; }
+  bool operator()(const std::shared_ptr<const Node>& node) const {
+    return node->level() == level_;
+  }
   NodeLevel level_;
 };
 }
 
 class Nodes {
-
 private:
-  typedef boost::filter_iterator<
+  using LevelIter = boost::filter_iterator<
     detail::DoesNodeBelongToLevel,
-    std::vector<NodePtr>::const_iterator
-  > LevelIter;
-  typedef boost::iterator_range<LevelIter> LevelIterRange;
+    std::vector<std::shared_ptr<const Node>>::const_iterator
+  >;
+  using LevelIterRange = boost::iterator_range<LevelIter>;
 
 public:
 
@@ -61,8 +61,6 @@ public:
 
   LevelIterRange iterateOverLevel(NodeLevel level) const;
 
-  ShuffledRange<std::vector<NodePtr>::const_iterator> shuffled() const;
-
   size_t size() const {
     return nodes_.size();
   }
@@ -71,20 +69,16 @@ public:
     return nodes_.front().get();
   }
 
-  // EXTREMELY INEFFICIENT; used only in unit tests.
-  NodePtr getNodeVerySlow(const std::string& name) const;
-
-  std::vector<NodePtr>::const_iterator begin() const {
+  std::vector<std::shared_ptr<const Node>>::const_iterator begin() const {
     return nodes_.begin();
   }
 
-  std::vector<NodePtr>::const_iterator end() const {
+  std::vector<std::shared_ptr<const Node>>::const_iterator end() const {
     return nodes_.end();
   }
 
 private:
-  std::vector<NodePtr> nodes_;
-
+  std::vector<std::shared_ptr<const Node>> nodes_;
 };
 
 }}

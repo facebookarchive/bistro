@@ -35,7 +35,7 @@ typedef map<string, BistroJobConfigFilters>
 
 struct BistroJobConfig {
   1: string name,
-  2: bool enabled,
+  2: bool enabled = 0,
   3: string owner,
   // Map of resource name => resources required
   4: stringToIntMap resources,
@@ -46,16 +46,22 @@ struct BistroJobConfig {
   9: list<i32> backoffValues,
   10: bool backoffRepeat,
   // createTime & modifyTime may not be set -- only valid if they're positive.
-  11: i64 createTime,
-  12: i64 modifyTime,
+  11: i64 createTime = 0,
+  12: i64 modifyTime = 0,
   13: string levelForTasks,
   14: string levelForHostPlacement,
   15: list<string> dependsOn,
   16: string hostPlacement,
   17: optional double killOrphanTasksAfterSec,
+  19: common.TaskSubprocessOptions taskSubprocessOptions,
+  20: common.KillRequest killRequest,
   // ConfigLoaders can use this to implement compare-and-swap for saveJob(),
   // preventing two concurrent calls from silently clobbering one another.
-  18: i64 versionID,
+  //
+  // Default to -1 because we need the "no version ID specified" behavior to
+  // be equivalent to "add new job" (rather than "update existing job") and
+  // -1 is the sentinel for this.
+  18: i64 versionID = -1,
 } (final)
 
 struct BistroCountWithSamples {
@@ -238,6 +244,14 @@ service BistroScheduler extends fb303.FacebookService {
    * moment, there is no clear need to muddy up the logic this way, since
    * heartbeats are cheap.
    */
-  common.SchedulerHeartbeatResponse processHeartbeat(1: common.BistroWorker w);
+  common.SchedulerHeartbeatResponse processHeartbeat(
+    1: common.BistroWorker w,
+    // When a scheduler restarts, it inspects the IDs being sent by
+    // connecting workers to determine if all previous workers had already
+    // reconnected.  If we achieve complete consensus -- all connected
+    // workers report the same ID, which is also the ID of the set of
+    // connected workers -- then the scheduler exits its "initial wait".
+    2: common.WorkerSetID workerSetID,
+  );
 
 }

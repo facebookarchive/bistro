@@ -1,0 +1,26 @@
+cpp_library(
+    name = 'remote_lib',
+    headers = [
+        'BusiestRemoteWorkerSelector.h',
+        'RemoteWorker.h',
+        'RemoteWorkerSelector.h',
+        'RemoteWorkers.h',
+        'RemoteWorkerState.h',
+        'RemoteWorkerUpdate.h',
+        'RoundRobinRemoteWorkerSelector.h',
+        'WorkerSetID.h',
+    ],
+    srcs = [
+        'BusiestRemoteWorkerSelector.cpp',
+        'RemoteWorker.cpp',
+        'RemoteWorkers.cpp',
+        'RemoteWorkerState.cpp',
+        'RemoteWorkerSelector.cpp',
+        'RoundRobinRemoteWorkerSelector.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/flags:flags_lib',
+    ],
+)

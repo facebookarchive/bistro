@@ -21,7 +21,8 @@ class NodeConfig;
 class Nodes;
 
 // A utility for node fetchers that generate nodes based on their parents.
-std::pair<NodeLevel, std::vector<NodePtr>> getMyLevelAndParents(
+std::pair<NodeLevel, std::vector<std::shared_ptr<const Node>>>
+getMyLevelAndParents(
     const Config& config,
     const NodeConfig& node_config,
     const Nodes* all_nodes);

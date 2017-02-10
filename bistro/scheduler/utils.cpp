@@ -13,6 +13,7 @@
 
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/config/Job.h"
+#include "bistro/bistro/scheduler/SchedulerPolicy.h"
 
 namespace facebook { namespace bistro {
 
@@ -24,32 +25,29 @@ using namespace std;
  * actually run, modify the passed in resource array.
  */
 TaskRunnerResponse try_to_schedule(
-    ResourcesByNodeType& resources_by_node,
-    const NodePtr& node_ptr,
-    const JobPtr& job_ptr,
+    const Node& task_node,
+    const JobWithNodes& jwn,
     TaskRunnerCallback cb) {
 
-  // Store the potential new resources for each node. We'll only actually modify
-  // them at the end if we are able to satisfy all the resource constraints.
-  ResourcesByNodeType new_resources_by_node;
+  std::vector<std::pair<int*, int>> updates;
 
-  auto& job_resources = job_ptr->resources();
-  for (const auto& node : node_ptr->traverseUp()) {
-    new_resources_by_node[node.id()] = resources_by_node[node.id()];
-    auto& cur_resources = new_resources_by_node[node.id()];
-    for (int i = 0; i < cur_resources.size() && i < job_resources.size(); ++i) {
-      int& amount = cur_resources[i];
-      amount -= job_resources[i];
-      if (amount < 0) {
+  for (const auto& node : task_node.traverseUp()) {
+    auto& resources = jwn.nodeGroupResources().at(node.level());
+    CHECK_GE(resources.nodes_->size(), node.offset + resources.job_.size());
+    for (size_t i = 0; i < resources.job_.size(); ++i) {
+      auto& node_resource = (*resources.nodes_)[node.offset + i];
+      if (resources.job_[i] > node_resource) {
         return TaskRunnerResponse::DidNotRunTask;
       }
+      updates.emplace_back(std::make_pair(&node_resource, resources.job_[i]));
     }
   }
 
-  const auto ret = cb(job_ptr, node_ptr);
+  const auto ret = cb(jwn.job(), task_node);
   if (ret == TaskRunnerResponse::RanTask) {
-    for (const auto& pair : new_resources_by_node) {
-      resources_by_node[pair.first] = pair.second;
+    for (auto& p : updates) {
+      CHECK_GE(*p.first, p.second);
+      *p.first -= p.second;
     }
   }
   return ret;

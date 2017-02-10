@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -11,9 +11,8 @@
 
 #include "bistro/bistro/config/JobBackoffSettings.h"
 
-using namespace std;
 using namespace facebook::bistro;
-using namespace folly;
+using folly::dynamic;
 
 cpp2::BackoffDuration bd(int i) {
   cpp2::BackoffDuration d;
@@ -27,52 +26,50 @@ cpp2::BackoffDuration bd(int i) {
   return d;
 }
 
-JobBackoffSettings make(const dynamic& d) {
-  return JobBackoffSettings(d);
+template <typename... Args>
+JobBackoffSettings make(Args&&... args) {
+  return JobBackoffSettings(dynamic::array(std::forward<Args>(args)...));
 }
 
 TEST(TestJobBackoffSettings, HandleNonPositiveInterval) {
-  dynamic d = { 0 };
-  EXPECT_THROW(make(d), runtime_error);
+  EXPECT_THROW(make(0), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleInvalidType) {
-  dynamic d = { 1, 2, 3, "invalid" };
-  EXPECT_THROW(make(d), runtime_error);
+  EXPECT_THROW(make(1, 2, 3, "invalid"), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleNonArray) {
-  EXPECT_THROW(make(dynamic::object()), runtime_error);
+  EXPECT_THROW({
+    JobBackoffSettings jbs(dynamic::object());
+  }, std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleNonInt) {
-  dynamic d = { 1, 2, dynamic::object };
-  EXPECT_THROW(make(d), runtime_error);
+  EXPECT_THROW(make(1, 2, dynamic::object()), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleDuplicate) {
-  dynamic d = { 1, 1, 2, "fail" };
-  EXPECT_THROW(make(d), runtime_error);
+  EXPECT_THROW(make(1, 1, 2, "fail"), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleNoValues) {
-  vector<int> v;
-  dynamic d(v.begin(), v.end());
-  EXPECT_THROW(make(d), runtime_error);
+  EXPECT_THROW({
+    JobBackoffSettings jbs(dynamic::array());
+  }, std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleInvalidRepeat) {
-  dynamic d = { "repeat" };
-  EXPECT_THROW(make(d), runtime_error);
+  EXPECT_THROW(make("repeat"), std::runtime_error);
 }
 
 TEST(TestJobBackoffSettings, HandleDirectFail) {
-  auto s = make({ "fail" });
+  auto s = make("fail");
   EXPECT_EQ(bd(-1), s.getNext(bd(0)));
 }
 
 TEST(TestJobBackoffSettings, HandleNoType) {
-  auto s = make({ 1, 2, 3 });
+  auto s = make(1, 2, 3);
   EXPECT_EQ(bd(1), s.getNext(bd(0)));
   // We expect to default to fail
   EXPECT_EQ(bd(2), s.getNext(bd(1)));
@@ -81,7 +78,7 @@ TEST(TestJobBackoffSettings, HandleNoType) {
 }
 
 TEST(TestJobBackoffSettings, HandleFail) {
-  auto s = make({1, 2, 3, "fail"});
+  auto s = make(1, 2, 3, "fail");
   EXPECT_EQ(bd(1), s.getNext(bd(0)));
   EXPECT_EQ(bd(2), s.getNext(bd(1)));
   EXPECT_EQ(bd(3), s.getNext(bd(2)));
@@ -89,7 +86,7 @@ TEST(TestJobBackoffSettings, HandleFail) {
 }
 
 TEST(TestJobBackoffSettings, HandleRepeat) {
-  auto s = make({1, 2, 3, "repeat"});
+  auto s = make(1, 2, 3, "repeat");
   EXPECT_EQ(bd(1), s.getNext(bd(0)));
   EXPECT_EQ(bd(2), s.getNext(bd(1)));
   EXPECT_EQ(bd(3), s.getNext(bd(2)));
@@ -97,8 +94,7 @@ TEST(TestJobBackoffSettings, HandleRepeat) {
 }
 
 TEST(TestJobBackoffSettings, HandleConversion) {
-  auto s = make({1, 2, 3, "repeat"});
-  auto d = s.toDynamic();
-  auto s2 = make(d);
+  auto s = make(1, 2, 3, "repeat");
+  auto s2 = JobBackoffSettings(s.toDynamic());
   EXPECT_EQ(s, s2);
 }

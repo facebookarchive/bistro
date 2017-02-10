@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -13,6 +13,7 @@
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
+#include "bistro/bistro/nodes/test/utils.h"
 #include "bistro/bistro/utils/TemporaryFile.h"
 
 using namespace facebook::bistro;
@@ -23,9 +24,11 @@ TEST(TestScriptFetcher, HandleNoScript) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"level1", "level2"})
-      ("node_source", "script")
-      ("node_source_prefs", dynamic::object)
+      ("levels", dynamic::array("level1", "level2"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "script")
+        ("prefs", dynamic::object)
+      ))
     )
   );
   Nodes nodes;
@@ -45,12 +48,14 @@ TEST(TestScriptFetcher, HandleSimple) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"level1"})
-      ("node_source", "script")
-      ("node_source_prefs", dynamic::object
-        ("parent_level", "instance")
-        ("script", cmdFile.getFilename().native())
-      )
+      ("levels", dynamic::array("level1"))
+      ("node_sources", dynamic::array(dynamic::object
+        ("source", "script")
+        ("prefs", dynamic::object
+          ("parent_level", "instance")
+          ("script", cmdFile.getFilename().native())
+        )
+      ))
     )
   );
   Nodes nodes;
@@ -81,13 +86,13 @@ TEST(TestScriptFetcher, HandleParentArgument) {
   Config config(dynamic::object
     ("resources", dynamic::object)
     ("nodes", dynamic::object
-      ("levels", {"level1", "level2"})
-      ("node_sources", {
+      ("levels", dynamic::array("level1", "level2"))
+      ("node_sources", dynamic::array(
         dynamic::object
           ("source", "manual")
           ("prefs", dynamic::object
-            ("node1", {})
-            ("node2", {})
+            ("node1", dynamic::array())
+            ("node2", dynamic::array())
           )
         ,
         dynamic::object
@@ -96,18 +101,17 @@ TEST(TestScriptFetcher, HandleParentArgument) {
             ("parent_level", "level1")
             ("script", cmdFile.getFilename().native())
           )
-        }
-      )
+      ))
     )
   );
   Nodes nodes;
   NodesLoader::_fetchNodesImpl(config, &nodes);
 
   ASSERT_EQ(5, nodes.size());
-  auto n1 = nodes.getNodeVerySlow("node1:foo");
+  auto n1 = getNodeVerySlow(nodes, "node1:foo");
   ASSERT_EQ(2, n1->level());
   ASSERT_EQ("node1", n1->parent()->name());
-  auto n2 = nodes.getNodeVerySlow("node2:foo");
+  auto n2 = getNodeVerySlow(nodes, "node2:foo");
   ASSERT_EQ(2, n2->level());
   ASSERT_EQ("node2", n2->parent()->name());
 }

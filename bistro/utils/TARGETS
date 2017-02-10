@@ -1,0 +1,63 @@
+cpp_library(
+    name = 'exception_lib',
+    headers = ['Exception.h'],
+    srcs = ['Exception.cpp'],
+    deps = ['@/folly:conv'],
+)
+
+cpp_library(
+    name = 'hostname_lib',
+    headers = ['hostname.h'],
+    srcs = ['hostname.cpp'],
+    external_deps = ['boost', 'glog'],  # Future: Move startsWithAny elsewhere.
+)
+
+cpp_library(
+    name = 'shell_lib',
+    headers = ['shell.h'],
+    srcs = ['shell.cpp'],
+    deps = ['@/folly:string'],
+    external_deps = ['boost'],
+)
+
+cpp_library(
+    name = 'utils_lib',
+    headers = [
+        # Classes
+        'BackgroundThreads.h',
+        'BackgroundThreadMixin.h',  # DEPRECATED, do not use
+        'EnumHash.h',
+        'LogLines.h',
+        'LogWriter.h',
+        'PeriodicPoller.h',
+        'service_clients.h',
+        'server_socket.h',
+        'SettingsMap.h',
+        'ShuffledRange.h',
+        'SymbolTable.h',
+        'TemporaryFile.h',
+        # Collections of utility functions
+        'signal.h',
+        'Exception.h',
+    ],
+    srcs = [
+        'BackgroundThreads.cpp',
+        'LogWriter.cpp',
+        'service_clients.cpp',
+        'server_socket.cpp',
+        'SettingsMap.cpp',
+        'TemporaryFile.cpp',
+        'signal.cpp',
+        'Exception.cpp',
+    ],
+    deps = [
+        '@/folly:folly',
+        '@/folly/experimental:autotimer',
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/sqlite:sqlite_lib',
+        '@/bistro/bistro/utils:exception_lib',
+        '@/bistro/bistro/utils:hostname_lib',
+        '@/bistro/bistro/utils:shell_lib',
+    ],
+    external_deps = [('boost', None, 'boost_regex')],
+)

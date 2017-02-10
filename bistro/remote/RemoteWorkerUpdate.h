@@ -40,8 +40,10 @@ public:
     std::string, std::pair<cpp2::BistroWorker, std::vector<cpp2::RunningTask>>
   > UnsureIfRunningTaskMap;
 
-  RemoteWorkerUpdate() : curTime_(time(nullptr)) {}
-  RemoteWorkerUpdate(UnitTestTime, int64_t t) : curTime_(t) {}
+  RemoteWorkerUpdate()
+    : curTime_(time(nullptr)), initialWaitMessage_("unknown") {}
+  RemoteWorkerUpdate(UnitTestTime, int64_t t)
+    : curTime_(t), initialWaitMessage_("unknown") {}
 
   int64_t curTime() const { return curTime_; }
 
@@ -113,6 +115,11 @@ public:
     }
   }
 
+  const std::string& initialWaitMessage() const { return initialWaitMessage_; }
+  void setInitialWaitMessage(std::string m) {
+    initialWaitMessage_ = std::move(m);
+  }
+
 private:
   const int64_t curTime_;
 
@@ -133,6 +140,9 @@ private:
 
   // RemoteWorker wants us to ask the remote worker if these are running.
   UnsureIfRunningTaskMap unsureIfRunningTasks_;
+
+  // Empty once the scheduler exits initial wait.
+  std::string initialWaitMessage_;
 };
 
 }}

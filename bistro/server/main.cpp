@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -19,7 +19,8 @@
 #include "bistro/bistro/runners/BenchmarkRunner.h"
 #include "bistro/bistro/runners/LocalRunner.h"
 #include "bistro/bistro/runners/RemoteWorkerRunner.h"
-#include "bistro/bistro/server/HTTPMonitor.h"
+#include "bistro/bistro/scheduler/SchedulerPolicies.h"
+#include "bistro/bistro/server/HTTPMonitorServer.h"
 #include "bistro/bistro/server/ThriftMonitor.h"
 #include "bistro/bistro/statuses/SQLiteTaskStore.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
@@ -56,6 +57,8 @@ int main(int argc, char* argv[]) {
   FLAGS_logtostderr = 1;
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+
+  registerDefaultSchedulerPolicies();
 
   boost::filesystem::path config_file(FLAGS_config_file);
   auto config_loader = make_shared<FileConfigLoader>(
@@ -107,7 +110,7 @@ int main(int argc, char* argv[]) {
   bistro_thread.add(bind(&Bistro::scheduleOnceSystemTime, &bistro));
   SCOPE_EXIT { bistro_thread.stop(); };
 
-  HTTPMonitor http_monitor(
+  auto http_monitor = make_shared<HTTPMonitor>(
     config_loader,
     nodes_loader,
     task_statuses,
@@ -115,8 +118,10 @@ int main(int argc, char* argv[]) {
     monitor
   );
 
+  HTTPMonitorServer http_monitor_server(http_monitor);
+
   // Initialize the thrift monitor
-  auto handler = folly::make_unique<ThriftMonitor>(
+  auto handler = std::make_unique<ThriftMonitor>(
     config_loader,
     nodes_loader,
     task_statuses,

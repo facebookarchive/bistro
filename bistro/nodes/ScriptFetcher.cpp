@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,12 +9,15 @@
  */
 #include "bistro/bistro/nodes/ScriptFetcher.h"
 
+#include <iostream>
+
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/utils.h"
 #include <folly/Subprocess.h>
 #include <folly/gen/File.h>
+
 
 namespace facebook { namespace bistro {
 
@@ -37,7 +40,7 @@ void ScriptFetcher::fetch(
       },
       Subprocess::pipeStdout()
     );
-    gen::byLine(p.stdout()) | [&](StringPiece line) {
+    gen::byLine(p.stdoutFd()) | [&](StringPiece line) {
       all_nodes->add(
         line.str(),
         my_level_and_parents.first,

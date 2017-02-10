@@ -14,6 +14,7 @@
 #include <thread>
 
 #include "bistro/bistro/runners/TaskRunner.h"
+#include "bistro/bistro/statuses/TaskStatus.h"
 
 namespace facebook { namespace bistro {
 
@@ -26,14 +27,19 @@ class TaskStatus;
  * for debugging the scheduler if you don't actually want to run any jobs.
  */
 class NoOpRunner : boost::noncopyable, public TaskRunner {
+public:
+  explicit NoOpRunner(TaskStatus last_status = TaskStatus::done())
+    : lastStatus_(std::move(last_status)) {}
 protected:
- TaskRunnerResponse runTaskImpl(
-     const std::shared_ptr<const Job>& job,
-     const std::shared_ptr<const Node>& node,
-     cpp2::RunningTask& rt,
-     folly::dynamic& job_args,
-     std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)>
-         cb) noexcept override;
+  TaskRunnerResponse runTaskImpl(
+    const std::shared_ptr<const Job>& job,
+    const Node& node,
+    cpp2::RunningTask& rt,
+    folly::dynamic& job_args,
+    std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
+  ) noexcept override;
+private:
+  TaskStatus lastStatus_;
 };
 
 }}

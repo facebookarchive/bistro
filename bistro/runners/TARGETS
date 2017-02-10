@@ -1,0 +1,28 @@
+cpp_library(
+    name = 'runners_lib',
+    headers = [
+        'BenchmarkRunner.h',
+        'LocalRunner.h',
+        'NoOpRunner.h',
+        'RemoteWorkerRunner.h',
+        'TaskRunner.h',
+    ],
+    srcs = [
+        'BenchmarkRunner.cpp',
+        'LocalRunner.cpp',
+        'NoOpRunner.cpp',
+        'RemoteWorkerRunner.cpp',
+        'TaskRunner.cpp',
+    ],
+    deps = [
+        '@/bistro/bistro/config:config_lib',
+        '@/bistro/bistro/remote:remote_lib',
+        '@/bistro/bistro/nodes:nodes_lib',
+        '@/bistro/bistro/processes:processes',
+        '@/bistro/bistro/statuses:statuses_lib',
+        '@/bistro/bistro/utils:utils_lib',
+        '@/bistro/bistro/if:if-cpp2',
+        '@/bistro/bistro/if:worker_if-cpp2',
+    ],
+    external_deps = [('boost', None, 'boost_filesystem')],
+)

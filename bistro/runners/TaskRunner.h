@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,7 +9,6 @@
  */
 #pragma once
 
-#include "bistro/bistro/config/utils.h"
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/utils/LogLines.h"
 #include "bistro/bistro/scheduler/ResourceVector.h"
@@ -42,12 +41,9 @@ enum TaskRunnerResponse {
   DoNotRunMoreTasks,
 };
 
-typedef std::function<
-  TaskRunnerResponse(
-    const std::shared_ptr<const Job>&,
-    const std::shared_ptr<const Node>&
-  )
-> TaskRunnerCallback;
+using TaskRunnerCallback = std::function<
+  TaskRunnerResponse(const std::shared_ptr<const Job>&, const Node&)
+>;
 
 /**
  * Performs the action we take to actually 'run' the task.
@@ -89,8 +85,9 @@ public:
   TaskRunnerResponse runTask(
     const Config& config,
     const std::shared_ptr<const Job>& job,
-    const std::shared_ptr<const Node>& node,
+    const Node& node,
     const TaskStatus* prev_status,
+    // Must be thread-safe
     std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
   ) noexcept;
 
@@ -101,19 +98,17 @@ public:
     int64_t line_id,
     bool is_ascending,
     const std::string& regex_filter
-  ) {
+  ) const {
     return LogLines();
   }
 
   virtual bool canKill() { return false; }
 
   /**
-   * Blocking (many seconds!) call to kill a task. Throws if the kill fails.
+   * Kill a task -- blocks until the first signal is sent, does not wait for
+   * the kill to succeed.  Throws if the signal cannot be sent.
    */
-  virtual void killTask(
-      const std::string& job,
-      const std::string& node,
-      cpp2::KilledTaskStatusFilter status_filter) {
+  virtual void killTask(const cpp2::RunningTask&, const cpp2::KillRequest&) {
     throw std::runtime_error("Killing tasks is not supported");
   }
 
@@ -127,7 +122,9 @@ public:
    */
   virtual cpp2::SchedulerHeartbeatResponse processWorkerHeartbeat(
     const cpp2::BistroWorker&,
-    RemoteWorkerUpdate update = RemoteWorkerUpdate()
+    const cpp2::WorkerSetID&,
+    RemoteWorkerUpdate /* update */ = RemoteWorkerUpdate(),
+    std::function<void()> /* unit_test_cob */ = []() {}
   ) { throw std::logic_error("Not implemented"); }
 
   /**
@@ -147,7 +144,9 @@ public:
  protected:
 
   // Used by RemoteWorkerRunner to record worker resources
-  static void addNodeResourcesToRunningTask(
+  // Returns a pointer to the just-added RunningTask::nodeResources entry,
+  // or nullptr if no resources exist for this node.
+  static cpp2::NodeResources* addNodeResourcesToRunningTask(
     cpp2::RunningTask* out_rt,
     folly::dynamic* out_resources_by_node,
     const Config& config,
@@ -177,9 +176,10 @@ public:
    */
   virtual TaskRunnerResponse runTaskImpl(
     const std::shared_ptr<const Job>& job,
-    const std::shared_ptr<const Node>& node,
+    const Node& node,
     cpp2::RunningTask& rt,
     folly::dynamic& job_args,
+    // Must be thread-safe
     std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
   ) noexcept = 0;
 

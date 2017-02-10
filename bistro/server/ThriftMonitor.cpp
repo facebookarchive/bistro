@@ -84,8 +84,10 @@ void ThriftMonitor::updateStatus(
 
 void ThriftMonitor::processHeartbeat(
     cpp2::SchedulerHeartbeatResponse& out_response,
-    const cpp2::BistroWorker& worker) {
-  out_response = taskRunner_->processWorkerHeartbeat(worker);  // may throw
+    const cpp2::BistroWorker& worker,
+    const cpp2::WorkerSetID& worker_set_id) {
+  out_response =
+    taskRunner_->processWorkerHeartbeat(worker, worker_set_id);  // may throw
 }
 
 void ThriftMonitor::getJobs(vector<cpp2::BistroJobConfig>& out) {

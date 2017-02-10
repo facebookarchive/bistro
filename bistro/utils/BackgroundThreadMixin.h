@@ -28,7 +28,7 @@ namespace facebook { namespace bistro {
  * work. The most common pattern looks like this:
  * struct MyClass : BackgroundThreadMixin {
  *   MyClass() {
- *     runInTimedBackgroundLoop(bind(&MyClass::foo, this));
+ *     runInBackgroundLoop(bind(&MyClass::foo, this));
  *   }
  *   ~MyClass() {
  *     stopBackgroundThreads();

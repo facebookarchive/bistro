@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2016, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -18,9 +18,9 @@ using namespace std;
 using namespace folly;
 
 JobBackoffSettings::JobBackoffSettings()
-  : JobBackoffSettings({
+  : JobBackoffSettings(dynamic::array(
       15, 30, 60, 300, 900, 3600, 7200, 21600, 86400, "repeat"
-    }) {}
+    )) {}
 
 JobBackoffSettings::JobBackoffSettings(const dynamic& d) : repeat_(false) {
   if (!d.isArray()) {
@@ -87,6 +87,8 @@ dynamic JobBackoffSettings::toDynamic() const {
   dynamic d(values_.begin(), values_.end());
   if (repeat_) {
     d.push_back("repeat");
+  } else {
+    d.push_back("fail");  // ["fail"] should produce ["fail"], not ""
   }
   return d;
 }

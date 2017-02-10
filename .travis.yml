@@ -1,3 +1,6 @@
+# Facebook projects that use `fbcode_builder` for continuous integration
+# share this Travis configuration to run builds via Docker.
+
 sudo: required
 
 # Ugh, `services:` must be in the matrix, or we get `docker: command not found`
@@ -18,4 +21,4 @@ script:
   - sudo apt-get install python2.7
   # We don't want to write the script inline because of Travis kludginess --
   # it looks like it escapes " and \ in scripts when using `matrix:`.
-  - ./bistro/build/ci/travis_docker_build.sh
+  - ./build/travis_docker_build.sh

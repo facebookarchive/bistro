@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -83,7 +83,7 @@ void Database::exec(const string& sql) {
 }
 
 shared_ptr<Statement> Database::prepare(const string& sql) {
-  return unique_ptr<Statement>(new Statement(shared_from_this(), sql));
+  return shared_ptr<Statement>(new Statement(shared_from_this(), sql));
 }
 
 }}}

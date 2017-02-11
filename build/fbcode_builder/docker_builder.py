@@ -44,9 +44,9 @@ class DockerFBCodeBuilder(FBCodeBuilder):
                 # Docker can't deal with quotes. Oh well.
                 img=ShellQuoted(self.option('os_image')),
             ),
-            ShellQuoted('ENV CFLAGS=-O2'),
-            ShellQuoted('ENV CXXFLAGS=-O2'),
-            ShellQuoted('ENV CPPFLAGS=-O2'),
+            ShellQuoted('ENV CFLAGS=-O'),
+            ShellQuoted('ENV CXXFLAGS=-O'),
+            ShellQuoted('ENV CPPFLAGS=-O'),
             # /bin/sh syntax is a pain
             ShellQuoted('SHELL ["/bin/bash", "-c"]'),
         ] + self.install_debian_deps() + [self._change_user()])

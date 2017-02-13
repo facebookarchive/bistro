@@ -14,10 +14,10 @@
 namespace facebook { namespace bistro {
 
 JobWithNodes::JobWithNodes(
-    const JobPtr& job,
-    const std::unordered_map<int, NodeGroupResources>& nodeGroupToResources)
-    : job_(job),
-      nodeGroupToResources_(nodeGroupToResources) {}
+    JobPtr job,
+    std::unordered_map<int, NodeGroupResources> nodeGroupToResources)
+    : job_(std::move(job)),
+      nodeGroupToResources_(std::move(nodeGroupToResources)){}
 
 JobWithNodes::JobWithNodes(
     const Config& cfg,

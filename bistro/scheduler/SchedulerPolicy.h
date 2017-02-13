@@ -48,9 +48,12 @@ public:
    */
   JobWithNodes(const Config&, JobPtr, NodeGroupToPackedResources*);
 
-  JobWithNodes(
-    const JobPtr&,
-    const std::unordered_map<int, NodeGroupResources>&);
+  /**
+  * This constructor is unused in mainline Bistro. A service, which uses Bistro
+  * as a library (db_migrations) relies on it to populate
+  * `nodeGroupToResources_` in a custom way.
+  */
+  JobWithNodes(JobPtr, std::unordered_map<int, NodeGroupResources>);
 
   JobWithNodes(JobWithNodes&&) = default;
   JobWithNodes& operator=(JobWithNodes&&) = default;

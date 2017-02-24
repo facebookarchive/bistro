@@ -8,15 +8,15 @@
       group     : "{{ group.title }}",
       items     : [
         {% for item in group.items %}
-        {% for docitem in site.docs %}
-          {% if docitem.id == item.id %}
+        {% for docitem in site.documents %}
+          {% if docitem.docid == item.id %}
             {% assign doc = docitem %}
           {% endif %}
         {% endfor %}
         {
-          key : "{{ site.baseurl }}{{ doc.url }}",
+          key : "{{ doc.url | relative_url }}",
           title : "{{ doc.title }}",
-          url : "{{ site.baseurl }}{{ doc.url }}",
+          url : "{{ doc.url | relative_url }}",
         }{% unless forloop.last %},{% endunless %}
         {% endfor %}
       ],
@@ -24,7 +24,7 @@
     {% endfor %}
   ];
 </script>
-<script type="text/javascript">  
+<script type="text/javascript">
   var DocNav = React.createClass({displayName: "DocNav",
     getInitialState: function() {
       return {
@@ -53,10 +53,10 @@
         'toggleNavActive': this.state.toggleActive,
       });
       return (
-        React.createElement("div", {className: navClasses}, 
-          React.createElement("section", null, 
+        React.createElement("div", {className: navClasses},
+          React.createElement("section", null,
             this.props.data.map(this.renderNavGroups)
-          ), 
+          ),
           React.createElement("div", {className: classes, onClick: this.handleSlide}, React.createElement("i", {className: "fa fa-chevron-circle-down"}))
         )
       );
@@ -67,9 +67,9 @@
         'navGroupActive': this.props.currentGroup === child.group,
       });
       return (
-        React.createElement("div", {className: classes, key: index}, 
-          React.createElement("h3", null, child.group), 
-          React.createElement("ul", null, 
+        React.createElement("div", {className: classes, key: index},
+          React.createElement("h3", null, child.group),
+          React.createElement("ul", null,
             child.items.map(this.renderNavItems)
           )
         )
@@ -96,5 +96,6 @@
       document.getElementById('doc_nav')
     );
   }
+  console.log(docnavData);
   docNavRender(docnavData);
 </script>

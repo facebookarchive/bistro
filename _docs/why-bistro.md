@@ -1,5 +1,5 @@
 ---
-id: why-bistro
+docid: why-bistro
 title: Why use Bistro?
 layout: docs
 permalink: /docs/why-bistro/

@@ -1,5 +1,5 @@
 ---
-id: getting-started
+docid: getting-started
 title: Getting started
 layout: docs
 permalink: /docs/getting-started/
@@ -34,7 +34,7 @@ to:
 
 Although this is just a toy example, we can learn a lot from it:
 
-* The scheduler uses two fixed ports: 
+* The scheduler uses two fixed ports:
   * `--server_port` provides a Thrift interface used by the workers.
   * `--http_server_port` provides an HTTP REST API, used for monitoring and
     control.
@@ -63,7 +63,7 @@ Although this is just a toy example, we can learn a lot from it:
     to differ from the hostname.  We could equally well have renamed the
     worker's node via `--shard_id=worker`.
 * The worker's configuration is simpler:
-  * `--scheduler_host` (IPv6 is evidently ok) and `--scheduler_port` 
+  * `--scheduler_host` (IPv6 is evidently ok) and `--scheduler_port`
     identify the scheduler instance, and the worker registers itself.
   * `--worker_command` is invoked for every new task, although Bistro's
     [task execution is also
@@ -126,14 +126,14 @@ A `node` is a unique string, which is Bistro's way of making tasks and
 tracking resources.  To make a task, you need:
 
   * a job
-  * a logical node, which identifies the unique shard being worked on -- see 
+  * a logical node, which identifies the unique shard being worked on -- see
     `argv[1]` above
   * some number of resource nodes, which serve to enforce resource constraints
 
 Each node belongs to one `level`. The scheduler's sole instance node belongs
 to the special `instance` level.  The workers' nodes belong to the special
 `worker` level.  Any other number of levels can be created, modeling data
-resources.  Non-`worker` levels are ordered, starting with `instance`. 
+resources.  Non-`worker` levels are ordered, starting with `instance`.
 Nodes have parents, with the parent always belonging to the immediately
 preceding level.
 
@@ -195,7 +195,7 @@ job becomes disabled, or their node is deleted (see `nodes_update_ms` in the
 code).
 
 ### Your choices will differ
-   
+
 You can see that the demo made a lot of implementation choices, but they are
 not set in stone.  Configuration and plugins let you:
 

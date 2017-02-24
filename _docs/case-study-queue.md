@@ -16,7 +16,7 @@ and executes them on the appropriate hardware.
 There are numerous task queue implementations, both open-source and
 proprietary.  Some well-known ones include [Open Grid
 Scheduler](http://gridscheduler.sourceforge.net/) and
-[Slurm](slurm.schedmd.com) --- Wikipedia has a more exhaustive [list](
+[Slurm](https://slurm.schedmd.com/) --- Wikipedia has a more exhaustive [list](
 https://en.wikipedia.org/wiki/Comparison_of_cluster_software).
 
 ### What does Bistro offer?

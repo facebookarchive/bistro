@@ -1,5 +1,5 @@
 ---
-id: getting-started
+docid: getting-started
 title: Getting started
 layout: docs
 permalink: /docs/getting-started/
@@ -20,21 +20,22 @@ to:
 * Make a `demo_bistro_task.sh`, which Bistro will run for you.
 * Start a scheduler:
 
-  ~~~ sh
+```sh
   bistro_scheduler --server_port=6789 --http_server_port=6790 \
     --config_file=scripts/test_configs/simple --clean_statuses \
     --CAUTION_startup_wait_for_workers=1 --instance_node_name=scheduler
-  ~~~
+```
+
 * Start a worker, to be commanded by the scheduler:
 
-  ~~~ sh
+```sh
   bistro_worker --scheduler_host=:: --scheduler_port=6789 \
     --worker_command="$HOME/demo_bistro_task.sh" --data_dir=/tmp/bistro_worker
-  ~~~
+```
 
 Although this is just a toy example, we can learn a lot from it:
 
-* The scheduler uses two fixed ports: 
+* The scheduler uses two fixed ports:
   * `--server_port` provides a Thrift interface used by the workers.
   * `--http_server_port` provides an HTTP REST API, used for monitoring and
     control.
@@ -63,7 +64,7 @@ Although this is just a toy example, we can learn a lot from it:
     to differ from the hostname.  We could equally well have renamed the
     worker's node via `--shard_id=worker`.
 * The worker's configuration is simpler:
-  * `--scheduler_host` (IPv6 is evidently ok) and `--scheduler_port` 
+  * `--scheduler_host` (IPv6 is evidently ok) and `--scheduler_port`
     identify the scheduler instance, and the worker registers itself.
   * `--worker_command` is invoked for every new task, although Bistro's
     [task execution is also
@@ -87,13 +88,13 @@ Although this is just a toy example, we can learn a lot from it:
     and assumes an error if you did not write exactly one status line.
   * `argv[3]`: JSON of the form:
 
-    ~~~ json
+    ```json
     {
       "config": {...passed through from your job's config...},
       "prev_status": {... the job's previous status on this node ...},
       ... other, more advanced metadata, like nodes & resources ...
     }
-    ~~~
+    ```
 
     `"config"` lets you change your tasks' configuration on the fly ---
     since job configuration is polled frequently, new tasks are always
@@ -109,31 +110,30 @@ file](https://github.com/facebook/bistro/blob/master/bistro/scripts/test_configs
 line by line.  We start with the `"nodes"` in the `"bistro_settings"`
 section --- this is the part that configures the scheduler.
 
-~~~ json
-{
-  "bistro_settings" : {
-    "nodes" : {
-      "levels": [ "level1", "level2"],
-      "node_source": "manual",
-      "node_source_prefs": {
-        "node1": ["node11", "node12"],
-        "node2": ["node21", "node22"]
-      }
-    },
-~~~
+
+    {
+      "bistro_settings" : {
+        "nodes" : {
+          "levels": [ "level1", "level2"],
+          "node_source": "manual",
+          "node_source_prefs": {
+            "node1": ["node11", "node12"],
+            "node2": ["node21", "node22"]
+          }
+        },
 
 A `node` is a unique string, which is Bistro's way of making tasks and
 tracking resources.  To make a task, you need:
 
   * a job
-  * a logical node, which identifies the unique shard being worked on -- see 
+  * a logical node, which identifies the unique shard being worked on -- see
     `argv[1]` above
   * some number of resource nodes, which serve to enforce resource constraints
 
 Each node belongs to one `level`. The scheduler's sole instance node belongs
 to the special `instance` level.  The workers' nodes belong to the special
 `worker` level.  Any other number of levels can be created, modeling data
-resources.  Non-`worker` levels are ordered, starting with `instance`. 
+resources.  Non-`worker` levels are ordered, starting with `instance`.
 Nodes have parents, with the parent always belonging to the immediately
 preceding level.
 
@@ -152,11 +152,11 @@ When Bistro makes tasks for a job, it takes all the nodes from its
 node's parents, all the way up to the `instance`.  The tasks's nodes
 must have enough `"resources"` for it to run:
 
-~~~ json
-    "resources": {
-      "instance": {"concurrency": {"limit": 3, "default": 1}}
-    },
-~~~
+```json
+  "resources": {
+    "instance": {"concurrency": {"limit": 3, "default": 1}}
+  },
+```
 
 The `"resources"` entry in `"bistro_settings"` says:
 
@@ -167,10 +167,11 @@ The `"resources"` entry in `"bistro_settings"` says:
 In other words, this Bistro scheduler will not run more than 3 tasks, unless
 some jobs use 0 `"concurrency"` slots.
 
-~~~ json
-    "enabled" : true
-  },
-~~~
+```json
+  "enabled" : true
+},
+```
+
 
 The scheduler will not start any new tasks unless `"bistro_settings"` sets
 `"enabled"` to `true`.
@@ -180,13 +181,13 @@ distinguishes jobs via the `bistro_job->` prefix, so this deployment has
 just one job named `simple_job`.  The required parameter `"owner"` is
 typically the name or UNIX username of the person responsible for the job.
 
-~~~ json
+```json
   "bistro_job->simple_job" : {
     "owner" : "test",
     "enabled" : true
   }
 }
-~~~
+```
 
 A job will not start any tasks unless it is `"enabled"`.  Moreover, the
 `"kill_orphan_tasks_after_sec"` option (in `"bistro_settings"` or per-job)
@@ -195,7 +196,7 @@ job becomes disabled, or their node is deleted (see `nodes_update_ms` in the
 code).
 
 ### Your choices will differ
-   
+
 You can see that the demo made a lot of implementation choices, but they are
 not set in stone.  Configuration and plugins let you:
 

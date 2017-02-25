@@ -9,10 +9,11 @@ baseurl: /bistro
 url: https://facebook.github.io
 ghrepo: "facebook/bistro"
 
-# Build settings
-markdown: kramdown  # redcarpet segfaults like crazy :'(
-highlighter: pygments
-
+# Blog posts are built into Jekyll by default, with the `_posts` directory.
+# Here you can specify other types of documentation. The names here are `docs`
+# and `support`. This means their content will be in `_docs` and `_support`.
+# The permalink format is also given.
+# http://ben.balter.com/2015/02/20/jekyll-collections/
 collections:
   docs:
     output: true
@@ -21,12 +22,29 @@ collections:
     output: true
     permalink: /support/
 
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+  syntax_highlighter_opts:
+    css_class: 'rougeHighlight'
+    span:
+      line_numbers: false
+    block:
+      line_numbers: true
+      start_line: 1
+
 sass:
   style: :compressed
 
-# Currently unused, since we are on kramdown
 redcarpet:
-  extensions: [with_toc_data, smart]
+  extensions: [with_toc_data]
+
+gems:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
 
 color:
   # Provides colour for background of top header of homepage

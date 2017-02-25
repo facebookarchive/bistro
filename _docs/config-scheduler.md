@@ -1,5 +1,5 @@
 ---
-id: config-scheduler
+docid: config-scheduler
 title: Configuring the scheduler
 layout: docs
 permalink: /docs/config-scheduler/

@@ -1,5 +1,5 @@
 ---
-id: case-study-db
+docid: case-study-db
 title: Sharded database
 layout: docs
 permalink: /docs/case-study-db/

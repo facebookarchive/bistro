@@ -1,5 +1,5 @@
 ---
-id: best-practices
+docid: best-practices
 title: Best practices
 layout: docs
 permalink: /docs/best-practices/

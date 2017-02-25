@@ -1,5 +1,5 @@
 ---
-id: case-study-queue
+docid: case-study-queue
 title: Task queue
 layout: docs
 permalink: /docs/case-study-queue/
@@ -8,7 +8,7 @@ permalink: /docs/case-study-queue/
 ### What's a task queue, anyway?
 
 The traditional task queue is a service, which accepts tasks --- pieces of
-work to be executed, together with the computational resources they demand. 
+work to be executed, together with the computational resources they demand.
 It schedules the jobs according to one of a myriad of heuristics, like
 [fair-share scheduling](https://en.wikipedia.org/wiki/Fair-share_scheduling)
 and executes them on the appropriate hardware.
@@ -27,7 +27,7 @@ of many related tasks) with constraints on both *computational resources*
 either unique, or have limited replication).
 
 A traditional task queue is a simple reduction of the above problem:
- 
+
  * Each job consists of just 1 task.
  * Computational resources are treated normally.
  * There are no data resources.
@@ -51,7 +51,7 @@ When does this make sense? Any of the below options might be good reasons.
 
 One caveat is that Bistro's current public release only supports loading job
 configurations [from a
-file](https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h). 
+file](https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h).
 Our high-performance MySQL-based `ConfigLoader` has too many unreleased
 dependencies to make it into the initial release.  However, we would be glad
 to guide you in implementing a high-performance, read-write `ConfigLoader`

@@ -1,5 +1,5 @@
 ---
-id: config-source
+docid: config-source
 title: Configuration source
 layout: docs
 permalink: /docs/config-source/

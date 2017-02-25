@@ -39,7 +39,8 @@ Luckily, Bistro can adapt to your needs in three different ways.
 
 **1. Configuration**: most aspects of a Bistro deployment can be tuned:
 
-{::comment} XXX Linkify these headings once written -- 
+{::comment}
+XXX Linkify these headings once written -- 
  * [Configuration](docs/config-source/):
  * [Persistence](docs/persistence/):
  * [Code execution](docs/execution/):

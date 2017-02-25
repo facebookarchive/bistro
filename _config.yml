@@ -41,7 +41,6 @@ sass:
 redcarpet:
   extensions: [with_toc_data]
 
-# Gems
 gems:
   - jekyll-feed
   - jekyll-seo-tag

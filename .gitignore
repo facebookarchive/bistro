@@ -7,3 +7,4 @@ _site
 *.psd
 *~
 .jekyll-metadata
+*.pyc

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -26,7 +26,8 @@
 #include "bistro/bistro/statuses/TaskStatuses.h"
 #include "bistro/bistro/utils/BackgroundThreads.h"
 
-DEFINE_int32(server_port, 13131, "Server port");
+DECLARE_int32(server_port); // from server_socket.cpp
+
 DEFINE_string(config_file, "", "File to use for resource and job config");
 DEFINE_int32(config_update_ms, 10000, "How often to re-read the config");
 DEFINE_int32(nodes_update_ms, 300000, "How often to re-read the nodes");

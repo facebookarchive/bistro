@@ -56,7 +56,7 @@ using namespace facebook::bistro;
 
 int main(int argc, char* argv[]) {
   FLAGS_logtostderr = 1;
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
   registerDefaultSchedulerPolicies();

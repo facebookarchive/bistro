@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -114,7 +114,7 @@ BENCHMARK(MakeSpan) {
 
 int main(int argc, char** argv) {
   FLAGS_log_status_changes_every_ms = 1000000;
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   runBenchmarks();
   return 0;

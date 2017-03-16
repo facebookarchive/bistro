@@ -550,8 +550,7 @@ void TaskSubprocessState::asyncSubprocessCallback(
         }
         // Pick the earlier kill time of the two -- only one SIGKILL will fire.
         {
-          uint32_t ticks =
-            std::max(0U, kill_req.killWaitMs / pollMs(opts_));
+          uint32_t ticks = std::max(kill_req.killWaitMs, 0) / pollMs(opts_);
           killAfterTicks_ =
             (killAfterTicks_ == 0) ? ticks : std::min(ticks, killAfterTicks_);
         }

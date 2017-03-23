@@ -18,7 +18,7 @@ TEST(TestNode, HandleNoParents) {
   Node n("foo", 1, true);
   EXPECT_EQ("foo", n.name());
   EXPECT_EQ(1, n.level());
-  EXPECT_EQ(true, n.enabled());
+  EXPECT_TRUE(n.enabled());
   EXPECT_EQ(Node::ID(0), n.id());
 
   vector<const Node*> nodes;

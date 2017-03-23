@@ -101,7 +101,7 @@ TEST(TestThriftConversion, HandleJob) {
 
   auto d = toDynamic(c);
   ASSERT_EQ(dynamic("job1"), d["name"]);
-  ASSERT_EQ(true, d["enabled"].asBool());
+  ASSERT_TRUE(d["enabled"].asBool());
   ASSERT_EQ(dynamic("owner"), d["owner"]);
   ASSERT_EQ(2.0, d["priority"].asDouble());
   ASSERT_EQ(7, d["resources"]["foo_resource"].asInt());

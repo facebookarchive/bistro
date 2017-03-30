@@ -8,6 +8,7 @@
  *
  */
 #include <folly/Memory.h>
+#include <folly/init/Init.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <memory>
@@ -47,8 +48,7 @@ using namespace facebook::bistro;
 
 int main(int argc, char* argv[]) {
   FLAGS_logtostderr = 1;
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+  folly::init(&argc, &argv);
 
   cpp2::ServiceAddress scheduler_addr;
   // DO: It would be faster & more robust to pre-resolve the hostname here.

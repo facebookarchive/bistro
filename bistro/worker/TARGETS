@@ -18,5 +18,8 @@ cpp_library(
 cpp_binary(
     name = 'bistro_worker',
     srcs = ['main.cpp'],
-    deps = [':bistro_worker_lib'],
+    deps = [
+        ':bistro_worker_lib',
+        '@/folly/init:init',
+    ],
 )

@@ -13,6 +13,7 @@
 #include <folly/Synchronized.h>
 #include <queue>
 #include <chrono>
+#include <random>
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/runners/TaskRunner.h"

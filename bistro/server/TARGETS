@@ -36,6 +36,7 @@ cpp_binary(
         '@/bistro/bistro/nodes:nodes_lib',
         '@/bistro/bistro/statuses:statuses_lib',
         '@/bistro/bistro/runners:runners_lib',
+        '@/folly/init:init',
         '@/thrift/lib/cpp2:server',
     ],
 )

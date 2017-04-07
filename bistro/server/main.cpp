@@ -8,6 +8,7 @@
  *
  */
 #include <glog/logging.h>
+#include <folly/init/Init.h>
 #include <folly/ScopeGuard.h>
 #include <thrift/lib/cpp2/server/ThriftServer.h>
 
@@ -56,8 +57,7 @@ using namespace facebook::bistro;
 
 int main(int argc, char* argv[]) {
   FLAGS_logtostderr = 1;
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+  folly::init(&argc, &argv);
 
   registerDefaultSchedulerPolicies();
 

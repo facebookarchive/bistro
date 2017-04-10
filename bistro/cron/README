@@ -262,8 +262,8 @@ For example, both of these compute "Sun Nov 1 01:59:59 EDT 1992" followed by
 
   export TZ="EST+5EDT+4,M3.2.0,M11.1.0"; date -d@720597599; date -d@720597600
 
-  #include "boost/date_time/local_time/local_time.hpp"
-  #include "boost/date_time/posix_time/posix_time.hpp"
+  #include <boost/date_time/local_time/local_time.hpp>
+  #include <boost/date_time/posix_time/posix_time.hpp>
   int main(int argc, char **argv) {
     for (time_t t : {720597599, 720597600}) {
       std::cout << boost::local_time::local_date_time(

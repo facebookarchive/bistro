@@ -388,7 +388,7 @@ void TaskSubprocessQueue::runTask(
         ("command", folly::dynamic(full_cmd.begin(), full_cmd.end()))
       );
 
-      auto opts = folly::Subprocess::pipeStdout().pipeStderr()
+      auto opts = folly::Subprocess::Options().pipeStdout().pipeStderr()
         .chdir(working_dir.native())
         .fd(childStatusPipePlaceholder_.fd(), folly::Subprocess::PIPE_OUT);
       if (state->opts().useCanaryPipe) {

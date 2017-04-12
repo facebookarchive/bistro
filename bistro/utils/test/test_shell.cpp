@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -19,7 +19,7 @@ void check(const std::vector<std::string>& args) {
   for (size_t i = 0; i < args.size(); ++i) {
     folly::Subprocess p({"/bin/sh", "-c", folly::to<std::string>(
       "/bin/sh -c 'echo -n $", i, "' ", escapeShellArgsInsecure(args)
-    )}, folly::Subprocess::pipeStdout());
+    )}, folly::Subprocess::Options().pipeStdout());
     EXPECT_EQ(args[i], p.communicate().first);
     p.wait();
   }

@@ -14,8 +14,8 @@ include "bistro/bistro/if/bits.thrift"
 namespace cpp facebook.bistro
 namespace py facebook.bistro.scheduler
 
-cpp_include "unordered_map"
-cpp_include "unordered_set"
+cpp_include "<unordered_map>"
+cpp_include "<unordered_set>"
 
 typedef map<string, i32> (cpp.template = "std::unordered_map") stringToIntMap
 typedef set<string> (cpp.template = "std::unordered_set") stringSet

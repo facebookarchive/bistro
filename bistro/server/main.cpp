@@ -8,6 +8,7 @@
  *
  */
 #include <glog/logging.h>
+#include <folly/experimental/ThreadedRepeatingFunctionRunner.h>
 #include <folly/init/Init.h>
 #include <folly/ScopeGuard.h>
 #include <thrift/lib/cpp2/server/ThriftServer.h>
@@ -25,7 +26,6 @@
 #include "bistro/bistro/server/ThriftMonitor.h"
 #include "bistro/bistro/statuses/SQLiteTaskStore.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
-#include "bistro/bistro/utils/BackgroundThreads.h"
 
 DECLARE_int32(server_port); // from server_socket.cpp
 
@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
     task_runner,
     monitor
   );
-  BackgroundThreads bistro_thread;
+  folly::ThreadedRepeatingFunctionRunner bistro_thread;
   bistro_thread.add(bind(&Bistro::scheduleOnceSystemTime, &bistro));
   SCOPE_EXIT { bistro_thread.stop(); };
 

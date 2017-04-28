@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -14,15 +14,14 @@
 #include <thread>
 #include <vector>
 
-#include "bistro/bistro/utils/BackgroundThreads.h"
+#include "folly/experimental/ThreadedRepeatingFunctionRunner.h"
 
 namespace facebook { namespace bistro {
 
 /**
- * DEPRECATED -- instead, include BackgroundThreads by composition.  Also,
- * be careful not to pass "this" to the thread from your constructor.
- *
- * DO: Replace more of the uses of the mixin with BackgroundThreads members.
+ * DEPRECATED -- instead, include ThreadedRepeatingFunctionRunner by
+ * composition.  Also, be careful not to pass "this" to the thread from your
+ * constructor.
  *
  * A mixin that supports having one or more 'background' threads to do some
  * work. The most common pattern looks like this:
@@ -56,7 +55,7 @@ protected:
   }
 
 private:
-  BackgroundThreads threads_;
+  folly::ThreadedRepeatingFunctionRunner threads_;
 };
 
 }}

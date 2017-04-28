@@ -32,8 +32,6 @@ struct TestRemoteRunner : public ::testing::Test {
   TestRemoteRunner() {
     // Don't block starting tasks due to 'initial wait'.
     FLAGS_CAUTION_startup_wait_for_workers = 0;
-    // Make BackgroundThreads exit a lot faster.
-    FLAGS_incremental_sleep_ms = 10;
     // Minimize delay between RemoteWorkerRunner's updateState calls.
     FLAGS_worker_check_interval = 1;
     // These tests are heavily threaded, and death tests don't work otherwise.

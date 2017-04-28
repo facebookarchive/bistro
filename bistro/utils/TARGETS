@@ -24,7 +24,6 @@ cpp_library(
     name = 'utils_lib',
     headers = [
         # Classes
-        'BackgroundThreads.h',
         'BackgroundThreadMixin.h',  # DEPRECATED, do not use
         'EnumHash.h',
         'LogLines.h',
@@ -41,7 +40,6 @@ cpp_library(
         'Exception.h',
     ],
     srcs = [
-        'BackgroundThreads.cpp',
         'LogWriter.cpp',
         'service_clients.cpp',
         'server_socket.cpp',
@@ -53,6 +51,7 @@ cpp_library(
     deps = [
         '@/folly:folly',
         '@/folly/experimental:autotimer',
+        '@/folly/experimental:threaded_repeating_function_runner',
         '@/bistro/bistro/if:if-cpp2',
         '@/bistro/bistro/sqlite:sqlite_lib',
         '@/bistro/bistro/utils:exception_lib',

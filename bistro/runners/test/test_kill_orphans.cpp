@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -37,7 +37,6 @@ TEST(TestKillDisabled, KillJobOrphans) {
 
   FLAGS_log_performance = true;  // Shows orphan calculations.
   FLAGS_instance_node_name = "instance";
-  FLAGS_incremental_sleep_ms = 10;  // Threads exit quickly
 
   dynamic c = dynamic::object
     ("nodes", dynamic::object("levels", dynamic::array()))

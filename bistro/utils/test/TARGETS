@@ -17,12 +17,6 @@ cpp_unittest(
 )
 
 cpp_unittest(
-    name = 'test_background_thread',
-    srcs = ['test_background_thread.cpp'],
-    deps = ['@/bistro/bistro/utils:utils_lib'],
-)
-
-cpp_unittest(
     name = 'test_log_writer',
     srcs = ['test_log_writer.cpp'],
     deps = ['@/bistro/bistro/utils:utils_lib'],

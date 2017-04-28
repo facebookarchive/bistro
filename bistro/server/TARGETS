@@ -37,6 +37,7 @@ cpp_binary(
         '@/bistro/bistro/statuses:statuses_lib',
         '@/bistro/bistro/runners:runners_lib',
         '@/folly/init:init',
+        '@/folly/experimental:threaded_repeating_function_runner',
         '@/thrift/lib/cpp2:server',
     ],
 )

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -59,8 +59,6 @@ struct TestWorker : public ::testing::Test {
   TestWorker() {
     // Faster heartbeat arrival => tests finish faster
     FLAGS_heartbeat_period_sec = 0;
-    // Make BackgroundThreads exit a lot faster.
-    FLAGS_incremental_sleep_ms = 10;
     // Speed up HandleSuicide
     FLAGS_CAUTION_worker_suicide_task_kill_wait_ms = 1000;
   }
@@ -195,8 +193,6 @@ struct TestSuicide : public TestWorker {
   ) {
     // Faster heartbeat arrival => tests finish faster
     FLAGS_heartbeat_period_sec = 0;
-    // Make BackgroundThreads exit a lot faster.
-    FLAGS_incremental_sleep_ms = 10;
     // Speed up HandleSuicide
     FLAGS_CAUTION_worker_suicide_task_kill_wait_ms = 1000;
   }

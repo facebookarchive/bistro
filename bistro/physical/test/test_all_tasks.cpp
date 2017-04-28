@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -20,7 +20,6 @@ using namespace facebook::bistro;
 
 TEST(AllTasksPhysicalResourceMonitor, FetchAllAndExtractTasks) {
   folly::test::ChangeToTempDir td;
-  FLAGS_incremental_sleep_ms = 10;  // Speed up BackgroundThreads exit.
   const uint32_t kTimeoutMs = 5000;  // Minimize flaky tests.
   const std::chrono::milliseconds kPeriod(1000);  // Don't run twice.
 

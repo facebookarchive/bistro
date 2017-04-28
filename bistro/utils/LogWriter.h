@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -58,7 +58,8 @@ public:
   }
 };
 
-// You must NOT inherit from this, since it contains a BackgroundThreads.
+// You must NOT inherit from this, since it contains a
+// ThreadedRepeatingFunctionRunner.
 class LogWriter final : public BaseLogWriter {
 public:
   explicit LogWriter(const boost::filesystem::path& db_file);
@@ -98,7 +99,8 @@ private:
 
   std::atomic<uint32_t> counter_;
 
-  BackgroundThreads threads_;  // Declared last as per BackgroundThreads doc.
+  // Declared last since the threads' callbacks access other members.
+  folly::ThreadedRepeatingFunctionRunner threads_;
 };
 
 }}

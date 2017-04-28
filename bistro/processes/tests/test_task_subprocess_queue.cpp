@@ -76,11 +76,7 @@ struct TestLogWriter : public BaseLogWriter {
 
   explicit TestLogWriter(
     folly::Synchronized<TaskLogMap>* tlm = nullptr, bool print_logs = true
-  ) : taskToLogs_(tlm), printLogs_(print_logs) {
-    // This test relies on timing, so the resource background thread had
-    // better not block.
-    FLAGS_incremental_sleep_ms = 5;
-  }
+  ) : taskToLogs_(tlm), printLogs_(print_logs) {}
 
   void write(
     LogTable table,

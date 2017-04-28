@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -19,7 +19,7 @@
 #include <string>
 #include <thread>
 
-#include "bistro/bistro/utils/BackgroundThreads.h"
+#include "folly/experimental/ThreadedRepeatingFunctionRunner.h"
 
 namespace facebook { namespace bistro {
 
@@ -36,12 +36,12 @@ namespace facebook { namespace bistro {
  *  - It polls on construction, so you can immediately get a valid value.
  *
  *  - It is hard to correctly use threads that are bound to class lifetimes
- *    (see the docblock of BackgroundThreads). This class makes it safe by
- *    handling state & thread lifetimes correctly, and providing just one
- *    thread-safe accessor: getDataOrThrow().  You can still break it by
- *    providing a fetch_raw_data that captures 'this', or members of your
- *    class that aren't fully initialized, but it's harder to accidentally
- *    shoot yourself in the foot.
+ *    (see the docblock of ThreadedRepeatingFunctionRunner).  This class
+ *    makes it safe by handling state & thread lifetimes correctly, and
+ *    providing just one thread-safe accessor: getDataOrThrow().  You can
+ *    still break it by providing a fetch_raw_data that captures 'this', or
+ *    members of your class that aren't fully initialized, but it's harder
+ *    to accidentally shoot yourself in the foot.
  *
  *  - Most pollers fetch from an external data source (which may fail
  *    transiently), and then perform side-effect-free parsing (which will
@@ -128,8 +128,9 @@ public:
 
     // Make the first call to getDataOrThrow return real data.
     auto initial_period = refresh();
-    // Though the BackgroundThreads docs urge double-initialization, it is
-    // safe to make this thread in the constructor, since:
+    // Though the ThreadedRepeatingFunctionRunner docs urge
+    // double-initialization, it is safe to make this thread in the
+    // constructor, since:
     //  - this is the last action in the constructor
     //  - this class is guaranteed not to have derived classes
     //  - the threads_ object is declared last, and hence is destroyed first
@@ -217,8 +218,8 @@ private:
   // Uninitialized until the first call to getDataOrThrow
   folly::Synchronized<Result> result_;
 
-  // Should be last in the class, see BackgroundThreads for the reason.
-  BackgroundThreads threads_;
+  // Declared last since the thread's callback may access other members.
+  folly::ThreadedRepeatingFunctionRunner threads_;
 };
 
 }}

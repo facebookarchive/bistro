@@ -17,7 +17,7 @@ def query_bistro(args, req):
                       timeout=60)
     response = json.loads(r.text)
     assert 'error' not in response, response['error']
-    for k in req.iterkeys():
+    for k in req.keys():
         assert 'error' not in response[k], \
             '{}: {}'.format(k, response[k]['error'])
     return response

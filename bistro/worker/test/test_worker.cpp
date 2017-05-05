@@ -103,7 +103,7 @@ TEST_F(TestWorker, HandleNormal) {
   // 1) faster unit test
   // 1) no error msg for inconsistent running tasks between worker and scheduler
   // 2) checking statusUpdate calls to the scheduler
-  // see Thrift2 mock example in: https://phabricator.fb.com/D1491659
+  // see Thrift2 mock example in: https://phabricator.intern.facebook.com/D1491659
   //
   // TODO 5486195 make a real integrated test using a shell script
   auto start_time = time(nullptr);

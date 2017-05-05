@@ -26,7 +26,7 @@ fi
 # Decide if we're using CMake or the FB build system
 BISTRO_BINARY="$D/../../../_bin/bistro/bistro/server/bistro_scheduler"
 if [[ -x "$BISTRO_BINARY" ]] ; then
-  PHABRICATOR_DOMAIN="phabricator.fb.com"
+  PHABRICATOR_DOMAIN="phabricator.intern.facebook.com"
 else
   PHABRICATOR_DOMAIN="[YOUR PHABRICATOR DOMAIN]"
   # Try the release binary, then default to the debug binary

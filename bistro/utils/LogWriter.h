@@ -11,11 +11,11 @@
 
 #include <atomic>
 #include <boost/filesystem/path.hpp>
+#include <folly/experimental/ThreadedRepeatingFunctionRunner.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-#include "bistro/bistro/utils/BackgroundThreadMixin.h"
 #include "bistro/bistro/utils/EnumHash.h"
 #include "bistro/bistro/utils/LogLines.h"
 
@@ -99,8 +99,8 @@ private:
 
   std::atomic<uint32_t> counter_;
 
-  // Declared last since the threads' callbacks access other members.
+  // CAUTION: Declared last since the threads' callbacks access other members.
   folly::ThreadedRepeatingFunctionRunner threads_;
 };
 
-}}
+}}  // namespace facebook::bistro

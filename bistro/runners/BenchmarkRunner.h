@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,15 +9,14 @@
  */
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <folly/Synchronized.h>
+#include <folly/experimental/ThreadedRepeatingFunctionRunner.h>
 #include <queue>
 #include <chrono>
 #include <random>
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/runners/TaskRunner.h"
-#include "bistro/bistro/utils/BackgroundThreadMixin.h"
 
 namespace facebook { namespace bistro {
 
@@ -48,13 +47,10 @@ struct TestTask {
  * Its running overhead is almost zero at the turnover rate of 10k tasks/sec.
  * Therefore we can accurately measure the scheduling overhead.
  */
-class BenchmarkRunner :
-    boost::noncopyable,
-    public TaskRunner,
-    BackgroundThreadMixin {
-
+class BenchmarkRunner final : public TaskRunner {
 public:
   BenchmarkRunner();
+  BenchmarkRunner(const BenchmarkRunner&) = delete;
   ~BenchmarkRunner() override;
 
   // make this a function for unit test
@@ -87,6 +83,9 @@ private:
   uint64_t totalMs_{0};
   uint64_t totalTasks_{0};
   size_t queueMax_{0};
+
+  // CAUTION: Declared last since the threads access other members of `this`.
+  folly::ThreadedRepeatingFunctionRunner backgroundThreads_;
 };
 
-}}
+}}  // namespace facebook::bistro

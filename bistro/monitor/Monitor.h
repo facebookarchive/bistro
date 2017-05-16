@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -11,9 +11,9 @@
 
 #include <folly/Conv.h>
 #include <folly/Synchronized.h>
+#include <folly/experimental/ThreadedRepeatingFunctionRunner.h>
 #include <memory>
 
-#include "bistro/bistro/utils/BackgroundThreadMixin.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
 
 namespace facebook { namespace bistro {
@@ -28,15 +28,14 @@ typedef std::shared_ptr<const Job> JobPtr;
 /**
  * Asynchronously computes information useful for monitoring.
  */
-class Monitor : BackgroundThreadMixin {
-
+class Monitor final {
 public:
   Monitor(
     std::shared_ptr<ConfigLoader> config_loader,
     std::shared_ptr<NodesLoader> nodes_loader,
     std::shared_ptr<TaskStatuses> task_statuses
   );
-  ~Monitor() override;
+  ~Monitor();
 
   typedef std::pair<int, std::vector<std::string>> CountWithSamples;
   typedef std::map<TaskStatusBits, CountWithSamples> HistogramRow;
@@ -84,6 +83,9 @@ private:
   folly::Synchronized<JobHistograms> histograms_;
 
   std::atomic<time_t> lastUpdateTime_;
+
+  // CAUTION: Declared last since the threads access other members of `this`.
+  folly::ThreadedRepeatingFunctionRunner backgroundThreads_;
 };
 
 /**
@@ -134,4 +136,4 @@ private:
     ::folly::to<std::string>((key), " (", __FILE__, ":", __LINE__, ")") \
   )
 
-}}
+}}  // namespace facebook::bistro

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -27,7 +27,11 @@ namespace {
 
 BenchmarkRunner::BenchmarkRunner()
     : distribution_(0, FLAGS_test_task_duration * 2) {
-  runInBackgroundLoop([this](){
+  // CAUTION: ThreadedRepeatingFunctionRunner recommends two-stage
+  // initialization for starting threads.  This specific case is safe since:
+  //  - this comes last in the constructor, so the class is fully constructed,
+  //  - this class is final, so no derived classes remain to be constructed.
+  backgroundThreads_.add([this](){
     const auto cur = std::chrono::system_clock::now();
     SYNCHRONIZED(queue_) {
       while (!queue_.empty() && queue_.top().due_ <= cur) {
@@ -57,7 +61,7 @@ BenchmarkRunner::BenchmarkRunner()
 BenchmarkRunner::~BenchmarkRunner() {
   LOG(INFO) << queue_->size() << " still in queue, " << totalMs_ << " ms, "
     << totalTasks_ << " tasks, " << queueMax_ << " max queue size";
-  stopBackgroundThreads();
+  backgroundThreads_.stop();
 }
 
 TaskRunnerResponse BenchmarkRunner::runTaskImpl(
@@ -72,4 +76,4 @@ TaskRunnerResponse BenchmarkRunner::runTaskImpl(
   return RanTask;
 }
 
-}}
+}}  // namespace facebook::bistro

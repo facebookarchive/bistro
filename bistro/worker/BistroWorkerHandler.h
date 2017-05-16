@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -10,6 +10,7 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <folly/experimental/ThreadedRepeatingFunctionRunner.h>
 #include <folly/MPMCQueue.h>
 #include <folly/Synchronized.h>
 #include <memory>
@@ -21,7 +22,6 @@
 #include "bistro/bistro/processes/TaskSubprocessQueue.h"
 #include "bistro/bistro/remote/RemoteWorkerState.h"
 #include "bistro/bistro/statuses/TaskStatus.h"
-#include "bistro/bistro/utils/BackgroundThreadMixin.h"
 #include "common/fb303/cpp/FacebookBase2.h"
 
 namespace apache { namespace thrift { class ThriftServer; }}
@@ -33,9 +33,8 @@ namespace cpp2 {
 }
 class UsablePhysicalResourceMonitor;
 
-class BistroWorkerHandler : public cpp2::BistroWorkerSvIf,
-                            public fb303::FacebookBase2,
-                            BackgroundThreadMixin {
+class BistroWorkerHandler final : public cpp2::BistroWorkerSvIf,
+                                  public fb303::FacebookBase2 {
 public:
   // Must be thread-safe.
   typedef std::function<std::shared_ptr<cpp2::BistroSchedulerAsyncClient>(
@@ -245,6 +244,9 @@ private:
   // To suicide gracefully, the handler needs to be able to stop its server.
   // Must be a weak_ptr to avoid a circular server<->handler dependency.
   std::weak_ptr<apache::thrift::ThriftServer> server_;
+
+  // CAUTION: Declared last since the threads access other members of `this`.
+  folly::ThreadedRepeatingFunctionRunner backgroundThreads_;
 };
 
 }}

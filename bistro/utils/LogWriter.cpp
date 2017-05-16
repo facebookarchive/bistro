@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -11,12 +11,12 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
-
 #include <folly/Conv.h>
+#include <folly/experimental/AutoTimer.h>
 #include <folly/String.h>
+
 #include "bistro/bistro/utils/Exception.h"
 #include "bistro/bistro/utils/LogLines.h"
-#include <folly/experimental/AutoTimer.h>
 #include "bistro/bistro/sqlite/Database.h"
 #include "bistro/bistro/sqlite/Statement.h"
 
@@ -78,6 +78,10 @@ LogWriter::LogWriter(const boost::filesystem::path& db_file) : counter_(0) {
 
     LOG(INFO) << "Created table " << name;
   }
+  // CAUTION: ThreadedRepeatingFunctionRunner recommends two-stage
+  // initialization for starting threads.  This specific case is safe since:
+  //  - this comes last in the constructor, so the class is fully constructed,
+  //  - this class is final, so no derived classes remain to be constructed.
   if (FLAGS_log_prune_frequency > 0) {
     threads_.add([this]() {
       prune();

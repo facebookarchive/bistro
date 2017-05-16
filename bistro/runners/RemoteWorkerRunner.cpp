@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -37,7 +37,7 @@ using namespace apache::thrift::async;
 using namespace apache::thrift;
 
 RemoteWorkerRunner::RemoteWorkerRunner(
-    shared_ptr<TaskStatuses> task_statuses,
+    std::shared_ptr<TaskStatuses> task_statuses,
     std::shared_ptr<Monitor> monitor)
   : TaskRunner(),  // Initializes schedulerID_
     workers_(folly::construct_in_place, time(nullptr), schedulerID_),
@@ -49,7 +49,12 @@ RemoteWorkerRunner::RemoteWorkerRunner(
     monitor_(monitor) {
 
   // Monitor the workers: send healthchecks, mark them (un)healthy / lost, etc
-  runInBackgroundLoop([this](){
+  //
+  // CAUTION: ThreadedRepeatingFunctionRunner recommends two-stage
+  // initialization for starting threads.  This specific case is safe since:
+  //  - this comes last in the constructor, so the class is fully constructed,
+  //  - this class is final, so no derived classes remain to be constructed.
+  backgroundThreads_.add([this]() {
     auto config = config_.copy();
     bool log_manually_exit_initial_wait = false;
     RemoteWorkerUpdate update;
@@ -95,7 +100,7 @@ RemoteWorkerRunner::RemoteWorkerRunner(
 }
 
 RemoteWorkerRunner::~RemoteWorkerRunner() {
-  stopBackgroundThreads();
+  backgroundThreads_.stop();
   eventBase_->terminateLoopSoon();
   eventBaseThread_.join();
 }

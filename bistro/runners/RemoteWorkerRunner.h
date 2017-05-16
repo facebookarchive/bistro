@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,16 +9,15 @@
  */
 #pragma once
 
-#include <boost/noncopyable.hpp>
+#include <folly/experimental/ThreadedRepeatingFunctionRunner.h>
+#include <folly/io/async/EventBase.h>
 #include <folly/Synchronized.h>
 #include <memory>
 #include <thread>
-#include <folly/io/async/EventBase.h>
 
 #include "bistro/bistro/remote/RemoteWorkers.h"
 #include "bistro/bistro/runners/TaskRunner.h"
 #include "bistro/bistro/scheduler/ResourceVector.h"
-#include "bistro/bistro/utils/BackgroundThreadMixin.h"
 
 namespace folly {
   class dynamic;
@@ -39,14 +38,13 @@ class Node;
 class TaskStatus;
 class TaskStatuses;
 
-class RemoteWorkerRunner
-  : boost::noncopyable, public TaskRunner, BackgroundThreadMixin {
-
+class RemoteWorkerRunner final : public TaskRunner {
 public:
   explicit RemoteWorkerRunner(
     std::shared_ptr<TaskStatuses> task_statuses,
     std::shared_ptr<Monitor> monitor
   );
+  RemoteWorkerRunner(const RemoteWorkerRunner&) = delete;
   ~RemoteWorkerRunner() override;
 
   /**
@@ -169,6 +167,9 @@ private:
 
   // Used to report errors to the UI, can be null.
   std::shared_ptr<Monitor> monitor_;
+
+  // CAUTION: Declared last since the threads access other members of `this`.
+  folly::ThreadedRepeatingFunctionRunner backgroundThreads_;
 };
 
-}}
+}}  // namespace facebook::bistro

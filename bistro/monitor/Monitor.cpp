@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -9,11 +9,12 @@
  */
 #include "bistro/bistro/monitor/Monitor.h"
 
+#include <folly/experimental/AutoTimer.h>
+
 #include "bistro/bistro/config/Config.h"
 #include "bistro/bistro/config/ConfigLoader.h"
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/config/Node.h"
-#include <folly/experimental/AutoTimer.h>
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
 #include "bistro/bistro/statuses/TaskStatuses.h"
@@ -35,11 +36,15 @@ Monitor::Monitor(
     nodesLoader_(nodes_loader),
     taskStatuses_(task_statuses) {
 
-  runInBackgroundLoop(bind(&Monitor::update, this));
+  // CAUTION: ThreadedRepeatingFunctionRunner recommends two-stage
+  // initialization for starting threads.  This specific case is safe since:
+  //  - this comes last in the constructor, so the class is fully constructed,
+  //  - this class is final, so no derived classes remain to be constructed.
+  backgroundThreads_.add(bind(&Monitor::update, this));
 }
 
 Monitor::~Monitor() {
-  stopBackgroundThreads();
+  backgroundThreads_.stop();
 }
 
 Monitor::JobHistograms Monitor::getHistograms(
@@ -144,4 +149,4 @@ std::chrono::milliseconds Monitor::update() noexcept {
   return chrono::milliseconds(FLAGS_monitor_update_ms);
 }
 
-}}
+}}  // namespace facebook::bistro

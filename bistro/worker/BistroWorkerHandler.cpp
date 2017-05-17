@@ -151,10 +151,18 @@ BistroWorkerHandler::BistroWorkerHandler(
   // initialization for starting threads.  This specific case is safe since:
   //  - this comes last in the constructor, so the class is fully constructed,
   //  - this class is final, so no derived classes remain to be constructed.
-  backgroundThreads_.add(bind(&BistroWorkerHandler::healthcheck, this));
-  backgroundThreads_.add(bind(&BistroWorkerHandler::heartbeat, this));
-  backgroundThreads_.add(bind(&BistroWorkerHandler::notifyFinished, this));
-  backgroundThreads_.add(bind(&BistroWorkerHandler::notifyNotRunning, this));
+  backgroundThreads_.add(
+    "BWH:healthcheck", bind(&BistroWorkerHandler::healthcheck, this)
+  );
+  backgroundThreads_.add(
+    "BWH:heartbeat", bind(&BistroWorkerHandler::heartbeat, this)
+  );
+  backgroundThreads_.add(
+    "BWH:ntfyFnshd", bind(&BistroWorkerHandler::notifyFinished, this)
+  );
+  backgroundThreads_.add(
+    "BWH:ntfyNotRnng", bind(&BistroWorkerHandler::notifyNotRunning, this)
+  );
 }
 
 BistroWorkerHandler::~BistroWorkerHandler() {

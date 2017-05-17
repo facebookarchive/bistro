@@ -83,7 +83,7 @@ LogWriter::LogWriter(const boost::filesystem::path& db_file) : counter_(0) {
   //  - this comes last in the constructor, so the class is fully constructed,
   //  - this class is final, so no derived classes remain to be constructed.
   if (FLAGS_log_prune_frequency > 0) {
-    threads_.add([this]() {
+    threads_.add("LogWriterPrune", [this]() {
       prune();
       return chrono::seconds(FLAGS_log_prune_frequency);
     }, std::chrono::milliseconds(0));

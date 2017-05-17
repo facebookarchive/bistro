@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -34,6 +34,7 @@ FileConfigLoader::FileConfigLoader(
     std::chrono::milliseconds update_period,
     const boost::filesystem::path& filename)
   : loader_(
+    "FileCfgLoader",
     [filename](
       std::string* out_contents,
       PollerState* state,

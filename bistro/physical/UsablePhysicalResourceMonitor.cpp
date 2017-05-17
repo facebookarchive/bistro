@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -62,7 +62,12 @@ UsablePhysicalResourceMonitor::UsablePhysicalResourceMonitor(
 ) : cgpaths_(
       std::make_shared<folly::Synchronized<CGroupPaths>>(std::move(cgpaths))
     ),
-    poller_(Fetcher(cgpaths_, subprocess_timeout_ms), period, period) {
+    poller_(
+      "UsablePhysRsrcs",
+      Fetcher(cgpaths_, subprocess_timeout_ms),
+      period,
+      period
+    ) {
 }
 
 }}  // namespace facebook::bistro

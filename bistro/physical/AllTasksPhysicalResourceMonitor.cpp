@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -85,7 +85,9 @@ struct Fetcher {
 AllTasksPhysicalResourceMonitor::AllTasksPhysicalResourceMonitor(
   uint32_t subprocess_timeout_ms,
   std::chrono::milliseconds period  // same delay on error as on success
-) : poller_(Fetcher(subprocess_timeout_ms), period, period) {
+) : poller_(
+  "AllTaskPhysRsrc", Fetcher(subprocess_timeout_ms), period, period
+) {
 }
 
 }}  // namespace facebook::bistro

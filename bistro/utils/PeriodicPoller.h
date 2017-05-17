@@ -115,6 +115,7 @@ typedef std::function<bool (
 
 public:
   PeriodicPoller(
+    std::string thread_name,  // up to 15 chars
     FetchRawDataFn fetch_raw_data,  // see the typedef
     std::chrono::milliseconds period,
     std::chrono::milliseconds retry_period
@@ -134,7 +135,11 @@ public:
     //  - this is the last action in the constructor
     //  - this class is guaranteed not to have derived classes
     //  - the threads_ object is declared last, and hence is destroyed first
-    threads_.add(std::bind(&PeriodicPoller::refresh, this), initial_period);
+    threads_.add(
+      std::move(thread_name),
+      std::bind(&PeriodicPoller::refresh, this),
+      initial_period
+    );
   }
 
   ~PeriodicPoller() {

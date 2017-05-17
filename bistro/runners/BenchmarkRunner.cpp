@@ -31,7 +31,7 @@ BenchmarkRunner::BenchmarkRunner()
   // initialization for starting threads.  This specific case is safe since:
   //  - this comes last in the constructor, so the class is fully constructed,
   //  - this class is final, so no derived classes remain to be constructed.
-  backgroundThreads_.add([this](){
+  backgroundThreads_.add("BenchmarkRunner", [this](){
     const auto cur = std::chrono::system_clock::now();
     SYNCHRONIZED(queue_) {
       while (!queue_.empty() && queue_.top().due_ <= cur) {

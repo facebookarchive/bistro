@@ -40,7 +40,7 @@ Monitor::Monitor(
   // initialization for starting threads.  This specific case is safe since:
   //  - this comes last in the constructor, so the class is fully constructed,
   //  - this class is final, so no derived classes remain to be constructed.
-  backgroundThreads_.add(bind(&Monitor::update, this));
+  backgroundThreads_.add("Monitor", bind(&Monitor::update, this));
 }
 
 Monitor::~Monitor() {

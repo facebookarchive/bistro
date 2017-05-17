@@ -108,7 +108,9 @@ int main(int argc, char* argv[]) {
     monitor
   );
   folly::ThreadedRepeatingFunctionRunner bistro_thread;
-  bistro_thread.add(bind(&Bistro::scheduleOnceSystemTime, &bistro));
+  bistro_thread.add(
+    "BistroSchedule", bind(&Bistro::scheduleOnceSystemTime, &bistro)
+  );
   SCOPE_EXIT { bistro_thread.stop(); };
 
   auto http_monitor = make_shared<HTTPMonitor>(

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -120,6 +120,14 @@ TEST(TestStandardCrontabItem, TestAll) {
     );
     for (auto t : {1390118400, 1390550400, 1390636800}) {
       EXPECT_EQ(1390636800, sat->findFirstMatch(t).value());
+    }
+
+    // Corner case: Carry from Tue May 16 09:20:18 PDT 2017 to the next Tue.
+    {
+      auto tue8am = CrontabItem::fromDynamic(parseJson(
+        kDstPrefix + "\"hour\": 8, \"minute\": 50, \"day_of_week\": 3}"
+      ), tz);
+      EXPECT_EQ(1495554600, tue8am->findFirstMatch(1494951618).value());
     }
 
     // DoW carry: Mon 20, Sat 25, Sun 26 => Sun Jan 26 00:00:00 PST 2014

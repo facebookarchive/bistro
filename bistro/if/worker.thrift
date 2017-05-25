@@ -11,6 +11,7 @@ include "common/fb303/if/fb303.thrift"
 include "bistro/bistro/if/common.thrift"
 
 namespace cpp facebook.bistro
+namespace py facebook.bistro.worker
 
 /***************************************************************************
  *** Read README.worker_protocol, and keep it up-to-date with this file. ***

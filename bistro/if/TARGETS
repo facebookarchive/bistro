@@ -13,13 +13,14 @@ thrift_library(
 
 thrift_library(
     name = 'worker_if',
-    languages = ['cpp2'],
+    languages = ['cpp2', 'py'],
     thrift_srcs = {'worker.thrift': ['BistroWorker']},
     thrift_cpp2_options = 'stack_arguments',
     deps = [
         '@/common/fb303/if:fb303',
         '@/bistro/bistro/if:common',
     ],
+    py_base_module = 'facebook.bistro',
 )
 
 thrift_library(

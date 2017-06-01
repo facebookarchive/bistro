@@ -1,22 +1,22 @@
 cpp_library(
-    name = 'cron_lib',
-    headers = [
-        'CrontabItem.h',
-        'CrontabSelector.h',
-        'EpochCrontabItem.h',
-        'StandardCrontabItem.h',
-    ],
+    name = "cron_lib",
     srcs = [
-        'CrontabItem.cpp',
-        'CrontabSelector.cpp',
-        'EpochCrontabItem.cpp',
-        'StandardCrontabItem.cpp',
+        "CrontabItem.cpp",
+        "CrontabSelector.cpp",
+        "EpochCrontabItem.cpp",
+        "StandardCrontabItem.cpp",
+    ],
+    headers = [
+        "CrontabItem.h",
+        "CrontabSelector.h",
+        "EpochCrontabItem.h",
+        "StandardCrontabItem.h",
     ],
     deps = [
-        '@/folly:folly',
-        '@/bistro/bistro/cron/utils:cron_utils_lib',
+        "@/bistro/bistro/cron/utils:cron_utils_lib",
+        "@/folly:folly",
     ],
     external_deps = [
-        ('boost', None, 'boost_date_time'),
+        ("boost", None, "boost_date_time"),
     ],
 )

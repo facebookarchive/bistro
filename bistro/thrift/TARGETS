@@ -1,16 +1,16 @@
 cpp_library(
-    name = 'conversion_lib',
-    headers = ['ThriftConversion.h'],
-    srcs = ['ThriftConversion.cpp'],
+    name = "conversion_lib",
+    srcs = ["ThriftConversion.cpp"],
+    headers = ["ThriftConversion.h"],
     deps = [
-        '@/bistro/bistro/config:config_lib',
-        '@/bistro/bistro/if:if-cpp2',
-        '@/folly:folly',
+        "@/bistro/bistro/config:config_lib",
+        "@/bistro/bistro/if:if-cpp2",
+        "@/folly:folly",
     ],
 )
 
 cpp_unittest(
-    name = 'test_thrift_conversion',
-    srcs = ['test_thrift_conversion.cpp'],
-    deps = [':conversion_lib'],
+    name = "test_thrift_conversion",
+    srcs = ["test_thrift_conversion.cpp"],
+    deps = [":conversion_lib"],
 )

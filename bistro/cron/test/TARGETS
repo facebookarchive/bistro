@@ -5,6 +5,8 @@ def cron_test(name):
         deps = ['@/bistro/bistro/cron:cron_lib'],
     )
 
-cron_test('test_crontab_selector')
-cron_test('test_epoch_crontab_item')
-cron_test('test_standard_crontab_item')
+cron_test("test_crontab_selector")
+
+cron_test("test_epoch_crontab_item")
+
+cron_test("test_standard_crontab_item")

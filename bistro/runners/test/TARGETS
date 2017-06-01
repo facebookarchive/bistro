@@ -1,26 +1,26 @@
 cpp_unittest(
-    name = 'test_local_runner',
-    srcs = ['test_local_runner.cpp'],
-    deps = ['@/bistro/bistro/runners:runners_lib'],
+    name = "test_local_runner",
+    srcs = ["test_local_runner.cpp"],
+    deps = ["@/bistro/bistro/runners:runners_lib"],
 )
 
 cpp_unittest(
-    name = 'test_benchmark_runner',
-    srcs = ['test_benchmark_runner.cpp'],
-    deps = ['@/bistro/bistro/runners:runners_lib'],
+    name = "test_benchmark_runner",
+    srcs = ["test_benchmark_runner.cpp"],
+    deps = ["@/bistro/bistro/runners:runners_lib"],
 )
 
 cpp_unittest(
-    name = 'test_remote_runner',
-    srcs = ['test_remote_runner.cpp'],
+    name = "test_remote_runner",
+    srcs = ["test_remote_runner.cpp"],
     deps = [
-        '@/bistro/bistro/runners:runners_lib',
-        '@/bistro/bistro/worker/test:bistro_worker_test_lib',
+        "@/bistro/bistro/runners:runners_lib",
+        "@/bistro/bistro/worker/test:bistro_worker_test_lib",
     ],
 )
 
 cpp_unittest(
-    name = 'test_kill_orphans',
-    srcs = ['test_kill_orphans.cpp'],
-    deps = ['@/bistro/bistro:bistro_lib'],
+    name = "test_kill_orphans",
+    srcs = ["test_kill_orphans.cpp"],
+    deps = ["@/bistro/bistro:bistro_lib"],
 )

@@ -1,15 +1,15 @@
 cpp_library(
-    name = 'cron_utils_lib',
-    headers = [
-        'date_time.h',
-    ],
+    name = "cron_utils_lib",
     srcs = [
-        'date_time.cpp',
+        "date_time.cpp",
+    ],
+    headers = [
+        "date_time.h",
     ],
     deps = [
-        '@/folly:folly',
+        "@/folly:folly",
     ],
     external_deps = [
-        ('boost', None, 'boost_date_time'),
+        ("boost", None, "boost_date_time"),
     ],
 )

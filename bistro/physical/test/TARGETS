@@ -1,39 +1,39 @@
 cpp_unittest(
-    name = 'test_all_tasks',
-    headers = ['utils.h'],
-    srcs = ['test_all_tasks.cpp'],
+    name = "test_all_tasks",
+    srcs = ["test_all_tasks.cpp"],
+    headers = ["utils.h"],
     deps = [
-        '@/bistro/bistro/physical:physical_lib',
-        '@/folly/experimental:test_util',
+        "@/bistro/bistro/physical:physical_lib",
+        "@/folly/experimental:test_util",
     ],
 )
 
 cpp_unittest(
-    name = 'test_utils',
-    headers = ['utils.h'],
-    srcs = ['test_utils.cpp'],
+    name = "test_utils",
+    srcs = ["test_utils.cpp"],
+    headers = ["utils.h"],
     deps = [
-        '@/bistro/bistro/physical:physical_lib',
-        '@/folly/experimental:test_util',
+        "@/bistro/bistro/physical:physical_lib",
+        "@/folly/experimental:test_util",
     ],
 )
 
 cpp_unittest(
-    name = 'test_cgroup_resources',
-    headers = ['utils.h'],
-    srcs = ['test_cgroup_resources.cpp'],
+    name = "test_cgroup_resources",
+    srcs = ["test_cgroup_resources.cpp"],
+    headers = ["utils.h"],
     deps = [
-        '@/bistro/bistro/physical:physical_lib',
-        '@/folly/experimental:test_util',
+        "@/bistro/bistro/physical:physical_lib",
+        "@/folly/experimental:test_util",
     ],
 )
 
 cpp_unittest(
-    name = 'test_usable_fetcher',
-    headers = ['utils.h'],
-    srcs = ['test_usable_fetcher.cpp'],
+    name = "test_usable_fetcher",
+    srcs = ["test_usable_fetcher.cpp"],
+    headers = ["utils.h"],
     deps = [
-        '@/bistro/bistro/physical:physical_lib',
-        '@/folly/experimental:test_util',
+        "@/bistro/bistro/physical:physical_lib",
+        "@/folly/experimental:test_util",
     ],
 )

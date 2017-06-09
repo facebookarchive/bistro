@@ -44,7 +44,7 @@ public:
   void reduceQuotaBy(Quota);
 
 protected:
-  virtual void timeoutExpired() noexcept override;  // Grow quota periodically.
+ void timeoutExpired() noexcept override; // Grow quota periodically.
 
 private:
   const uint32_t pollEveryMs_;

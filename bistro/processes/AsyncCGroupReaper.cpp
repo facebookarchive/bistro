@@ -69,7 +69,7 @@ public:
     // Better do **nothing** else, `this` is gone.
   }
 
-  virtual void timeoutExpired() noexcept override {
+  void timeoutExpired() noexcept override {
     // DO NOT use objects with non-empty destructors here, we `delete this`.
     totalWaitMs_ += curWaitMs_;
     // Check before trying to kill. The other order is less efficient -- a

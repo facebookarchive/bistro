@@ -263,7 +263,7 @@ protected:
 
   // Implementation detail -- invoke the "read" callback.
   // Final: it's unsafe to extend AsyncReadPipe, see CAREFUL above.
-  void handlerReady(uint16_t events) noexcept override final {
+  void handlerReady(uint16_t events) noexcept final {
     // Must be FIRST line to trigger self-destruction as late as possible.
     SelfGuard self_guard(self_);
     CHECK(events & EventHandler::READ);  // No WRITE support

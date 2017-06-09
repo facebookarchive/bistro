@@ -22,8 +22,10 @@
 namespace facebook { namespace bistro {
 
 struct BitBucketTaskStore : public TaskStore {
-  void fetchJobTasks(const std::vector<std::string>& job_ids, Callback cb) {}
-  void store(const std::string& j, const std::string& n, TaskResult r) {}
+  void fetchJobTasks(const std::vector<std::string>& job_ids, Callback cb)
+      override {}
+  void store(const std::string& j, const std::string& n, TaskResult r)
+      override {}
 };
 
 struct MockRunner : public TaskRunner {
@@ -38,13 +40,13 @@ struct MockRunner : public TaskRunner {
     events_.emplace_back(EventType::KILL_TASK, rt.job, rt.node);
   }
 
-  virtual TaskRunnerResponse runTaskImpl(
-    const std::shared_ptr<const Job>& job,
-    const Node& node,
-    cpp2::RunningTask& rt,
-    folly::dynamic& job_args,
-    std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
-  ) noexcept override {
+  TaskRunnerResponse runTaskImpl(
+      const std::shared_ptr<const Job>& job,
+      const Node& node,
+      cpp2::RunningTask& rt,
+      folly::dynamic& job_args,
+      std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)>
+          cb) noexcept override {
     cb(rt, TaskStatus::running());  // Otherwise the scheduler won't know.
     events_.emplace_back(EventType::RUN, job->name(), node.name());
     return RanTask;

@@ -64,9 +64,9 @@ class AddChildToCGroups
 public:
   explicit AddChildToCGroups(std::vector<std::string> procs_paths)
     : cgroupProcsPaths_(std::move(procs_paths)) {}
-  virtual ~AddChildToCGroups() {}
-  int operator()();  // Return 0 on success, or an `errno` error code.
-private:
+  ~AddChildToCGroups() override {}
+  int operator()() override; // Return 0 on success, or an `errno` error code.
+ private:
   // It is crucial that this be `const`, since otherwise we could not safely
   // use `c_str()` on the strings after `vfork()`.
   const std::vector<std::string> cgroupProcsPaths_;

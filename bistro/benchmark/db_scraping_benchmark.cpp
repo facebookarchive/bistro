@@ -75,7 +75,11 @@ BENCHMARK(MakeSpan) {
   Config config(c);
   for (int i=1; i <= FLAGS_num_jobs; i++) {
     config.addJob(
-      to<string>("job", i), dynamic::object("owner", "owner"), nullptr
+        std::make_shared<Job>(
+            config,
+            to<string>("job", i),
+            dynamic::object("owner", "owner")),
+        nullptr
     );
   }
   auto config_loader = make_shared<InMemoryConfigLoader>(config);

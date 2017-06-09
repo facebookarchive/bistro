@@ -36,7 +36,8 @@ public:
   Job(
     const Config& parent_config,  // Copies some fields from the Config
     const std::string& job_name,
-    const folly::dynamic& job_config
+    const folly::dynamic& job_config,
+    JobFilters::NodeDoesPassCob filter_cb = nullptr
   );
 
   explicit Job(const Job& j) = default;

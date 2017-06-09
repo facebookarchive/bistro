@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -22,7 +22,8 @@ using namespace std;
 JobFilters::JobFilters() : isEmpty_(true) {
 }
 
-JobFilters::JobFilters(const folly::dynamic& d) {
+JobFilters::JobFilters(const folly::dynamic& d,
+    JobFilters::NodeDoesPassCob filter_cb) : cb_(filter_cb) {
   auto jt = d.find("whitelist");
   if (jt != d.items().end()) {
     for (const auto& item : jt->second) {
@@ -94,7 +95,8 @@ bool JobFilters::isEmpty() const {
 bool JobFilters::doesPass(const string& salt, const Node& n) const {
   return
     doesPass(salt, n.name())
-      && (tagWhitelist_.empty() || n.hasTags(tagWhitelist_));
+      && (tagWhitelist_.empty() || n.hasTags(tagWhitelist_))
+      && (!cb_ || cb_(n));
 }
 
 bool JobFilters::doesPass(const string& salt, const string& s) const {
@@ -118,7 +120,9 @@ bool JobFilters::operator==(const JobFilters& other) const {
     && blacklist_ == other.blacklist_
     && blacklistRegex_ == other.blacklistRegex_
     && tagWhitelist_ == other.tagWhitelist_
-    && fractionOfNodes_ == other.fractionOfNodes_;
+    && fractionOfNodes_ == other.fractionOfNodes_
+    && cb_ == nullptr
+    && other.cb_ == nullptr;
 }
 
 void JobFilters::setFractionOfNodes(double f) {
@@ -135,7 +139,8 @@ bool JobFilters::isNonTriviallyEmpty() const {
   // We might have a configuration that is actually 'empty' (always matches)
   // even if some filters are set (if they are set to trivial values).
   return
-    whitelist_.empty()
+    !cb_
+    && whitelist_.empty()
     && whitelistRegex_.empty()
     && blacklist_.empty()
     && blacklistRegex_.empty()

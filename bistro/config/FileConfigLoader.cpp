@@ -81,7 +81,11 @@ std::shared_ptr<const Config> FileConfigLoader::parseConfigFile(
       continue;
     }
     config->addJob(
-      key.substr(kJobPrefix.size()), pair.second, prev_config.get()
+      std::make_shared<Job>(
+          *config,
+          key.substr(kJobPrefix.size()),
+          pair.second),
+      prev_config.get()
     );
   }
 

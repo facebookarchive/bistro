@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -58,30 +58,36 @@ TaskCatcher mock_schedule(bool add_third_job = false) {
     )
   );
   config.addJob(
-    "job1",
-    folly::dynamic::object
-      ("owner", "owner")
-      ("priority", 10.0),
+    std::make_shared<Job>(
+        config,
+        "job1",
+        folly::dynamic::object
+          ("owner", "owner")
+          ("priority", 10.0)),
     nullptr
   );
   config.addJob(
-    "job2",
-    folly::dynamic::object
-      ("owner", "owner")
-      ("priority", 1.0),
+    std::make_shared<Job>(
+        config,
+        "job2",
+        folly::dynamic::object
+          ("owner", "owner")
+          ("priority", 1.0)),
     nullptr
   );
   if (add_third_job) {
     config.addJob(
-      "job3",
-      folly::dynamic::object
-        ("owner", "owner")
-        ("priority", 100.0)
-        ("filters", folly::dynamic::object
-          ("db", folly::dynamic::object
-            ("whitelist", folly::dynamic::array("db12"))
-          )
-        ),
+      std::make_shared<Job>(
+          config,
+          "job3",
+        folly::dynamic::object
+          ("owner", "owner")
+          ("priority", 100.0)
+          ("filters", folly::dynamic::object
+            ("db", folly::dynamic::object
+              ("whitelist", folly::dynamic::array("db12"))
+            )
+          )),
       nullptr
     );
   }

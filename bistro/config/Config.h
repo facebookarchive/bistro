@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -58,14 +58,10 @@ public:
    */
   enum class JobStatus { NEW_CONFIG, ADDED, UPDATED, UNCHANGED };
   JobStatus addJob(
-    const std::string& name,
-    const folly::dynamic& d,
+    std::shared_ptr<Job> job,
     // Tests may set this to nullptr, but ConfigLoaders should do their
     // darndest to set this correctly (this massively improves logging).
-    const Config* prev_config,
-    // A slightly ugly way of giving the caller non-const access to the Job
-    Job** job_ptr = nullptr
-  );
+    const Config* prev_config);
 
   // Only counts explicitly given levels, excluding "instance" and "worker".
   int getNumConfiguredLevels() const {

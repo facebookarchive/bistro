@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -23,7 +23,8 @@ using dynamic = folly::dynamic;
 folly::Synchronized<StringTable> Job::JobNameTable =
   folly::Synchronized<StringTable>();
 
-Job::Job(const Config& config, const std::string& name, const dynamic& d)
+Job::Job(const Config& config, const std::string& name, const dynamic& d,
+    JobFilters::NodeDoesPassCob filter_cb)
   // IMPORTANT: The initializers MUST NOT THROW. Use them to set defaults
   // (or if possible, default-initializers in Job.h), and then use
   // DynamicParser in the body for any parsing and validation.
@@ -73,7 +74,7 @@ Job::Job(const Config& config, const std::string& name, const dynamic& d)
     p.objectItems([&](std::string level, const dynamic& v) {
       // On error, a user must redo the whole filter. This seems unlikely to
       // cause confusion or data-loss.  If not, use `p` to make JobFilters.
-      filters_[checkedLookup(config.levels, level)] = JobFilters(v);
+      filters_[checkedLookup(config.levels, level)] = JobFilters(v, filter_cb);
     });
   });
   p.optional("level_for_host_placement", [&](const std::string& level) {

@@ -45,7 +45,9 @@ TEST(TestKillDisabled, KillJobOrphans) {
     ("enabled", true);
 
   Config config(c);
-  config.addJob("j1", dynamic::object("owner", "me"), nullptr);
+  config.addJob(
+      std::make_shared<Job>(config, "j1", dynamic::object("owner", "me")),
+      nullptr);
   MockBistro b(config);
 
   b.bistro_.scheduleOnce(std::chrono::seconds(0));
@@ -83,7 +85,9 @@ TEST(TestKillDisabled, KillJobOrphans) {
 
   // Re-enable killing & bring the job back
   config.killOrphanTasksAfter = std::chrono::seconds(0);
-  config.addJob("j1", dynamic::object("owner", "me"), nullptr);
+  config.addJob(
+      std::make_shared<Job>(config, "j1", dynamic::object("owner", "me")),
+      nullptr);
   b.configLoader_->setConfig(config);
 
   b.bistro_.scheduleOnce(std::chrono::seconds(60));

@@ -63,10 +63,12 @@ TEST(TestDependencyScheduling, HandleInvalidDependency) {
   testRegisterSchedulerPolicies();
   Config config(c);
   config.addJob(
-    "job1",
-    dynamic::object
-      ("owner", "owner")
-      ("depends_on", dynamic::array("job2")),
+    std::make_shared<Job>(
+        config,
+        "job1",
+        dynamic::object
+          ("owner", "owner")
+          ("depends_on", dynamic::array("job2"))),
     nullptr
   );
 
@@ -89,18 +91,22 @@ TEST(TestDependencyScheduling, HandleAll) {
   testRegisterSchedulerPolicies();
   Config config(c);
   config.addJob(
-    "job1",
-    dynamic::object
-      ("owner", "owner")
-      ("priority", 10.0)
-      ("depends_on", dynamic::array("job2")),
+    std::make_shared<Job>(
+        config,
+        "job1",
+        dynamic::object
+          ("owner", "owner")
+          ("priority", 10.0)
+          ("depends_on", dynamic::array("job2"))),
     nullptr
   );
   config.addJob(
-    "job2",
-    dynamic::object
-      ("owner", "owner")
-      ("priority", 1.0),
+    std::make_shared<Job>(
+        config,
+        "job2",
+        dynamic::object
+          ("owner", "owner")
+          ("priority", 1.0)),
     nullptr
   );
 

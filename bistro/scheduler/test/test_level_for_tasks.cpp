@@ -26,7 +26,9 @@ using namespace facebook::bistro;
 
 string scheduleOne(const dynamic& d) {
   Config config(d);
-  config.addJob("job1", dynamic::object("owner", "owner"), nullptr);
+  config.addJob(
+    std::make_shared<Job>(config, "job1", dynamic::object("owner", "owner")),
+    nullptr);
 
   auto nodes_ptr = make_shared<Nodes>();
   NodesLoader::_fetchNodesImpl(config, nodes_ptr.get());

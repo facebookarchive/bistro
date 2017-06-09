@@ -86,6 +86,25 @@ TEST(TestJobFilters, HandleTagWhitelist) {
   EXPECT_TRUE(filters.doesPass("", three_tags));
 }
 
+TEST(TestJobFilters, HandleCallback) {
+  auto filter_cb = [](const Node& n) -> bool {
+    std::vector<std::string> allowed_tags = {"abc", "car"};
+    return n.hasTags(allowed_tags);
+  };
+
+  JobFilters filters(dynamic::object(), filter_cb);
+  Node no_tags("no_tags");
+  Node one_tag("one_tag", 0, false, nullptr, Node::TagSet{"abc"});
+  Node two_tags("two_tags", 0, false, nullptr, Node::TagSet{"abc", "car"});
+  Node three_tags("three_tags", 0, false, nullptr,
+    Node::TagSet{"abc", "car", "ah"});
+
+  EXPECT_FALSE(filters.doesPass("", no_tags));
+  EXPECT_TRUE(filters.doesPass("", one_tag));
+  EXPECT_TRUE(filters.doesPass("", two_tags));
+  EXPECT_TRUE(filters.doesPass("", three_tags));
+}
+
 TEST(TestJobFilters, HandleCutoff) {
   JobFilters filters(dynamic::object("fraction_of_nodes", 0.5));
   int total_passed = 0;

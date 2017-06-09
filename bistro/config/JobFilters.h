@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -23,10 +23,14 @@ namespace facebook { namespace bistro {
 class Node;
 
 class JobFilters : boost::equality_comparable<JobFilters> {
-
+public:
+  // Returns true if the job can run on this node. An nullptr Function
+  // accepts all nodes.
+  using NodeDoesPassCob = std::function<bool(const Node&)>;
 public:
   JobFilters();
-  explicit JobFilters(const folly::dynamic& d);
+  explicit JobFilters(const folly::dynamic& d,
+    NodeDoesPassCob filter_cb = nullptr);
 
   JobFilters(JobFilters&&) = default;
   JobFilters(const JobFilters&) = default;
@@ -42,6 +46,8 @@ public:
    * Check if a string passes these filters. Unlike the overload above this does
    * not check the tag whitelist.
    */
+  FOLLY_DEPRECATED("Do not add new calls. This function will go away once "
+                   "workers are Nodes, nor does it run your filter_cb")
   bool doesPass(const std::string& salt, const std::string& s) const;
 
   bool isEmpty() const;
@@ -60,6 +66,7 @@ private:
   size_t fractionCutoff_;
   bool isEmpty_;
   std::hash<std::pair<std::string, std::string>> hasher_;
+  std::function<bool(const Node& n)> cb_;
 
   void setFractionOfNodes(double fraction);
   bool isNonTriviallyEmpty() const;

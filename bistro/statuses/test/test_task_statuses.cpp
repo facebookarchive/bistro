@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -47,7 +47,12 @@ TEST(TestTaskStatuses, HandleTaskStore) {
   CaptureFD stderr(2);  // Don't capture stdout, since gtest errors go there
 
   Config config_job1(c);
-  config_job1.addJob("job1", dynamic::object("owner", "owner"), nullptr);
+  config_job1.addJob(
+    std::make_shared<Job>(
+        config_job1,
+        "job1",
+        dynamic::object("owner", "owner")),
+    nullptr);
   Config config_no_job(c);
 
   auto nodes_ptr = make_shared<Nodes>();

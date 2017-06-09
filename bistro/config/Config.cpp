@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -306,34 +306,27 @@ Config::Config(const folly::dynamic& d_config)
 }
 
 Config::JobStatus Config::addJob(
-    const std::string& name,
-    const folly::dynamic& d,
-    const Config* prev_config,
-    Job** job_ptr) {
-  auto job = std::make_shared<Job>(*this, name, d);
-  auto j = job.get();  // This gets us a non-const pointer :)
-  auto p = jobs.emplace(name, std::move(job));
+    std::shared_ptr<Job> job,
+    const Config* prev_config) {
+  auto p = jobs.emplace(job->name(), job);
   if (!p.second) {
-    throw BistroException("Adding a job that already exists: ", name);
-  }
-  if (job_ptr) {
-    *job_ptr = j;
+    throw BistroException("Adding a job that already exists: ", job->name());
   }
   if (prev_config) {
-    auto it = prev_config->jobs.find(j->name());
+    auto it = prev_config->jobs.find(job->name());
     if (it != prev_config->jobs.end()) {
-      auto new_d = j->toDynamic(*this);
+      auto new_d = job->toDynamic(*this);
       // Slower than a dedicated comparator, but less likely to have bugs.
       if (new_d == it->second->toDynamic(*prev_config)) {
         return Config::JobStatus::UNCHANGED;
       }
       // This and the next log both seem useful for all config loaders.
-      LOG(INFO) << "Job " << j->name() << " was modified: "
+      LOG(INFO) << "Job " << job->name() << " was modified: "
         << folly::toJson(new_d);
       return Config::JobStatus::UPDATED;
     }
-    LOG(INFO) << "Job " << j->name() << " was added: "
-      << folly::toJson(j->toDynamic(*this));
+    LOG(INFO) << "Job " << job->name() << " was added: "
+      << folly::toJson(job->toDynamic(*this));
     return Config::JobStatus::ADDED;
   }
   return Config::JobStatus::NEW_CONFIG;

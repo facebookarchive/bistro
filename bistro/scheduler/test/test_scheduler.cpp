@@ -104,18 +104,22 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
   );
   config.schedulerPolicyName = kSchedulePolicyUnitTest.str();
   config.addJob(
-    "job",
-    dynamic::object
-      ("owner", "owner")
-      ("resources", dynamic::object("db_concurrency", 2)),
+    std::make_shared<Job>(
+        config,
+        "job",
+        dynamic::object
+          ("owner", "owner")
+          ("resources", dynamic::object("db_concurrency", 2))),
     nullptr
   );
   config.addJob(
-    "job_disabled",
-    dynamic::object
-      ("owner", "owner")
-      ("enabled", false)
-      ("resources", dynamic::object("chicken", 2)),
+    std::make_shared<Job>(
+        config,
+        "job_disabled",
+        dynamic::object
+          ("owner", "owner")
+          ("enabled", false)
+          ("resources", dynamic::object("chicken", 2))),
     nullptr
   );
 
@@ -244,7 +248,12 @@ struct ReplicaTest {
       statuses_(std::make_shared<NoOpTaskStore>()) {
 
     config_.schedulerPolicyName = kSchedulePolicyUnitTest.str();
-    config_.addJob("job", dynamic::object("owner", "owner"), nullptr);
+    config_.addJob(
+        std::make_shared<Job>(
+            config_,
+            "job",
+            dynamic::object("owner", "owner")),
+        nullptr);
     NodesLoader::_fetchNodesImpl(config_, nodesPtr_.get());
     statuses_.updateForConfig(config_);
   }

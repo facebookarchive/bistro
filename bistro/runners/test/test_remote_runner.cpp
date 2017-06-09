@@ -285,7 +285,9 @@ struct TestRemoteRunnerWithOneTask : TestRemoteRunner {
           ("enabled", true)
           ("nodes", dynamic::object("levels", dynamic::array()))
           ("resources", dynamic::object));
-        cfg->addJob(kOneTaskJobName, kJob, /*prev_config =*/ nullptr);
+        cfg->addJob(
+            std::make_shared<Job>(*cfg, kOneTaskJobName, kJob),
+            /*prev_config =*/ nullptr);
         return cfg;
       }()),
       job_(config_->jobs.at(kOneTaskJobName)),

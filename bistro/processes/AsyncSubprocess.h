@@ -161,7 +161,7 @@ protected:
     // may already be running, and this may already be destroyed (!!!)
   }
 
-  virtual void timeoutExpired() noexcept override {
+  void timeoutExpired() noexcept override {
     // No try-except since poll() only throws on usage errors.
     auto ret = subprocess_.poll();
     if (UNLIKELY(!ret.running())) {

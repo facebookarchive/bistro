@@ -39,15 +39,14 @@ using namespace apache::thrift;
 RemoteWorkerRunner::RemoteWorkerRunner(
     std::shared_ptr<TaskStatuses> task_statuses,
     std::shared_ptr<Monitor> monitor)
-  : TaskRunner(),  // Initializes schedulerID_
-    workers_(folly::construct_in_place, time(nullptr), schedulerID_),
-    workerLevel_(StringTable::NotFound),
-    taskStatuses_(task_statuses),
-    eventBase_(new folly::EventBase()),
-    eventBaseThread_(bind(&folly::EventBase::loopForever, eventBase_.get())),
-    inInitialWait_(true),
-    monitor_(monitor) {
-
+    : TaskRunner(), // Initializes schedulerID_
+      workers_(folly::in_place, time(nullptr), schedulerID_),
+      workerLevel_(StringTable::NotFound),
+      taskStatuses_(task_statuses),
+      eventBase_(new folly::EventBase()),
+      eventBaseThread_(bind(&folly::EventBase::loopForever, eventBase_.get())),
+      inInitialWait_(true),
+      monitor_(monitor) {
   // Monitor the workers: send healthchecks, mark them (un)healthy / lost, etc
   //
   // CAUTION: ThreadedRepeatingFunctionRunner recommends two-stage

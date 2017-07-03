@@ -19,6 +19,7 @@ cpp_library(
         "@/common/fb303/cpp:fb303",
         "@/folly:folly",
         "@/proxygen/httpserver:httpserver",
+        "@/thrift/lib/cpp2:server",
     ],
     external_deps = [
         ("boost", None),

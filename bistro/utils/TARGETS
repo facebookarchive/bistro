@@ -57,7 +57,7 @@ cpp_library(
         "@/bistro/bistro/utils:hostname_lib",
         "@/bistro/bistro/utils:shell_lib",
         "@/folly:folly",
-        "@/folly/experimental:autotimer",
+        "@/folly/experimental:auto_timer",
         "@/folly/experimental:threaded_repeating_function_runner",
     ],
     external_deps = [("boost", None, "boost_regex")],

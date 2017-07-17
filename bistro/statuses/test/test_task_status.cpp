@@ -310,7 +310,7 @@ void expectErrorFromString(const std::string& error_pcre, const char* s) {
   try {
     maybe_exception = actual_d["data"]["exception"].asString();
   } catch (const std::exception& e) {
-    EXPECT_TRUE(false) << "No 'data' with 'exception' in "
+    ADD_FAILURE() << "No 'data' with 'exception' in "
       << folly::toJson(actual_d);
   }
   if (maybe_exception) {

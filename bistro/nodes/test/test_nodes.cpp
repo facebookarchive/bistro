@@ -35,7 +35,7 @@ TEST(TestNodes, CheckIterateOverLevel) {
     EXPECT_EQ("bar", node->name());
   }
   for (const auto& node : nodes.iterateOverLevel(3)) {  // Nonexistent level
-    ASSERT_FALSE(true) << "Not reached";
+    FAIL() << "Not reached";
   }
 
   // Test noninstance node iteration for other tests :)

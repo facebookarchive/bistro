@@ -16,12 +16,12 @@
 namespace facebook { namespace bistro {
 
 TaskRunnerResponse NoOpRunner::runTaskImpl(
-  const std::shared_ptr<const Job>&,
-  const Node&,
-  cpp2::RunningTask& rt,
-  folly::dynamic& job_args,
-  std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)> cb
-) noexcept {
+    const std::shared_ptr<const Job>&,
+    const Node&,
+    cpp2::RunningTask& rt,
+    folly::dynamic& /*job_args*/,
+    std::function<void(const cpp2::RunningTask& rt, TaskStatus&& status)>
+        cb) noexcept {
   cb(rt, TaskStatus::running());
   if (!lastStatus_.isRunning()) {
     cb(rt, TaskStatus(lastStatus_));

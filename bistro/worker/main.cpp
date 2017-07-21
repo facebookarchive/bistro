@@ -30,19 +30,22 @@ DEFINE_string(
 );
 
 static const bool scheduler_host_validator = gflags::RegisterFlagValidator(
-  &FLAGS_scheduler_host,
-  [](const char* flagname, const std::string& value) { return !value.empty(); }
-);
+    &FLAGS_scheduler_host,
+    [](const char* /*flagname*/, const std::string& value) {
+      return !value.empty();
+    });
 
 static const bool scheduler_port_validator = gflags::RegisterFlagValidator(
-  &FLAGS_scheduler_port,
-  [](const char* flagname, int32_t value) {return value > 0 && value < 65536; }
-);
+    &FLAGS_scheduler_port,
+    [](const char* /*flagname*/, int32_t value) {
+      return value > 0 && value < 65536;
+    });
 
 static const bool worker_command_validator = gflags::RegisterFlagValidator(
-  &FLAGS_worker_command,
-  [](const char* flagname, const std::string& value) { return !value.empty(); }
-);
+    &FLAGS_worker_command,
+    [](const char* /*flagname*/, const std::string& value) {
+      return !value.empty();
+    });
 
 using namespace facebook::bistro;
 

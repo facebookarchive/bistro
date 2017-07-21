@@ -37,11 +37,12 @@ public:
   }
 
 private:
-  void deleteJobImpl(const std::string& name) override {
-    throw BistroException("deleteJob not implemented in InMemoryConfigLoader");
+ void deleteJobImpl(const std::string& /*name*/) override {
+   throw BistroException("deleteJob not implemented in InMemoryConfigLoader");
   }
 
-  void saveJobImpl(const std::string& name, const folly::dynamic& d) override {
+  void saveJobImpl(const std::string& /*name*/, const folly::dynamic& /*d*/)
+      override {
     throw BistroException("saveJob not implemented in InMemoryConfigLoader");
   }
 

@@ -17,7 +17,7 @@ using namespace std;
 
 struct StatusCatcher {
   void operator()(
-      const string& job,
+      const string& /*job*/,
       const string& node,
       TaskStore::TaskResult r) {
     tasks.push_back(make_tuple(node, r));

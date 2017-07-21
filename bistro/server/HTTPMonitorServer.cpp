@@ -28,8 +28,8 @@ public:
   explicit BistroHTTPHandler(HTTPMonitor* monitor)
     : monitor_(monitor) {}
 
-  void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers)
-    noexcept override {}
+  void onRequest(
+      std::unique_ptr<proxygen::HTTPMessage> /*headers*/) noexcept override {}
 
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override {
     if (body_) {
@@ -54,7 +54,7 @@ public:
   }
 
   // We don't support upgrading the connection.
-  void onUpgrade(proxygen::UpgradeProtocol proto) noexcept override {}
+  void onUpgrade(proxygen::UpgradeProtocol /*proto*/) noexcept override {}
 
   void requestComplete() noexcept override {
     delete this;

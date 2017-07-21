@@ -33,32 +33,30 @@ namespace {
 FileConfigLoader::FileConfigLoader(
     std::chrono::milliseconds update_period,
     const boost::filesystem::path& filename)
-  : loader_(
-    "FileCfgLoader",
-    [filename](
-      std::string* out_contents,
-      PollerState* state,
-      std::shared_ptr<const Config> unused_prev_config
-    ) {
-      folly::AutoTimer<> timer;
-      time_t cur_time = boost::filesystem::last_write_time(filename);
-      if (state->modificationTime_ >= cur_time) {
-        timer.log("Config was already fresh");
-        return false;
-      }
-      state->modificationTime_ = cur_time;
+    : loader_(
+          "FileCfgLoader",
+          [filename](
+              std::string* out_contents,
+              PollerState* state,
+              std::shared_ptr<const Config> /*unused_prev_config*/
+              ) {
+            folly::AutoTimer<> timer;
+            time_t cur_time = boost::filesystem::last_write_time(filename);
+            if (state->modificationTime_ >= cur_time) {
+              timer.log("Config was already fresh");
+              return false;
+            }
+            state->modificationTime_ = cur_time;
 
-      ifstream fin(filename.native());
-      stringstream sstr;
-      sstr << fin.rdbuf();
-      *out_contents = sstr.str();
-      timer.log("Read config from ", filename.native());
-      return true;
-    },
-    update_period,
-    update_period
-  ) {
-}
+            ifstream fin(filename.native());
+            stringstream sstr;
+            sstr << fin.rdbuf();
+            *out_contents = sstr.str();
+            timer.log("Read config from ", filename.native());
+            return true;
+          },
+          update_period,
+          update_period) {}
 
 std::shared_ptr<const Config> FileConfigLoader::parseConfigFile(
     std::shared_ptr<const Config> prev_config,
@@ -93,14 +91,14 @@ std::shared_ptr<const Config> FileConfigLoader::parseConfigFile(
   return config;
 }
 
-void FileConfigLoader::deleteJobImpl(const string& name) {
+void FileConfigLoader::deleteJobImpl(const string& /*name*/) {
   // When you implement this, see the notes for saveJobImpl()
   throw BistroException("Not implemented for files");
 }
 
 void FileConfigLoader::saveJobImpl(
-    const string& name, const folly::dynamic& d) {
-
+    const string& /*name*/,
+    const folly::dynamic& /*d*/) {
   // When you implement this, be sure to use the strongest form of locking
   // you can (at a minimum, fcntl FDLOCK) around the read-modify-write.
   //

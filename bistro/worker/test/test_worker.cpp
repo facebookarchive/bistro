@@ -359,8 +359,8 @@ struct ProtocolVerFakeScheduler : public virtual cpp2::BistroSchedulerSvIf {
   ProtocolVerFakeScheduler() : protocolVersion_(-1) {}  // Start incompatible.
   void processHeartbeat(
       cpp2::SchedulerHeartbeatResponse& res,
-      const cpp2::BistroWorker& worker,
-      const cpp2::WorkerSetID& worker_set_id) override {
+      const cpp2::BistroWorker& /*worker*/,
+      const cpp2::WorkerSetID& /*worker_set_id*/) override {
     res.protocolVersion = protocolVersion_.copy();
     res.id.startTime = 123;  // The "no scheduler" ID is 0/0, so change it.
     res.workerSetID.schedulerID = res.id;
@@ -401,7 +401,7 @@ struct WorkerSetIDFakeScheduler : public virtual cpp2::BistroSchedulerSvIf {
   }
   void processHeartbeat(
       cpp2::SchedulerHeartbeatResponse& res,
-      const cpp2::BistroWorker& worker,
+      const cpp2::BistroWorker& /*worker*/,
       const cpp2::WorkerSetID& worker_set_id) override {
     SYNCHRONIZED (workerSetIDs_) {
       if (!workerSetIDs_.empty()) {

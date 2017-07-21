@@ -18,7 +18,7 @@ namespace facebook { namespace bistro { namespace sqlite {
 namespace {
   std::atomic<bool> sqliteInitDone(false);
 
-  void callback(void* ignore, int err, const char* msg) {
+  void callback(void* /*ignore*/, int err, const char* msg) {
     LOG(ERROR) << "Sqlite error: (" << err << ") " << msg;
   }
 

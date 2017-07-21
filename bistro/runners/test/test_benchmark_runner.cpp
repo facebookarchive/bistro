@@ -78,12 +78,18 @@ TEST(TestBenchmarkRunner, HandleTaskOrder) {
   BenchmarkRunner runner;
   Synchronized<vector<int>> catcher;
   cpp2::RunningTask rt;
-  runner.emplaceTask([&catcher](const cpp2::RunningTask& rt, TaskStatus&& st) {
-    catcher->push_back(1);
-  }, rt, 20); // Task 1 finishes in 20ms
-  runner.emplaceTask([&catcher](const cpp2::RunningTask& rt, TaskStatus&& st) {
-    catcher->push_back(2);
-  }, rt, 10); // Task 2 finishes in 10ms
+  runner.emplaceTask(
+      [&catcher](const cpp2::RunningTask& /*rt*/, TaskStatus&& /*st*/) {
+        catcher->push_back(1);
+      },
+      rt,
+      20); // Task 1 finishes in 20ms
+  runner.emplaceTask(
+      [&catcher](const cpp2::RunningTask& /*rt*/, TaskStatus&& /*st*/) {
+        catcher->push_back(2);
+      },
+      rt,
+      10); // Task 2 finishes in 10ms
   this_thread::sleep_for(chrono::milliseconds(110)); // sleep an idleWait cycle
   EXPECT_EQ(2, catcher->at(0));
   EXPECT_EQ(1, catcher->at(1));

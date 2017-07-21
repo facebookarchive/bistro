@@ -80,7 +80,7 @@ public:
   virtual ~TaskRunner() {}
 
   // Used by child classes to do work before each scheduling loop.
-  virtual void updateConfig(std::shared_ptr<const Config> config) {}
+  virtual void updateConfig(std::shared_ptr<const Config> /*config*/) {}
 
   TaskRunnerResponse runTask(
     const Config& config,
@@ -92,13 +92,13 @@ public:
   ) noexcept;
 
   virtual LogLines getJobLogs(
-    const std::string& logtype,
-    const std::vector<std::string>& jobs,
-    const std::vector<std::string>& nodes,
-    int64_t line_id,
-    bool is_ascending,
-    const std::string& regex_filter
-  ) const {
+      const std::string& /*logtype*/,
+      const std::vector<std::string>& /*jobs*/,
+      const std::vector<std::string>& /*nodes*/,
+      int64_t /*line_id*/,
+      bool /*is_ascending*/,
+      const std::string& /*regex_filter*/
+      ) const {
     return LogLines();
   }
 
@@ -133,11 +133,11 @@ public:
    * throws, the remote worker will re-send the status update.
    */
   virtual void remoteUpdateStatus(
-    const cpp2::RunningTask& rt,
-    TaskStatus&& status,
-    const cpp2::BistroInstanceID scheduler_id,
-    const cpp2::BistroInstanceID worker_id
-  ) {
+      const cpp2::RunningTask& /*rt*/,
+      TaskStatus&& /*status*/,
+      const cpp2::BistroInstanceID /*scheduler_id*/,
+      const cpp2::BistroInstanceID /*worker_id*/
+      ) {
     throw std::logic_error("remoteUpdateStatus not implemented");
   }
 

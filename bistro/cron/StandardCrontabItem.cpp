@@ -448,9 +448,10 @@ time_t findPreSkipUTCTime(const ptime& not_a_time, time_zone_ptr tz) {
 
   auto first = PTimeSecondsIterator(first_pt);
   auto last = PTimeSecondsIterator(not_a_time);
-  auto first_non_time = *upper_bound(first, last, 0, [tz](int _0, ptime pt) {
-    return timezoneLocalPTimeToUTCTimestamps(pt, tz).isNotATime();
-  });
+  auto first_non_time =
+      *upper_bound(first, last, 0, [tz](int /*_0*/, ptime pt) {
+        return timezoneLocalPTimeToUTCTimestamps(pt, tz).isNotATime();
+      });
   // The search cannot fail and we cannot even check since last is the only
   // known isNotATime() value. Iterating in reverse would work, but no need.
   return timezoneLocalPTimeToUTCTimestamps(

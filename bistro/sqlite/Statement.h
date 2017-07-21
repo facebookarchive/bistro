@@ -211,7 +211,7 @@ private:
 
   void throwError(const std::string& msg) const;
 
-  void bindAll(int id) {}
+  void bindAll(int /*id*/) {}
 
   inline void bind(int id, int32_t value) {
     check(sqlite3_bind_int(stmt_, id, value));

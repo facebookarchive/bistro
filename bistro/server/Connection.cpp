@@ -113,24 +113,23 @@ void Connection::read() {
 
 void Connection::write() {
   boost::asio::async_write(
-    socket_,
-    std::vector<boost::asio::const_buffer>{
-      boost::asio::buffer("HTTP/1.0 200 OK"),
-      boost::asio::buffer(kHeaderEnd),
-      boost::asio::buffer(kContentLength),
-      boost::asio::buffer(to<string>(response_.size())),
-      boost::asio::buffer(kAllHeaderEnd),
-      boost::asio::buffer(response_),
-    },
-    [this](boost::system::error_code ec, size_t bytes_transferred) {
-      if (ec) {
-        LOG(ERROR) << "Error writing request: " << ec;
-      }
-      socket_.close();
-      destroyCallback_(this);
-      // DANGER: `this` has now been destroyed.
-    }
-  );
+      socket_,
+      std::vector<boost::asio::const_buffer>{
+          boost::asio::buffer("HTTP/1.0 200 OK"),
+          boost::asio::buffer(kHeaderEnd),
+          boost::asio::buffer(kContentLength),
+          boost::asio::buffer(to<string>(response_.size())),
+          boost::asio::buffer(kAllHeaderEnd),
+          boost::asio::buffer(response_),
+      },
+      [this](boost::system::error_code ec, size_t /*bytes_transferred*/) {
+        if (ec) {
+          LOG(ERROR) << "Error writing request: " << ec;
+        }
+        socket_.close();
+        destroyCallback_(this);
+        // DANGER: `this` has now been destroyed.
+      });
 }
 
 }}

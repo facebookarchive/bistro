@@ -65,10 +65,14 @@ dynamic c = dynamic::object
 
 struct TaskCounter : public TaskStore {
   int count_ = 0;
-  void fetchJobTasks(const vector<string>& job_ids, Callback cb)
-    override {}
-  void store(const string& job, const string& node, TaskResult result)
-    override { ++count_; }
+  void fetchJobTasks(const vector<string>& /*job_ids*/, Callback /*cb*/)
+      override {}
+  void store(
+      const string& /*job*/,
+      const string& /*node*/,
+      TaskResult /*result*/) override {
+    ++count_;
+  }
 };
 
 BENCHMARK(MakeSpan) {

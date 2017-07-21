@@ -193,15 +193,19 @@ TEST(TestAsyncReadPipe, ExternalClose) {
   folly::EventBase evb;
   size_t num_lines = 0;
   auto pipe = asyncReadPipe(
-    &evb,
-    std::move(read_pipe),
-    readPipeLinesCallback([&](AsyncReadPipe* pipe, folly::StringPiece s) {
-      if (!s.empty()) {
-        LOG(INFO) << "Read: '" << s << "'";
-        ++num_lines;
-      }
-    }, 0, '\n', 1)  // 1-char buffer to ensure that close is "instant"
-  );
+      &evb,
+      std::move(read_pipe),
+      readPipeLinesCallback(
+          [&](AsyncReadPipe* /*pipe*/, folly::StringPiece s) {
+            if (!s.empty()) {
+              LOG(INFO) << "Read: '" << s << "'";
+              ++num_lines;
+            }
+          },
+          0,
+          '\n',
+          1) // 1-char buffer to ensure that close is "instant"
+      );
   auto closed = pipe->pipeClosed();
 
   evb.loopOnce(EVLOOP_NONBLOCK);  // No data, no action

@@ -17,24 +17,22 @@ using namespace std;
 namespace facebook { namespace bistro {
 
 void FakeBistroWorker::async_tm_runTask(
-  unique_ptr<apache::thrift::HandlerCallback<void>> cb,
-  const cpp2::RunningTask& rt,
-  const string& config,
-  const std::vector<std::string>& command,
-  const cpp2::BistroInstanceID& scheduler,
-  const cpp2::BistroInstanceID& worker,
-  int64_t notify_if_tasks_not_running_sequence_num,
-  const cpp2::TaskSubprocessOptions& tso) {
-
+    unique_ptr<apache::thrift::HandlerCallback<void>> cb,
+    const cpp2::RunningTask& rt,
+    const string& /*config*/,
+    const std::vector<std::string>& /*command*/,
+    const cpp2::BistroInstanceID& /*scheduler*/,
+    const cpp2::BistroInstanceID& /*worker*/,
+    int64_t /*notify_if_tasks_not_running_sequence_num*/,
+    const cpp2::TaskSubprocessOptions& tso) {
   taskSubprocessOptsCob_(rt, tso);
   cb->done();
 }
 
 void FakeBistroWorker::async_tm_getRunningTasks(
-  std::unique_ptr<apache::thrift::HandlerCallback<
-    std::vector<cpp2::RunningTask>>> cb,
-  const cpp2::BistroInstanceID& worker) {
-
+    std::unique_ptr<
+        apache::thrift::HandlerCallback<std::vector<cpp2::RunningTask>>> cb,
+    const cpp2::BistroInstanceID& /*worker*/) {
   std::vector<cpp2::RunningTask> tasks;
   cb->result(tasks);
 }

@@ -30,25 +30,25 @@ BistroWorkerTestThread::BistroWorkerTestThread(
   auto ts = make_shared<ThriftServer>();
   auto socket_and_addr = getServerSocketAndAddress();
   workerPtr_ = make_shared<BistroWorkerHandler>(
-    ts,
-    dataDir_.getPath().native(),  // each worker runs in its own directory
-    [this, state_transition_cob](
-      const char* m, const cpp2::BistroWorker& w, const cpp2::RunningTask* rt
-    ) {
-      // Make it easy to wait for events using waitForRegexOnFd()
-      if (!rt) {
-        LOG(INFO) << "worker state change: " << m;
-      } else {
-        LOG(INFO) << "worker task state change: " << m
-          << " - " << rt->job << " / " << rt->node;
-      }
-      state_transition_cob(this, m);
-    },
-    std::move(scheduler_client_fn),
-    "",
-    socket_and_addr.second,
-    socket_and_addr.second.port
-  );
+      ts,
+      dataDir_.getPath().native(), // each worker runs in its own directory
+      [this, state_transition_cob](
+          const char* m,
+          const cpp2::BistroWorker& /*w*/,
+          const cpp2::RunningTask* rt) {
+        // Make it easy to wait for events using waitForRegexOnFd()
+        if (!rt) {
+          LOG(INFO) << "worker state change: " << m;
+        } else {
+          LOG(INFO) << "worker task state change: " << m << " - " << rt->job
+                    << " / " << rt->node;
+        }
+        state_transition_cob(this, m);
+      },
+      std::move(scheduler_client_fn),
+      "",
+      socket_and_addr.second,
+      socket_and_addr.second.port);
   ts->setInterface(workerPtr_);
   ts->useExistingSocket(std::move(socket_and_addr.first));
   sst_.start(std::move(ts));

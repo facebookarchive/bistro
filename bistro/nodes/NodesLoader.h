@@ -53,17 +53,18 @@ public:
 private:
   // It's not easy to separate fetching from pure post-processing for nodes,
   // since it's a multi-step process.
-  static std::shared_ptr<const Nodes> processRawData(
-    const std::shared_ptr<const Nodes> unused_prev_nodes,
-    const std::shared_ptr<const Nodes>& nodes
-  ) { return nodes; }
+ static std::shared_ptr<const Nodes> processRawData(
+     const std::shared_ptr<const Nodes> /*unused_prev_nodes*/,
+     const std::shared_ptr<const Nodes>& nodes) {
+   return nodes;
+ }
 
-  PeriodicPoller<
-    std::shared_ptr<const Nodes>,
-    int,
-    Nodes,
-    NodesLoader::processRawData
-  > loader_;
+ PeriodicPoller<
+     std::shared_ptr<const Nodes>,
+     int,
+     Nodes,
+     NodesLoader::processRawData>
+     loader_;
 };
 
 }}

@@ -209,7 +209,7 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
  * pages if "next_line_id" is -1.  To get the previous page, keep line page
  * ID (or time) the same, and toggle "sort".
  */
-dynamic HTTPMonitor::handleTaskLogs(const Config& c, const dynamic& d) {
+dynamic HTTPMonitor::handleTaskLogs(const Config& /*c*/, const dynamic& d) {
   if (d.get_ptr("columns")) {
     throw BistroException("Custom columns are currently not supported.");
   }
@@ -432,10 +432,9 @@ dynamic HTTPMonitor::handleRunningTasks(const dynamic& d) {
 }
 
 dynamic HTTPMonitor::handleHistograms(
-    const Config& c,
+    const Config& /*c*/,
     const vector<const Job*>& jobs,
     int num_samples) {
-
   const char* encoding =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 

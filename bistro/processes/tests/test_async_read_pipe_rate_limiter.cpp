@@ -35,15 +35,19 @@ struct Pipe {
     folly::checkUnixError(r, "fcntl");
 
     pipes_.emplace_back(asyncReadPipe(
-      evb,
-      std::move(read_pipe),
-      readPipeLinesCallback([this](AsyncReadPipe* pipe, folly::StringPiece s) {
-        if (!s.empty()) {  // Don't count the "end of stream" empty string
-          ++numRead_;
-        }
-        rateLim_->reduceQuotaBy(1);
-      }, 0, '\n', 10)  // Buffer size of 10 lines
-    ));
+        evb,
+        std::move(read_pipe),
+        readPipeLinesCallback(
+            [this](AsyncReadPipe* /*pipe*/, folly::StringPiece s) {
+              if (!s.empty()) { // Don't count the "end of stream" empty string
+                ++numRead_;
+              }
+              rateLim_->reduceQuotaBy(1);
+            },
+            0,
+            '\n',
+            10) // Buffer size of 10 lines
+        ));
     rateLim_.reset(new AsyncReadPipeRateLimiter(evb, 1, quota_incr, pipes_));
   }
 

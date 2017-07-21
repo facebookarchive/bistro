@@ -46,14 +46,14 @@ public:
   ) = 0;
 
   virtual LogLines getJobLogs(
-    const std::string& logtype,
-    const std::vector<std::string>& jobs,
-    const std::vector<std::string>& nodes,
-    int64_t line_id,
-    bool is_ascending,
-    int limit,
-    const std::string& regex_filter
-  ) const {
+      const std::string& /*logtype*/,
+      const std::vector<std::string>& /*jobs*/,
+      const std::vector<std::string>& /*nodes*/,
+      int64_t /*line_id*/,
+      bool /*is_ascending*/,
+      int /*limit*/,
+      const std::string& /*regex_filter*/
+      ) const {
     throw std::logic_error("Not implemented");
   }
 };

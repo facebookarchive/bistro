@@ -48,9 +48,9 @@ struct TaskStore {
  * persist done state anywhere.
  */
 struct NoOpTaskStore : public TaskStore {
-
-  void fetchJobTasks(const std::vector<std::string>& job_ids,
-                     Callback cb) override {}
+  void fetchJobTasks(
+      const std::vector<std::string>& /*job_ids*/,
+      Callback /*cb*/) override {}
 
   void store(const std::string&, const std::string&, TaskResult) override {}
 };

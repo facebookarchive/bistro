@@ -21,6 +21,7 @@ cpp_library(
         "@/bistro/bistro/if:common-cpp2",
         "@/bistro/bistro/processes:subprocess_with_timeout",
         "@/bistro/bistro/utils:utils_lib",
+        "@/folly:demangle",
         "@/folly:folly",
     ],
     external_deps = [("boost", None, "boost_filesystem")],

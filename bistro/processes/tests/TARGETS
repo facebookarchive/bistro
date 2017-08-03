@@ -1,7 +1,10 @@
 cpp_unittest(
     name = "test_async_read_pipe",
     srcs = ["test_async_read_pipe.cpp"],
-    deps = ["@/bistro/bistro/processes:processes"],
+    deps = [
+        "@/bistro/bistro/processes:processes",
+        "@/folly:exception",
+    ],
 )
 
 cpp_unittest(

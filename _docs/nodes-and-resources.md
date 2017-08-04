@@ -5,7 +5,7 @@ layout: docs
 permalink: /docs/nodes-and-resources/
 ---
 
-# Specify your computation using nodes and resources
+## Specify your computation using nodes and resources
 
 Your first step in using Bistro will likely be to figure out the node & resource model for your computation.
 

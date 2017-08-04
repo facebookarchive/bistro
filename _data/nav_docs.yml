@@ -8,6 +8,10 @@
   - id: case-study-db
   - id: case-study-queue
 
+- title: In depth
+  items:
+  - id: nodes-and-resources
+
 # XXX To be written soon --
 # - title: Guides
 #   items:

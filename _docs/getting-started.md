@@ -36,72 +36,72 @@ to:
 Although this is just a toy example, we can learn a lot from it:
 
 * The scheduler uses two fixed ports:
-  * `--server_port` provides a Thrift interface used by the workers.
-  * `--http_server_port` provides an HTTP REST API, used for monitoring and
-    control.
+    * `--server_port` provides a Thrift interface used by the workers.
+    * `--http_server_port` provides an HTTP REST API, used for monitoring and
+      control.
 * The scheduler is configured via a
   [file](https://github.com/facebook/bistro/blob/master/bistro/scripts/test_configs/simple),
   further discussed below.
-  * Configuration is constantly refreshed. Bistro polls the file every
-    `--config_update_ms` milliseconds.
-  * Configuration is
-    [pluggable](https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h):
-    you could use any kind of database instead.
+    * Configuration is constantly refreshed. Bistro polls the file every
+      `--config_update_ms` milliseconds.
+    * Configuration is
+      [pluggable](https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h):
+      you could use any kind of database instead.
 * The other scheduler settings are specific to the demo, but also clarify
   some of Bistro's design:
-  * `--CAUTION_startup_wait_for_workers=1` --- by default, Bistro waits a
-    fairly long time for remote workers to connect, before starting to run
-    tasks.  This prevents double-starting tasks in the event that the
-    scheduler restarts during a network partition.  Read the [protocol
-    documentation](https://github.com/facebook/bistro/blob/master/bistro/if/README.worker_protocol)
-    for the details.  For demo purposes, we abandon safety and shrink the
-    wait to just 1 second.
-  * Every Bistro scheduler has a root "instance" node, named after the
-    hostname of the machine it runs on.  This distinguishes their other
-    nodes in the UI in multi-scheduler deployments.  Unfortunately, the
-    worker hosts also correspond to nodes named by their hostname, so we add
-    `--instance_node_name=scheduler` to rename the scheduler's instance node
-    to differ from the hostname.  We could equally well have renamed the
-    worker's node via `--shard_id=worker`.
+    * `--CAUTION_startup_wait_for_workers=1` --- by default, Bistro waits a
+      fairly long time for remote workers to connect, before starting to run
+      tasks.  This prevents double-starting tasks in the event that the
+      scheduler restarts during a network partition.  Read the [protocol
+      documentation](https://github.com/facebook/bistro/blob/master/bistro/if/README.worker_protocol)
+      for the details.  For demo purposes, we abandon safety and shrink the
+      wait to just 1 second.
+    * Every Bistro scheduler has a root "instance" node, named after the
+      hostname of the machine it runs on.  This distinguishes their other
+      nodes in the UI in multi-scheduler deployments.  Unfortunately, the
+      worker hosts also correspond to nodes named by their hostname, so we add
+      `--instance_node_name=scheduler` to rename the scheduler's instance node
+      to differ from the hostname.  We could equally well have renamed the
+      worker's node via `--shard_id=worker`.
 * The worker's configuration is simpler:
-  * `--scheduler_host` (IPv6 is evidently ok) and `--scheduler_port`
-    identify the scheduler instance, and the worker registers itself.
-  * `--worker_command` is invoked for every new task, although Bistro's
-    [task execution is also
-    pluggable](https://github.com/facebook/bistro/blob/master/bistro/runners/),
-    so if you want your tasks to be custom RPC or even HTTP requests, all it
-    takes is a few lines of C++.
-  * `--data_dir` is required for two reasons:
-    * To keep the logs in `task_logs.sql3`, with automatic truncation,
-      see `--help`.
-    * To provide a per-job working directory in `jobs/`, useful for scratch
-      files, outputs, or inter-task data exchange.
+    * `--scheduler_host` (IPv6 is evidently ok) and `--scheduler_port`
+      identify the scheduler instance, and the worker registers itself.
+    * `--worker_command` is invoked for every new task, although Bistro's
+      [task execution is also
+      pluggable](https://github.com/facebook/bistro/blob/master/bistro/runners/),
+      so if you want your tasks to be custom RPC or even HTTP requests, all it
+      takes is a few lines of C++.
+    * `--data_dir` is required for two reasons:
+        * To keep the logs in `task_logs.sql3`, with automatic truncation,
+          see `--help`.
+        * To provide a per-job working directory in `jobs/`, useful for scratch
+          files, outputs, or inter-task data exchange.
 * Lastly, `demo_bistro_task.sh` will be triggered for every `job, level2
   node` pair --- this is the actual work of your sharded computation.  The
   arguments of this process follow a simple protocol:
-  * `argv[1]`: The *node* on which to run, a unique string --- a shard ID
-    for your computation.
-  * `argv[2]`: Write **one** status line into this status file. Valid values
-    include `done`, `incomplete`, `error_backoff`, `failed`, but other
-    values, including JSON, are also supported.  Bistro ignores your
-    process's exit code (these are unreliable in most scripting languages),
-    and assumes an error if you did not write exactly one status line.
-  * `argv[3]`: JSON of the form:
+    * `argv[1]`: The *node* on which to run, a unique string --- a shard ID
+      for your computation.
+    * `argv[2]`: Write **one** status line into this status file. Valid values
+      include `done`, `incomplete`, `error_backoff`, `failed`, but other
+      values, including JSON, are also supported.  Bistro ignores your
+      process's exit code (these are unreliable in most scripting languages),
+      and assumes an error if you did not write exactly one status line.
+    * `argv[3]`: JSON of the form:
 
-    ```json
-    {
-      "config": {...passed through from your job's config...},
-      "prev_status": {... the job's previous status on this node ...},
-      ... other, more advanced metadata, like nodes & resources ...
-    }
-    ```
+      ```json
+      {
+        "config": {...passed through from your job's config...},
+        "prev_status": {... the job's previous status on this node ...},
+        ... other, more advanced metadata, like nodes & resources ...
+      }
+      ```
 
-    `"config"` lets you change your tasks' configuration on the fly ---
-    since job configuration is polled frequently, new tasks are always
-    started with the latest `"config"`.  You can use `"prev_status"` as a
-    non-durable checkpoint (but [open an
-    issue](https://github.com/facebook/bistro/issues/new) if you want to
-    improve its durability).
+      `"config"` lets you change your tasks' configuration on the fly ---
+      since job configuration is polled frequently, new tasks are always
+      started with the latest `"config"`.  You can use `"prev_status"` as a
+      non-durable checkpoint (but [open an
+      issue](https://github.com/facebook/bistro/issues/new) if you want to
+      improve its durability).
 
 ### Understanding the configuration file
 
@@ -125,10 +125,10 @@ section --- this is the part that configures the scheduler.
 A `node` is a unique string, which is Bistro's way of making tasks and
 tracking resources.  To make a task, you need:
 
-  * a job
-  * a logical node, which identifies the unique shard being worked on -- see
-    `argv[1]` above
-  * some number of resource nodes, which serve to enforce resource constraints
+* a job
+* a logical node, which identifies the unique shard being worked on -- see
+  `argv[1]` above
+* some number of resource nodes, which serve to enforce resource constraints
 
 Each node belongs to one `level`. The scheduler's sole instance node belongs
 to the special `instance` level.  The workers' nodes belong to the special

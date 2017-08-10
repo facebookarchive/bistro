@@ -165,4 +165,4 @@ Combining the two preceding ideas, you can make it so that your special jobs, an
 
 ## Advanced resource configuration: automatically discovering physical worker resources
 
-See [Physical resources: discovering and enforcing](http://facebook.github.io/bistro/docs/physical-resources/).
+See [Physical resources: discovering and enforcing](https://facebook.github.io/bistro/docs/physical-resources/).

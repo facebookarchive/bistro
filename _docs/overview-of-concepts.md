@@ -49,7 +49,9 @@ Each task has a *status*. Bistro remembers the last status of each task. This pr
 - `done`: This task has finished. Bistro won't run it ever again.
 - `incomplete`: This task ran at least once and wants to run again, but it hasn't been scheduled yet.
 - `error_backoff`: This task failed on its previous run, and is currently waiting for its back-off period to expire before trying again.
-- `failed`: This task failed permanently and Bistro should not try to run it again.
+- `failed`: This task failed permanently and Bistro should not try to run it again. 
+
+*Note*: the [REST API](https://facebook.github.io/bistro/docs/rest-api/) has a `forgive_jobs` handler, which will immediately release any tasks from back-off, and will also allow permanently failed tasks to retry. This is useful if you are rolling out a fix that caused your task to crash on a portion of the data. See [HTTPMonitor.cpp](https://github.com/facebook/bistro/blob/master/bistro/server/HTTPMonitor.cpp)) for handler usage.
 
 Shell-command can write their status to their `argv[2]` as one of the above strings, or as a JSON string with extra metadata (TODO: docs). A task that fails to emit a status is taken to be in ["error_backoff", unless it was killed by Bistro](https://github.com/facebook/bistro/blob/master/bistro/processes/TaskSubprocessQueue.cpp#L64). In rare cases, you might use other [status codes not listed above](https://github.com/facebook/bistro/blob/master/bistro/statuses/TaskStatus.h).
 
@@ -66,7 +68,7 @@ Furthermore, in Bistro, you can:
 
 Bistro also provides a wide range of `filters` (specified per level) so you can run tasks against only a subset of nodes.
 
-Search the [Configuration](http://facebook.github.io/bistro/docs/configuration/) guide to learn more about the settings mentioned above.
+Search the [Configuration](https://facebook.github.io/bistro/docs/configuration/) guide to learn more about the settings mentioned above.
 
 # Scheduler Policy
 

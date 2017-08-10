@@ -22,6 +22,7 @@ This is a brief summary of [Nodes and Resources](https://facebook.github.io/bist
 Bistro models data resources hierarchically, usually as a tree, though other structures are possible. For example: the children of a database host are the databases it serves, an HBase host contains regions, a Hive table splits into partitions, which in turn consists of files.
 
 > ![Cartoon illustration of resource tree](https://facebook.github.io/bistro/static/resource_cartoon.jpg)
+>
 > *A three-level node tree, with resource constraints on:*
 >* *Rack switch bandwidth at the top (capacity of 10 Gbps), *
 >*  *Host IO capacity in the middle (3 logical units available per host),*
@@ -101,6 +102,7 @@ We support worker resource constraints so you can control how tasks are allocate
 
 By default, Bistro will assign tasks to workers in a round-robin fashion, subject to worker resource availability. This can be changed by setting `bistro_settings → remote_worker_selector` to one of these values:
   - [busiest](https://github.com/facebook/bistro/blob/master/bistro/remote/BusiestRemoteWorkerSelector.h): For the task to be scheduled, iterate through the workers in *increasing* order of their "remaining capacity", defined as `sum(r.weight * r.slots_remaining for r in worker.resources)`, where 
+
         - `weight` comes from `bistro_settings → resources → LEVEL -> RESOURCE -> weight` and `slots_remaining`, and
         - `slots_remaining` is that specific worker's capacity in that resource, minus the slots used by the tasks already running on the worker.
 

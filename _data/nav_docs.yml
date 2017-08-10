@@ -10,5 +10,6 @@
 
 - title: In depth
   items:
+  - id: overview-of-concepts
   - id: nodes-and-resources
   - id: configuration

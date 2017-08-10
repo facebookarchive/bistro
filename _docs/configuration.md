@@ -136,6 +136,7 @@ In addition to the `bistro_settings` key, each Bistro config can support 0 or mo
 
 - `enabled`: A boolean that determines whether we will run the job. Default: **true**. See also `kill_orphan_tasks_after_sec`.
 - `owner` *(required)*: A string representing the owner of the job. 
+- `command`: An array of `["command", "initial", "args"]`. The job will run this command instead of the `--worker_command` passed to `bistro_scheduler` (with `LocalRunner`) or `bistro_worker` (with `RemoteWorkerRunner`).  Also see [Task execution](https://facebook.github.io/bistro/docs/task-execution).
 - `priority`: A floating-point priority value, higher values are usually more important. Its effect depends on the scheduler policy used. Defaults to **1.0**.
 - `config`: This is an arbitrary JSON object that will be passed to each task. This is where custom configuration per-job should go. Defaults to **{}**.
 - `resources`: *(overrides `bistro_settings`)* A JSON object that determines how much of each resource a job uses (overriding the defaults set in the `bistro_settings`). The format is `{"RESOURCE_NAME": amount_used}`.

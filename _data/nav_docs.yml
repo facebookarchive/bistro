@@ -13,6 +13,7 @@
   - id: overview-of-concepts
   - id: nodes-and-resources
   - id: configuration
+  - id: task-execution
   - id: supervising-and-killing-tasks
   - id: rest-api
   - id: physical-resources

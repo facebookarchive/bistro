@@ -106,7 +106,8 @@ By default, Bistro will assign tasks to workers in a round-robin fashion, subjec
     - `weight` comes from `bistro_settings → resources → LEVEL -> RESOURCE -> weight` and `slots_remaining`, and
     - `slots_remaining` is that specific worker's capacity in that resource, minus the slots used by the tasks already running on the worker.
 
-  Then, pick the first worker that can fit the task.
+    Then, pick the first worker that can fit the task.
+
   - [roundrobin](https://github.com/facebook/bistro/blob/master/bistro/remote/RoundRobinRemoteWorkerSelector.h): Advances a pointer in a non-deterministic order to loop over the set of workers, so that `number of workers` scheduling attempts elapse before we reuse any given worker.
 
 

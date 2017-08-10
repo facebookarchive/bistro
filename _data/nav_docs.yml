@@ -11,17 +11,4 @@
 - title: In depth
   items:
   - id: nodes-and-resources
-
-# XXX To be written soon --
-# - title: Guides
-#   items:
-#   - id: key-concepts
-#   - id: config-source
-#   - id: config-scheduler
-#   - id: config-job
-#   - id: persistence
-#   - id: execution
-#   - id: data-shards
-#   - id: logging
-#   - id: best-practices
-
+  - id: configuration

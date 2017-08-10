@@ -14,4 +14,5 @@
   - id: nodes-and-resources
   - id: configuration
   - id: supervising-and-killing-tasks
+  - id: rest-api
   - id: physical-resources

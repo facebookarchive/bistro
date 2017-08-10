@@ -165,27 +165,4 @@ Combining the two preceding ideas, you can make it so that your special jobs, an
 
 ## Advanced resource configuration: automatically discovering physical worker resources
 
-This section is bare-bones by design, please talk to us if you need it to be fleshed out.
-
-Discovering available physical resources on a host is tricky business. You cannot just read `/proc/cpuinfo` and run with it. Linux provides `cgroup` and `cgroup-v2` for restricting the resources available to a process tree -- and it is completely reasonable for `bistro_worker` to be sandboxed in this way. At present, Bistro's code for discovering usable physical resources is aware of neither `cgroup` nor `cgroup-v2`. The setting "physical_reserve_amount" accommodates the case when a fixed part of a host's resources is reserved for something else (like basic system services). However, proper cgroup support would be better -- patches are welcome, see `bistro/physical`. 
-
-On the plus side, besides auto-detecting system memory & CPU cores, Bistro knows how to query available nVidia GPUs via `nvidia-smi`. Patches for other resource types are also welcome.
-
-Here is an example configuration for automatically setting 3 resources on all `worker`-level nodes:
-
-``` json
-"physical_resources": {
-    "ram_mb": {
-        "logical_resource": "ram_gb",
-        "multiply_logical_by": 1024,
-        "physical_reserve_amount": 4096
-    },
-    "cpu_core": {
-        "logical_resource": "cpu_core",
-        "enforcement": "none"
-    },
-    "gpu_card": {
-        "logical_resource": "gpu"
-    }
-}
-```
+See [Physical resources: discovering and enforcing](http://facebook.github.io/bistro/docs/physical-resources/).

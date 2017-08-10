@@ -39,7 +39,7 @@ The only key required to be present in the config is `bistro_settings`. This det
 - `resources` *(required)*: See "Node and Resource Settings" below.
 - `node_order`: For each job, the scheduler sequentially checks each node to see if a task can be run on it. This setting determines the order of these checks. Defaults to **"random"**. Other options are [here](https://github.com/facebook/bistro/blob/master/bistro/config/NodeOrderType.h).
 - `level_for_tasks`: See "Running Jobs on Different Levels" below.
-- `remote_worker_selector`, `worker_resources_override`, `CAUTION_exit_initial_wait_before_timestamp`, `physical_resources`: TODO refer to a text about remote workers.
+- `remote_worker_selector`, `worker_resources_override`, `CAUTION_exit_initial_wait_before_timestamp`, `physical_resources`: These settings control resource control and execution for Bistro's remote worker pool. To learn more, you will want to start with [Overview of concepts: RemoteWorkerRunner](http://facebook.github.io/bistro/docs/overview-of-concepts/#remoteworkerrunner), and then proceed to read the code.
 - `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: TODO refer to "Sandboxing and killing tasks".
 
 ## Determining which tasks run (or do not run), when
@@ -65,7 +65,7 @@ The `resources` in `bistro_settings` key restricts the tasks that can run concur
 This key is required, although it's possible to set it to an empty object to have no resource constraints (be careful!). This object describes resources available at each node level. It has the form `{"level name": {"resource_name": {...}}`. A resource object has these keys:
  * `default` *(required)*: excepting jobs that customize how much of this resource they require, every task of every job will need consume this much of the resource whenever it uses a node of this level.
  * `limit` *(required)*: the number of slots of that resource that is available at each node on that level (`bistro_settings → worker_resources_override` can change this for workers).
- * `weight` *(optional)*: How important is this resource when `remote_worker_selector` is set to `busiest`? (TODO: link to RemoteWorkerRunner in OverviewOfConcepts)
+ * `weight` *(optional)*: How important is this resource when `remote_worker_selector` is set to `busiest`? The mechanism is documented in [Overview of concepts: RemoteWorkerRunner](http://facebook.github.io/bistro/docs/overview-of-concepts/#remoteworkerrunner).
 
 ## Example `bistro_settings`
 

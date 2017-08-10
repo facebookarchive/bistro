@@ -66,7 +66,7 @@ Furthermore, in Bistro, you can:
 
 Bistro also provides a wide range of `filters` (specified per level) so you can run tasks against only a subset of nodes.
 
-(TODO: link to the Configuration doc in the above)
+Search the [Configuration](http://facebook.github.io/bistro/docs/configuration/) guide to learn more about the settings mentioned above.
 
 # Scheduler Policy
 

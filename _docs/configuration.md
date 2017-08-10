@@ -1,3 +1,10 @@
+---
+docid: configuration
+title: Configuration
+layout: docs
+permalink: /docs/configuration/
+---
+
 # Storing Configuration
 
 Bistro's configuration is formatted as JSON, and comes in two components:

@@ -24,8 +24,8 @@ Bistro models data resources hierarchically, usually as a tree, though other str
 > ![Cartoon illustration of resource tree](https://facebook.github.io/bistro/static/resource_cartoon.jpg)
 >
 > *A three-level node tree, with resource constraints on:*
->* *Rack switch bandwidth at the top (capacity of 10 Gbps), *
->*  *Host IO capacity in the middle (3 logical units available per host),*
+>* *Rack switch bandwidth at the top (capacity of 10 Gbps),*
+>* *Host IO capacity in the middle (3 logical units available per host),*
 >* *Data volume-level locks with a capacity of 1 per volume.*
 
 A resource at each level is just an arbitrary label, such as "volume_lock" or "host_io". Along with this label is a corresponding limit for how much of that resource is available at each node of the level. 
@@ -103,8 +103,8 @@ We support worker resource constraints so you can control how tasks are allocate
 By default, Bistro will assign tasks to workers in a round-robin fashion, subject to worker resource availability. This can be changed by setting `bistro_settings → remote_worker_selector` to one of these values:
   - [busiest](https://github.com/facebook/bistro/blob/master/bistro/remote/BusiestRemoteWorkerSelector.h): For the task to be scheduled, iterate through the workers in *increasing* order of their "remaining capacity", defined as `sum(r.weight * r.slots_remaining for r in worker.resources)`, where 
 
-        - `weight` comes from `bistro_settings → resources → LEVEL -> RESOURCE -> weight` and `slots_remaining`, and
-        - `slots_remaining` is that specific worker's capacity in that resource, minus the slots used by the tasks already running on the worker.
+    - `weight` comes from `bistro_settings → resources → LEVEL -> RESOURCE -> weight` and `slots_remaining`, and
+    - `slots_remaining` is that specific worker's capacity in that resource, minus the slots used by the tasks already running on the worker.
 
   Then, pick the first worker that can fit the task.
   - [roundrobin](https://github.com/facebook/bistro/blob/master/bistro/remote/RoundRobinRemoteWorkerSelector.h): Advances a pointer in a non-deterministic order to loop over the set of workers, so that `number of workers` scheduling attempts elapse before we reuse any given worker.

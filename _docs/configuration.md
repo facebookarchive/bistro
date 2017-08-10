@@ -39,7 +39,8 @@ The only key required to be present in the config is `bistro_settings`. This det
 - `resources` *(required)*: See "Node and Resource Settings" below.
 - `node_order`: For each job, the scheduler sequentially checks each node to see if a task can be run on it. This setting determines the order of these checks. Defaults to **"random"**. Other options are [here](https://github.com/facebook/bistro/blob/master/bistro/config/NodeOrderType.h).
 - `level_for_tasks`: See "Running Jobs on Different Levels" below.
-- `remote_worker_selector`, `worker_resources_override`, `CAUTION_exit_initial_wait_before_timestamp`, `physical_resources`: These settings control resource control and execution for Bistro's remote worker pool. To learn more, you will want to start with [Overview of concepts: RemoteWorkerRunner](http://facebook.github.io/bistro/docs/overview-of-concepts/#remoteworkerrunner), and then proceed to read the code.
+- `physical_resources`: See [Physical resources](http://facebook.github.io/bistro/docs/physical-resources/).
+- `remote_worker_selector`, `worker_resources_override`, `CAUTION_exit_initial_wait_before_timestamp`: These settings control resource control and execution for Bistro's remote worker pool. To learn more, you will want to start with [Overview of concepts: RemoteWorkerRunner](http://facebook.github.io/bistro/docs/overview-of-concepts/#remoteworkerrunner), and then proceed to read the code.
 - `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: TODO refer to "Sandboxing and killing tasks".
 
 ## Determining which tasks run (or do not run), when

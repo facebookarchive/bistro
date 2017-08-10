@@ -1,6 +1,6 @@
 ---
 docid: physical-resources
-title: Physical resources: discovering and enforcing
+title: Physical resources, discovering and enforcing
 layout: docs
 permalink: /docs/physical-resources/
 ---

@@ -13,4 +13,5 @@
   - id: overview-of-concepts
   - id: nodes-and-resources
   - id: configuration
+  - id: supervising-and-killing-tasks
   - id: physical-resources

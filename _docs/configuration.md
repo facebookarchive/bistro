@@ -41,7 +41,7 @@ The only key required to be present in the config is `bistro_settings`. This det
 - `level_for_tasks`: See "Running Jobs on Different Levels" below.
 - `physical_resources`: See [Physical resources](http://facebook.github.io/bistro/docs/physical-resources/).
 - `remote_worker_selector`, `worker_resources_override`, `CAUTION_exit_initial_wait_before_timestamp`: These settings control resource control and execution for Bistro's remote worker pool. To learn more, you will want to start with [Overview of concepts: RemoteWorkerRunner](http://facebook.github.io/bistro/docs/overview-of-concepts/#remoteworkerrunner), and then proceed to read the code.
-- `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: TODO refer to "Sandboxing and killing tasks".
+- `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: See [Supervising and killing tasks](snarkmaster.github.io/bistro/docs/supervising-and-killing-tasks) for the details.
 
 ## Determining which tasks run (or do not run), when
 
@@ -143,7 +143,7 @@ In addition to the `bistro_settings` key, each Bistro config can support 0 or mo
 - `filters`: See "Job Filters" below.
 - `depends_on`: If the configuration for "job3" sets `"depends_on": ["job1", "job2"]`, then "job3" will only start on node "n" after both "job1" and "job2" have finished on "n". Defaults to **[]**.
 - `level_for_tasks`: *(overrides `bistro_settings`)* See "Running Jobs on Different Levels" below.
-- `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: *(overrides `bistro_settings`)* TODO refer to "Sandboxing and killing tasks".
+- `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: *(overrides `bistro_settings`)* See [Supervising and killing tasks](snarkmaster.github.io/bistro/docs/supervising-and-killing-tasks) for the details.
 - `host_placement`, `level_for_host_placement`:  *CAUTION* — these options are likely to change significantly in the future. Allows scheduling a job on specific hosts, primarily useful for scheduling tasks on the hosts that contain the data. Note that both options use the actual hostname of the worker process (from the structure [MachinePortLock](https://github.com/facebook/bistro/blob/master/bistro/if/common.thrift)), not the worker's ID. If both `host_placement` and `level_for_host_placement` are set, the former prevails since it is more specific.
 - `errors`: If you the `ConfigLoader` contains an invalid job, or if the  `save_job` REST call received an invalid job, Bistro will do a best-effort parse of the JSON, and record any bad data in the `errors` key — see [DynamicParser.h](https://github.com/facebook/folly/blob/master/folly/experimental/DynamicParser.h) for a description of its format.
 

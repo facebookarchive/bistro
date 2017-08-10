@@ -21,8 +21,8 @@ actual scheduling and enforcement.
 Please talk to us if you need this documentation to be fleshed out.
 
 In principle, it would be desirable to extend this mechanism to support
-automatic discovery of other resource types.  If you are looking to do this
-work, please open an issue to discuss the design.
+automatic discovery of other resource types — including data resources.  If
+you are looking to do this work, please open an issue to discuss the design.
 
 ## Discovering worker host physical resources
 
@@ -84,7 +84,8 @@ use 10 cores and 20GB of RAM. In a shared compute cluster, this can lead
 to instability and poor performance.
 
 Bistro can use Linux `cgroup` subsystems (when appropriately configured, see
-TODO Killing and sandboxing tasks) to enforce CPU & RAM utilization.
+[Supervising and killing tasks](snarkmaster.github.io/bistro/docs/supervising-and-killing-tasks))
+to enforce CPU & RAM utilization.
 
 At present, `cgroup-v2` is not supported.
 

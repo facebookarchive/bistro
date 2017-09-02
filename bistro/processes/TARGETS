@@ -24,6 +24,7 @@ cpp_library(
         "@/folly:exception",
         "@/folly:subprocess",
         "@/folly/gen:file",
+        "@/folly/gen:string",
         "@/wangle:wangle",
     ],
 )
@@ -40,6 +41,7 @@ cpp_library(
         "@/folly:exception",
         "@/folly:subprocess",
         "@/folly/futures:futures",
+        "@/folly/gen:string",
     ],
     external_deps = ["libevent"],
 )

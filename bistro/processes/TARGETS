@@ -23,6 +23,7 @@ cpp_library(
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:exception",
         "@/folly:subprocess",
+        "@/folly/gen:file",
         "@/wangle:wangle",
     ],
 )

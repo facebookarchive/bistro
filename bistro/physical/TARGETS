@@ -24,6 +24,7 @@ cpp_library(
         "@/folly:demangle",
         "@/folly:exception",
         "@/folly:folly",
+        "@/folly/gen:file",
     ],
     external_deps = [("boost", None, "boost_filesystem")],
 )

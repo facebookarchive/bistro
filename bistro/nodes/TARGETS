@@ -26,6 +26,7 @@ cpp_library(
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:folly",
         "@/folly:subprocess",  # for ScriptFetcher
+        "@/folly/gen:file",
     ],
     external_deps = [
         "boost",

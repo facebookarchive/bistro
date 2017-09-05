@@ -1,0 +1,62 @@
+/**
+ * @provides bistro-prefs
+ */
+
+.bistro-prefs > div {
+  padding: 10px 0px 0px 5px;
+}
+
+.bistro-prefs .explicit-pref {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2a2;
+}
+
+.bistro-prefs .implicit-pref {
+  font-size: 14px;
+  font-weight: bold;
+  color: #888;
+}
+
+.bistro-prefs .nondefault-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2a2;
+}
+
+.bistro-prefs .default-value {
+  font-size: 14px;
+  color: #888;
+}
+
+.bistro-prefs .schema-type {
+  padding-left: 10px;
+  color: #aaa;
+}
+
+.bistro-prefs .schema-label {
+  font-size: 13px;
+  color: #888;
+}
+
+.bistro-prefs .schema-caption {
+  font-size: 12px;
+  color: #888;
+}
+
+.bistro-prefs .hostport-source-override {
+  font-size: 12px;
+  color: #c82;
+  padding-left: 10px;
+}
+
+/* Makes the link appear as '>' when contracted, and 'v' when expanded */
+.bistro-prefs .contract {
+  display: none;
+}
+.bistro-prefs .bistro-detail-toggle-expanded .contract {
+  display: inline;
+}
+.bistro-prefs .bistro-detail-toggle-expanded .expand {
+  display: none;
+}

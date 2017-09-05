@@ -1,0 +1,30 @@
+/**
+ * @provides details-for-stacked-bar-chart
+ */
+
+.stacked-bar-chart-detail-view
+{
+  margin: 3px 0px;
+  padding: 5px;
+  background-color: #ddd;
+  border-right: 1px solid black;
+  border-left: 1px solid black;
+  display: none;  /* only shown when expanded */
+}
+
+.stacked-bar-chart-detail-view.bistro-detail-toggle-expanded {
+  display: block;
+}
+
+.stacked-bar-chart-detail-view > table {
+  margin-left: 5px;
+}
+
+.stacked-bar-chart-detail-view > div {
+  margin-left: 5px;
+  white-space: normal; /* wrap inside Aphront tables */
+}
+
+.stacked-bar-chart-with-details > .stacked-bar-chart {
+  cursor: pointer;
+}

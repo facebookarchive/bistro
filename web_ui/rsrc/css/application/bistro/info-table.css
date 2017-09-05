@@ -1,0 +1,12 @@
+/**
+ * @provides info-table
+ */
+
+/* The selector is nasty to be more specific than the aphront td CSS */
+table.info-table > tbody > tr > td {
+  padding: 0px;
+}
+
+table.info-table {
+  margin-left: 10px;
+}

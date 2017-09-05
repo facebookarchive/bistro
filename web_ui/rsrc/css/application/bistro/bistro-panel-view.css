@@ -1,0 +1,15 @@
+/**
+ * @provides bistro-panel-view-css
+ */
+
+.phui-box.phui-object-box.bistro-panel-width-form {
+  width: 720px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.phui-box.phui-object-box.bistro-panel-width-wide {
+  width: 1080px;
+  margin-right: auto;
+  margin-left: auto;
+}

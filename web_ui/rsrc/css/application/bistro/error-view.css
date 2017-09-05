@@ -1,0 +1,89 @@
+/**
+ * @provides bistro-error-view-css
+ */
+
+.bistro-error-view {
+  border-style: solid;
+  border-width: 1px;
+}
+
+.bistro-error-view {
+  margin: 16px;
+}
+
+.device-phone .bistro-error-view {
+  margin: 8px;
+}
+
+.bistro-error-view .phui-form-view {
+  padding: 0;
+}
+
+.bistro-error-view-body {
+  padding: 12px;
+}
+
+.bistro-panel-plain .bistro-error-view {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+h1.bistro-error-view-head {
+  padding: 12px 8px 0 12px;
+  font-weight: bold;
+  font-size: 15px;
+  color: var(phabricator-darkgreytext);
+}
+
+.bistro-error-view-list {
+  margin: 0 0 0 16px;
+  list-style: disc;
+}
+
+.bistro-error-severity-error {
+  color: var(phabricator-red);
+  border-color: var(phabricator-red);
+  background: var(phabricator-lightred);
+}
+
+.bistro-error-severity-error .bistro-error-view-head {
+  color: var(phabricator-red);
+}
+
+.bistro-error-severity-warning {
+  color: #bc7837;
+  border-color: var(phabricator-yellow);
+  background: var(phabricator-lightyellow);
+}
+
+.bistro-error-severity-warning .bistro-error-view-head {
+  color: #bc7837;
+}
+
+.bistro-error-severity-notice {
+  color: var(phabricator-blue);
+  border-color: var(phabricator-blue);
+  background: var(phabricator-lightblue);
+}
+
+.bistro-error-severity-notice .bistro-error-view-head {
+  color: var(phabricator-blue);
+}
+
+.bistro-error-severity-nodata {
+  border-color: var(phabricator-lightgreyborder);
+  border-bottom: 1px solid var(phabricator-greyborder);
+  color: var(phabricator-greytext);
+  background-color: #fff;
+}
+
+.bistro-dialog-body .bistro-error-view {
+  margin: -16px -16px 16px -16px;
+  border-width: 0 0 1px 0;
+  border-bottom: 1px solid var(phabricator-lightblueborder);
+}
+
+.bistro-dialog-body .bistro-error-view .bistro-error-view-list {
+  margin: 0 0 0 16px;
+  list-style: disc;
+}

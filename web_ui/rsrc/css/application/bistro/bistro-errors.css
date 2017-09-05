@@ -1,0 +1,35 @@
+/**
+ * @provides bistro-errors
+ */
+
+.bistro-error {
+  background-color: #faa;
+  max-height: 240px; /* If we change resources, logspam can be massive */
+  overflow-x: auto; /* If the error is too wide, show a scroll bar */
+  padding: 5px;
+  width: 980px;
+}
+
+.bistro-error > pre {
+  padding: 5px;
+  white-space: pre-wrap;
+}
+
+.bistro-errors > h1 {
+  margin: 10px 0px;
+}
+
+/**
+ * Override the consensus finder's "inconsistent" markup, because multiple
+ * bottle errors is not in and of itself bad.
+ */
+.bistro-errors > .bistro-consensus-finder.inconsistent > * {
+  background-color: inherit;
+}
+.bistro-errors > .bistro-consensus-finder.inconsistent > p:after {
+  content: "";  /* No inconsistency warning */
+}
+.bistro-errors > .bistro-consensus-finder.inconsistent > p {
+  margin: 0px;
+  padding: 0px;
+}

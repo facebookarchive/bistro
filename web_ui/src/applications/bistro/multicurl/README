@@ -1,0 +1,14 @@
+Does your web UI need to query a lot of servers at once? Multi-curl
+dispatches a lot of concurrent self-curls against your web server as a crude
+form of multi-threading.
+
+The library abstracts away all the hard work. All you need to do is:
+  1) Extend BistroBaseMultiCurlController.
+  2) Add an endpoint for your controller to PhabricatorApplicationBistro.
+  3) Extend BistroBaseMultiCurlClient, with the class constant
+     CURL_ENDPOINT_PREFIX pointing at your endpoint.
+
+Note that multi-curl has substantial performance overhead (see the TODO in
+the base controller), so when your query parallelism is too low (under
+PREF_HOSTPORTS_PER_CURL), the library does the queries serially in the main
+request, with no self-curl.

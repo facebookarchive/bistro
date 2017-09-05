@@ -1,0 +1,96 @@
+/**
+ * @provides bistro-jobs
+ */
+
+/* Extra-specific to override some base Phabricator CSS #cssfailsauce */
+body div.bistro-jobs.aphront-panel-view {
+  margin: 0px auto;
+  width: 1000px;
+}
+
+div.bistro-jobs .bistro-jobs-edit-query-on-right {
+  float: right;
+  position: relative;
+  top: -33px;
+}
+
+div.bistro-jobs .job-filter {
+  margin-bottom: 20px;
+  max-width: 1000px;
+}
+
+/* Addind this hack because Phabricator made forms non-white */
+div.bistro-jobs .job-filter .phui-form-view {
+  background-color: white;
+}
+
+div.bistro-jobs .fetcher-summary {
+  margin-bottom: 15px;
+}
+
+div.bistro-jobs .job-col h2 {
+  margin-right: 10px;
+}
+
+div.bistro-jobs .job-col .disabled-job {
+  background-color: #fcc;
+}
+
+div.bistro-jobs .job-state {
+  float: right;
+}
+
+div.bistro-jobs .config-blob {
+  border: 1px solid #ccc;
+  max-width: 946px;
+  overflow-x: auto;
+}
+
+div.bistro-jobs .job-col {
+  background: #fff;
+  border-top: 1px solid #ccc;
+  margin-bottom: 20px;
+  max-width: 985px;
+  padding: 9px 0px 10px 15px;
+}
+
+div.bistro-jobs .job-col > h2 {
+  margin-bottom: 13px;
+}
+
+div.bistro-jobs .job-col .job-metadata {
+  display: inline-block;
+  margin-bottom: 8px;
+  margin-right: 15px;
+  max-width: 231px;
+  vertical-align: top;
+  width: 231px;
+}
+
+div.bistro-jobs .job-col .job-metadata > p {
+  color: #888;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+div.bistro-jobs .job-col .job-metadata .job-full-path {
+  word-break: break-all;
+}
+
+/*** Iframe div ***/
+
+div.bistro-jobs .job-col .iframe-div {
+  width: 964px;
+}
+
+div.bistro-jobs .job-col .iframe-div iframe {
+  height: 420px;
+  width: 100%;
+}
+
+div.bistro-jobs .job-col .iframe-div div {
+  background-color: #Ffc;
+  margin-left: 4px;
+  padding: 5px;
+}

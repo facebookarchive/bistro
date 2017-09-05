@@ -1,0 +1,39 @@
+/**
+ * @provides bistro-pager-view-css
+ */
+
+.bistro-pager-view {
+  clear: both;
+  text-align: right;
+  padding: 8px 4px 16px;
+  font-weight: bold;
+}
+
+.phui-box .bistro-pager-view {
+  padding: 0;
+}
+
+.bistro-pager-view a {
+  padding: 3px 7px;
+  border: 1px solid var(phabricator-lightblueborder);
+  border-bottom: 1px solid var(phabricator-blueborder);
+  margin: 0 2px;
+  background: #fff;
+  color: var(phabricator-lightbluetext);
+  display: inline-block;
+  border-radius: 2px;
+}
+
+.bistro-pager-view a:hover {
+  text-decoration: none;
+  border: 1px solid var(phabricator-greyborder);
+  border-bottom: 1px solid var(phabricator-darkgreyborder);
+  color: var(phabricator-darkgreytext);
+}
+
+.bistro-pager-view a.current {
+  background: var(phabricator-greybackground);
+  border: 1px solid var(phabricator-greyborder);
+  border-bottom: 1px solid var(phabricator-darkgreyborder);
+  color: var(phabricator-darkgreytext);
+}

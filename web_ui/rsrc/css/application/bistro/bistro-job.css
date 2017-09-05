@@ -1,0 +1,79 @@
+/**
+ * @provides bistro-job
+ */
+
+div.bistro-why-invalid {
+  max-height: 250px;
+  overflow: auto; /* If there are too many errors , show a scroll bar */
+}
+
+div.bistro-why-invalid > h2 {
+  margin-bottom: 5px;
+}
+
+div.bistro-why-invalid > div {
+  background-color: #faa;
+  font-weight: bold;
+  padding: 5px;
+  width: 960px;
+}
+
+.bistro-consensus-finder.inconsistent div.bistro-why-invalid {
+  padding: 0px; /* Already padded by the inconsistency rendering */
+}
+
+div.bistro-why-invalid > div > pre {
+  font-weight: normal;
+  max-height: 100px;
+  overflow: auto; /* If the error is too tall or wide, show a scroll bar */
+  padding: 5px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+div.bistro-job-secondary-bar {
+  margin-top: 5px;
+  padding-left: 15px;
+}
+
+div.bistro-job-primary-bar > p {
+  padding-bottom: 3px;
+}
+
+div.bistro-job-primary-bar .stacked-bar-chart td {
+  line-height: 120%;
+  padding-bottom: 3px;
+  padding-top: 3px;
+}
+
+/* Segmented sub-bars are smaller & indented 30px beyond the normal bars */
+
+div.bistro-job-primary-sub-bar {
+  line-height: 90%;
+  margin-top: 5px;
+  padding-left: 30px;
+}
+
+div.bistro-job-primary-sub-bar .stacked-bar-chart td {
+  font-size: 10px;
+}
+
+div.bistro-job-primary-sub-bar > p {
+  color: gray;
+  font-size: 11px;
+}
+
+div.bistro-job-secondary-sub-bar {
+  line-height: 90%;
+  margin-top: 5px;
+  padding-left: 45px;
+}
+
+div.bistro-job-secondary-sub-bar .stacked-bar-chart td {
+  font-size: 10px;
+}
+
+div.bistro-job-secondary-sub-bar > p {
+  color: gray;
+  font-size: 11px;
+}

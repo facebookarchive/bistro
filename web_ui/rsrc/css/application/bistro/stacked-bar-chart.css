@@ -1,0 +1,57 @@
+/**
+ * @provides stacked-bar-chart
+ */
+
+.stacked-bar-chart {
+  table-layout: fixed;
+  display: inline-table;
+
+  vertical-align: middle;
+  margin: 2px 0px 4px;  /* looks more centered with text on the same line */
+
+  font-size: 11px;
+  line-height: 14px;
+
+  border-top: 1px solid #aaa;
+  border-bottom: 1px solid #aaa;
+
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.sectioner.stacked-bar-chart {
+  line-height: 12px;
+  border-bottom: 0px;
+  margin-bottom: -2px;
+}
+
+.stacked-bar-chart .bistro-detail-toggle-expanded {
+  border-top: 1px solid black;
+  border-bottom: 1px solid black;
+  font-weight: bold;
+}
+
+/* The selector is nasty to be more specific than the aphront td CSS */
+table.stacked-bar-chart > tbody > tr > td {
+  line-height: 90%;
+  overflow-wrap: break-word;
+  /* Keep this in sync with StackedBarChart & bistro-running-jobs-summary */
+  padding: 1px 4px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+}
+
+/* Borders between bars */
+table.stacked-bar-chart.stacked-bar-borders tr {
+  border-right: 1px solid #aaa;
+}
+table.stacked-bar-chart.stacked-bar-borders > tbody > tr > td {
+  border-left: 1px solid #aaa;
+  padding-left: 3px; /* stacked-bar-chart padding - 1 to cancel the border */
+}
+
+/* Minimally bold boldface, if available */
+table.stacked-bar-chart > tbody > tr > td > b {
+  font-weight: 500;
+}

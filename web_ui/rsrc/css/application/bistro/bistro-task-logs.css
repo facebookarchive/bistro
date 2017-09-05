@@ -1,0 +1,134 @@
+/**
+ * @provides bistro-task-logs
+ */
+
+.has-newline:after {
+  content: "\21a9";
+  color: #bbf;
+}
+
+/*** Pink error boxes at the top of the log ***/
+
+div.log-errors {
+  background: #faa;
+  font-size: 125%;
+  margin: 20px auto; /* center */
+  padding: 20px 20px 0px 20px; /* bottom is provided by the last error */
+  width: 975px; /* as in log-line-meta - 2*10px for larger padding */
+}
+
+div.log-errors > div {
+  padding-bottom: 20px;
+}
+
+div.log-errors .log-error-source {
+  color: #777;
+  font-size: 12px;
+  padding-bottom: 10px;
+}
+
+/*** Center log lines, and make timestamps' background gray  ***/
+
+.log-lines > div {
+  background: #888;
+  margin: 0px auto; /* center */
+  width: 1015px; /* 10 padding + 995 as in log-line-meta + 10 padding */
+}
+
+.log-lines .log-time {
+  border-top: 1px #999 solid;
+  color: #ccc;
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 10px;
+  text-align: right;
+  vertical-align: top;
+  width: 155px;
+  word-wrap: break-word;
+}
+
+/*** Make the metadata lines full-width and gray ***/
+
+div.log-line-meta {
+  background: #888;
+  border-top: 1px #999 solid;
+  color: #ccc;
+  font-size: 12px;
+  letter-spacing: 0.02em; /* Hack to make width more similar to 'bold' below */
+  padding: 7px 10px;
+  width: 995px; /* 155 time + 10 + 10 padding + 820 value */
+  word-wrap: break-word;
+}
+
+/*** Highlight the changed parts of the metadata ***/
+
+div.log-line-meta .log-line-meta-changed {
+  color: #eee;
+  font-weight: bold;
+  letter-spacing: 0px; /* Hack so that bold and non-bold have similar width */
+}
+
+/*** Formatting for metadata entries ***/
+
+/* Deliberately more specific than .log-line-meta-changed above */
+.log-lines div.log-line-meta .log-stream:before,
+.log-lines div.log-line-meta .log-job:before,
+.log-lines div.log-line-meta .log-node:before {
+  font-weight: normal;
+}
+.log-lines .log-stream,
+.log-lines .log-job,
+.log-lines .log-node {
+  padding-right: 30px;
+}
+
+.log-lines .log-stream:before {
+  content: "Stream: ";
+}
+.log-lines .log-job:before {
+  content: "Job: ";
+}
+.log-lines .log-node:before {
+  content: "Node: ";
+}
+
+/*** Log line text formatting, different streams have differen colors ***/
+
+.log-lines .log-value {
+  background: #fff;
+  border-top: 1px #ddd solid;
+  color: #000;
+  display: inline-block;
+  padding: 1px 10px;
+  white-space: normal;
+  width: 820px;
+  word-wrap: break-word;
+}
+
+.log-lines .log-stream-stderr .log-value {
+  background-color: #ffd9d9;
+  border-top: 1px #bbb solid;
+}
+
+.log-lines .log-stream-statuses .log-value {
+  background-color: #d9d9ff;
+  border-top: 1px #bbb solid;
+}
+
+/*** Pager formatting ***/
+
+div.log-pager {
+  margin: 0px auto; /* center */
+  width: 995px; /* Just like log-line-meta */
+}
+
+.log-pager span {
+  display: inline-block;
+  width: 75px;
+}
+
+.log-pager span.log-pager-left {
+  margin-left: 20px; /* hack to make non-centered buttons look better */
+  margin-right: 675px; /* 995px of log-page - 4*75px - 20px */
+  width: 150px;
+}

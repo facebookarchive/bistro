@@ -1,0 +1,19 @@
+/**
+ * @provides bistro-log-entry
+ */
+
+.bistro-log-exception {
+  white-space: pre-line;
+  word-break: break-all;
+  font-size: 10px;
+}
+
+.bistro-log-timestamp {
+  font-size: 8px;
+  color: #888;
+}
+
+ul.bistro-log-list {
+  list-style: disc;
+  margin-left: 2em;
+}

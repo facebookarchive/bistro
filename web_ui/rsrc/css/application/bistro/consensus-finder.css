@@ -1,0 +1,61 @@
+/**
+ * @provides bistro-consensus-finder
+ */
+
+/* The +/- sign */
+.bistro-consensus-finder .contract, .bistro-consensus-finder .expand {
+  font-weight: bolder;
+  font-size: 10px;
+  color: #aaa;
+  padding: 0px 5px;
+}
+
+
+/* The location display is styled similarly to the stacked bar chart */
+.bistro-consensus-finder .locations {
+  padding: 0px 5px;
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+}
+
+
+/* The entire consensus-finder value should be no wider than necessary */
+.bistro-consensus-finder {
+  display: inline-block;
+}
+
+
+/* This table is for layout only. The specific selector avoids Aphront CSS */
+.bistro-consensus-finder > div > table > tbody > tr > td {
+  margin: 0px;
+  padding: 0px;
+  white-space: normal;
+}
+
+
+/* Makes the link appears as '+' when contracted, and '-' when expanded */
+.bistro-consensus-finder .contract {
+  display: none;
+}
+.bistro-consensus-finder .bistro-detail-toggle-expanded .contract {
+  display: inline;
+}
+.bistro-consensus-finder .bistro-detail-toggle-expanded .expand {
+  display: none;
+}
+
+
+
+
+/* Pink background + spacing for all sub-items of an inconsistent value */
+.bistro-consensus-finder.inconsistent > * {
+  background-color: #fcf;
+  padding: 5px;
+  margin-bottom: 5px;
+}
+
+/* "Value inconsistent" warning */
+.bistro-consensus-finder.inconsistent > p:after {
+  content: "Inconsistent value. Variants:";
+  font-weight: bold;
+}

@@ -11,8 +11,8 @@ cpp_library(
     headers = ["hostname.h"],
     external_deps = [
         "boost",
-        "glog",
-    ],  # Future: Move startsWithAny elsewhere.
+        "glog",  # Future: Move startsWithAny elsewhere.
+    ],
 )
 
 cpp_library(
@@ -57,6 +57,7 @@ cpp_library(
         "@/bistro/bistro/utils:hostname_lib",
         "@/bistro/bistro/utils:shell_lib",
         "@/folly:folly",
+        "@/folly:synchronized",
         "@/folly/experimental:auto_timer",
         "@/folly/experimental:threaded_repeating_function_runner",
     ],

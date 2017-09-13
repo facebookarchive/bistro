@@ -9,5 +9,6 @@ cpp_library(
         "@/bistro/bistro/statuses:statuses_lib",
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:folly",
+        "@/folly:synchronized",
     ],
 )

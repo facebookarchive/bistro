@@ -23,6 +23,7 @@ cpp_library(
         "@/bistro/bistro/remote:remote_lib",
         "@/bistro/bistro/statuses:statuses_lib",
         "@/bistro/bistro/utils:utils_lib",
+        "@/folly:synchronized",
         "@/folly/gen:base",
     ],
     external_deps = [("boost", None, "boost_filesystem")],

@@ -31,6 +31,7 @@ cpp_library(
         "@/bistro/bistro/scheduler:scheduler_policy_registry_lib",
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:folly",
+        "@/folly:synchronized",
         "@/folly/experimental:dynamic_parser",
     ],
     external_deps = [

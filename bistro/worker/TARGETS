@@ -11,6 +11,7 @@ cpp_library(
         "@/bistro/bistro/remote:remote_lib",
         "@/bistro/bistro/statuses:statuses_lib",
         "@/bistro/bistro/utils:utils_lib",
+        "@/folly:synchronized",
         "@/thrift/lib/cpp2:server",
     ],
 )

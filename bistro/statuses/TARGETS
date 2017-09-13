@@ -17,6 +17,7 @@ cpp_library(
     deps = [
         "@/bistro/bistro/config:config_lib",
         "@/bistro/bistro/sqlite:sqlite_lib",
+        "@/folly:synchronized",
     ],
     external_deps = [("boost", None, "boost_filesystem")],
 )

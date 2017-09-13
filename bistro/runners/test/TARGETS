@@ -1,13 +1,19 @@
 cpp_unittest(
     name = "test_local_runner",
     srcs = ["test_local_runner.cpp"],
-    deps = ["@/bistro/bistro/runners:runners_lib"],
+    deps = [
+        "@/bistro/bistro/runners:runners_lib",
+        "@/folly:synchronized",
+    ],
 )
 
 cpp_unittest(
     name = "test_benchmark_runner",
     srcs = ["test_benchmark_runner.cpp"],
-    deps = ["@/bistro/bistro/runners:runners_lib"],
+    deps = [
+        "@/bistro/bistro/runners:runners_lib",
+        "@/folly:synchronized",
+    ],
 )
 
 cpp_unittest(

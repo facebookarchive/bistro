@@ -38,6 +38,7 @@ set(
   libsqlite3.so
   libthrift.so
   libthriftcpp2.so
+  libprotocol.so
   libthriftprotocol.so
   libwangle.so
   libz.so

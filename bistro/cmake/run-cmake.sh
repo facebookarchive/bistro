@@ -11,12 +11,6 @@
 #
 # Runs `cmake` for Bistro, directing output to cmake/Release/ or cmake/Debug/.
 #
-# If Bistro's dependencies are installed in a non-default prefix, it will
-# need some help finding them:
-#   
-#   PYTHONPATH="$PYTHONPATH:$your_prefix/lib/python2.7/site-packages" \
-#     ./run-cmake.sh Debug -DCMAKE_INSTALL_PREFIX="$your_prefix"
-#
 # The last line printed to stdout is the path where you can run `make`, so
 # this script can be used e.g. as follows:
 #
@@ -35,34 +29,19 @@ build_type=$1
 shift 1
 # The remaining arguments will be passed to CMake
 
-# Does not change the timestamp if the file has not changed.
-update_file() {
-  if [[ ! -r "$2" ]] ; then
-    mkdir -p "$(dirname "$2")"
-    echo "Making $(readlink -f "$2")"
-    mv "$1" "$2"
-  elif ! diff -q "$1" "$2" ; then
-    echo "Updating $(readlink -f "$2")"
-    mv "$1" "$2"
-  # else ; echo "Already up-to-date: $(readlink -f "$2")"
-  fi
-}
-
 # TODO: This neither deletes generated files nor auto-updates CMakeLists.txt
 update_thrift() {
-  echo "Checking if Thrift-generated sources changed"
-  out_dir="$1"
+  echo "Generating Thrift Files"
   shift 1
-  temp_dir="$(mktemp -d)"
+  BISTRO_HOME="$build_dir/../../.."
+  pushd $BISTRO_HOME
   for f in "$@" ; do
-    python -mthrift_compiler.main -o "$temp_dir" --gen cpp2:stack_arguments \
-      -I ../.. -I "$build_dir/fbinclude" "$f"
+    thrift1 -o "bistro/bistro/$(dirname $f)" \
+      --gen mstch_cpp2:stack_arguments \
+      --templates $TEMPLATES_PATH \
+      -I "$BISTRO_HOME" -I "$build_dir/fbinclude" "bistro/bistro/$f"
   done
-  for f in "$temp_dir/gen-cpp2"/* ; do
-    update_file "$f" "$out_dir${f#$temp_dir}"
-  done
-  rm -r "$temp_dir/gen-cpp2"
-  rmdir "$temp_dir"
+  popd
 }
 
 fetch_gtest() {

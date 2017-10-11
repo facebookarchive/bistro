@@ -18,5 +18,6 @@ cpp_library(
     ],
     external_deps = [
         ("boost", None, "boost_date_time"),
+        "boost",
     ],
 )

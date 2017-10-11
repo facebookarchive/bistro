@@ -40,4 +40,5 @@ cpp_library(
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:folly",
     ],
+    external_deps = ["boost"],
 )

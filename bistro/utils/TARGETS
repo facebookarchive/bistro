@@ -61,5 +61,9 @@ cpp_library(
         "@/folly/experimental:auto_timer",
         "@/folly/experimental:threaded_repeating_function_runner",
     ],
-    external_deps = [("boost", None, "boost_regex")],
+    external_deps = [
+        ("boost", None, "boost_regex"),
+        "boost",
+        "gflags",
+    ],
 )

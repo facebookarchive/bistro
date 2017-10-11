@@ -23,7 +23,7 @@ cpp_library(
         "@/thrift/lib/cpp2:server",
     ],
     external_deps = [
-        ("boost", None),
+        "boost",
         ("glog", None),
         ("zlib", None, "z"),
     ],

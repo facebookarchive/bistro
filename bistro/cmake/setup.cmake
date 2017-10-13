@@ -36,13 +36,18 @@ set(
   libproxygenhttpserver.so
   libpthread.so
   libsqlite3.so
-  libthrift.so
-  libthriftcpp2.so
-  libprotocol.so
-  libthriftprotocol.so
   libwangle.so
   libz.so
   libzstd.so
+
+  # Thrift comes in a bajillion tiny pieces :'(
+  libasync.so
+  libconcurrency.so
+  libprotocol.so
+  libthrift.so
+  libthriftcpp2.so
+  libthriftprotocol.so
+  libtransport.so
 )
 
 # Use this instead of target_link_libraries() because pretty much everything

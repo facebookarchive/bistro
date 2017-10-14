@@ -11,6 +11,7 @@
 
 #include <boost/filesystem.hpp>
 #include <folly/json.h>
+#include <folly/Logging.h>
 #include <folly/Subprocess.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 

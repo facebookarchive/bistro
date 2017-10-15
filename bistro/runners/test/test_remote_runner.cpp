@@ -7,6 +7,8 @@
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
+
+#include <folly/Random.h>
 #include <gtest/gtest.h>
 
 #include "bistro/bistro/config/Config.h"

@@ -30,6 +30,7 @@ cpp_library(
         "@/bistro/bistro/if:common-cpp2",
         "@/bistro/bistro/scheduler:scheduler_policy_registry_lib",
         "@/bistro/bistro/utils:utils_lib",
+        "@/folly:fbstring",
         "@/folly:folly",
         "@/folly:synchronized",
         "@/folly/experimental:dynamic_parser",

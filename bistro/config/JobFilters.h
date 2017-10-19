@@ -16,7 +16,7 @@
 #include <unordered_set>
 
 #include <folly/dynamic.h>
-#include <folly/Hash.h>
+#include <folly/hash/Hash.h>
 
 namespace facebook { namespace bistro {
 

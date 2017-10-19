@@ -6,6 +6,7 @@ cpp_unittest(
         "@/bistro/bistro/physical:physical_lib",
         "@/folly/experimental:test_util",
     ],
+    external_deps = [("boost", None, "boost_filesystem")],
 )
 
 cpp_unittest(
@@ -16,6 +17,7 @@ cpp_unittest(
         "@/bistro/bistro/physical:physical_lib",
         "@/folly/experimental:test_util",
     ],
+    external_deps = [("boost", None, "boost_filesystem")],
 )
 
 cpp_unittest(
@@ -26,6 +28,7 @@ cpp_unittest(
         "@/bistro/bistro/physical:physical_lib",
         "@/folly/experimental:test_util",
     ],
+    external_deps = [("boost", None, "boost_filesystem")],
 )
 
 cpp_unittest(
@@ -36,4 +39,5 @@ cpp_unittest(
         "@/bistro/bistro/physical:physical_lib",
         "@/folly/experimental:test_util",
     ],
+    external_deps = [("boost", None, "boost_filesystem")],
 )

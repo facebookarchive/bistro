@@ -57,6 +57,7 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/config:config_lib",
     ],
+    external_deps = [("boost", None, "boost_filesystem")],
 )
 
 cpp_unittest(

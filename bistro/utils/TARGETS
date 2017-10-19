@@ -63,6 +63,7 @@ cpp_library(
     ],
     external_deps = [
         ("boost", None, "boost_regex"),
+        ("boost", None, "boost_filesystem"),
         "boost",
         "gflags",
     ],

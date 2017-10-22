@@ -17,7 +17,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <wangle/concurrent/IOThreadPoolExecutor.h>
+#include <folly/executors/IOThreadPoolExecutor.h>
 
 #include "bistro/bistro/if/gen-cpp2/common_types.h"
 #include "bistro/bistro/physical/AllTasksPhysicalResourceMonitor.h"

@@ -26,7 +26,7 @@ the code --- it was written to be read.
 
 Some applications of Bistro may involve writing small plugins to make it fit
 your needs.  The code is built to be extensible.  Ask for tips, and we'll do
-our best to help (https://www.facebook.com/groups/bistro.scheduler).  In
+our best to [help](https://www.facebook.com/groups/bistro.scheduler).  In
 return, we hope that you will send a pull request to allow us to share your
 work with the community.
 
@@ -50,7 +50,7 @@ a full list of Bistro's external dependencies (direct and indirect).  We
 gratefully accept patches that improve Bistro's builds, or add support for
 various flavors of Linux and Mac OS.
 
-The binaries will be in bistro/cmake/{Debug,Release}.  Available build
+The binaries will be in `bistro/cmake/{Debug,Release}`.  Available build
 targets are explained here:
    http://cmake.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools
 You can start Bistro's unit tests by running `ctest` in those directories.

@@ -60,7 +60,7 @@ struct BackoffDuration {
   1: required bool noMoreBackoffs,
   // Wait this long before trying again.
   2: required i32 seconds,
-} (final)
+}
 
 struct LogLine {
   1: string jobID,
@@ -68,24 +68,24 @@ struct LogLine {
   3: i32 time,
   4: string line,
   5: i64 lineID,  // Use lineID to start paging from this log line.
-} (final)
+}
 
 struct LogLines {
   // Can contain "error" lines whose lineID == kNotALineID
   1: list<LogLine> lines,
   // Contains the lineID of the next page, kNotALineID if no more lines
   2: i64 nextLineID,
-} (final)
+}
 
 struct Resource {
   1: required string name,
   2: required i32 amount,
-} (final)
+}
 
 struct NodeResources {
   1: required string node,
   2: required list<Resource> resources,
-} (final)
+}
 
 // Distinguish different invocations of the same task, or scheduler or
 // worker instances that use the same host:port at different points in time

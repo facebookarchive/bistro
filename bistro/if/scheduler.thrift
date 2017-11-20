@@ -27,7 +27,7 @@ struct BistroJobConfigFilters {
   4: string blacklistRegex,
   5: double fractionOfNodes = 1.0,
   6: stringSet tagWhitelist,
-} (final)
+}
 
 typedef map<string, BistroJobConfigFilters>
   (cpp.template = "std::unordered_map")
@@ -62,18 +62,18 @@ struct BistroJobConfig {
   // be equivalent to "add new job" (rather than "update existing job") and
   // -1 is the sentinel for this.
   18: i64 versionID = -1,
-} (final)
+}
 
 struct BistroCountWithSamples {
   1: i32 count,
   2: list<string> samples,
-} (final)
+}
 
 struct BistroJobHistogram {
   1: string job,
   2: map<string, map<bits.BistroTaskStatusBits, BistroCountWithSamples>>
     statuses,
-} (final)
+}
 
 exception BistroSchedulerUnknownJobException {
   1: string message,

@@ -22,6 +22,7 @@ cpp_library(
         "@/bistro/bistro/statuses:statuses_lib",
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:exception",
+        "@/folly:logging",
         "@/folly:subprocess",
         "@/folly:synchronized",
         "@/folly/gen:file",

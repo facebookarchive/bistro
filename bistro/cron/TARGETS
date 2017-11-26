@@ -15,6 +15,7 @@ cpp_library(
     deps = [
         "@/bistro/bistro/cron/utils:cron_utils_lib",
         "@/folly:folly",
+        "@/folly:optional",
     ],
     external_deps = [
         ("boost", None, "boost_date_time"),

@@ -18,6 +18,7 @@ cpp_library(
         "@/bistro/bistro/config:config_lib",
         "@/bistro/bistro/sqlite:sqlite_lib",
         "@/folly:logging",
+        "@/folly:optional",
         "@/folly:synchronized",
     ],
     external_deps = [

@@ -32,6 +32,7 @@ cpp_library(
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:fbstring",
         "@/folly:folly",
+        "@/folly:optional",
         "@/folly:synchronized",
         "@/folly/experimental:dynamic_parser",
     ],

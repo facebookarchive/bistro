@@ -3,6 +3,7 @@ cpp_unittest(
     srcs = ["test_task_status.cpp"],
     deps = [
         "@/bistro/bistro/statuses:statuses_lib",
+        "@/folly:optional",
         "@/folly/experimental:test_util",
     ],
 )

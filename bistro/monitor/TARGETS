@@ -8,6 +8,7 @@ cpp_library(
         "@/bistro/bistro/nodes:nodes_lib",
         "@/bistro/bistro/statuses:statuses_lib",
         "@/bistro/bistro/utils:utils_lib",
+        "@/folly:conv",
         "@/folly:folly",
         "@/folly:synchronized",
     ],

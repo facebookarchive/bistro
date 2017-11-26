@@ -17,6 +17,7 @@ cpp_library(
         "@/bistro/bistro/if:if-cpp2",
         "@/bistro/bistro/thrift:conversion_lib",
         "@/common/fb303/cpp:fb303",
+        "@/folly:conv",
         "@/folly:folly",
         "@/folly:synchronized",
         "@/proxygen/httpserver:httpserver",

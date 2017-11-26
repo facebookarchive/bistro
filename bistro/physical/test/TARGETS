@@ -4,6 +4,7 @@ cpp_unittest(
     headers = ["utils.h"],
     deps = [
         "@/bistro/bistro/physical:physical_lib",
+        "@/folly:conv",
         "@/folly:optional",
         "@/folly/experimental:test_util",
     ],
@@ -16,6 +17,7 @@ cpp_unittest(
     headers = ["utils.h"],
     deps = [
         "@/bistro/bistro/physical:physical_lib",
+        "@/folly:conv",
         "@/folly:optional",
         "@/folly/experimental:test_util",
     ],
@@ -28,6 +30,7 @@ cpp_unittest(
     headers = ["utils.h"],
     deps = [
         "@/bistro/bistro/physical:physical_lib",
+        "@/folly:conv",
         "@/folly:optional",
         "@/folly/experimental:test_util",
     ],
@@ -40,6 +43,7 @@ cpp_unittest(
     headers = ["utils.h"],
     deps = [
         "@/bistro/bistro/physical:physical_lib",
+        "@/folly:conv",
         "@/folly:optional",
         "@/folly/experimental:test_util",
     ],

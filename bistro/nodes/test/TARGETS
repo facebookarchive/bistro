@@ -7,13 +7,19 @@ cpp_unittest(
 cpp_unittest(
     name = "test_range_label_fetcher",
     srcs = ["test_range_label_fetcher.cpp"],
-    deps = ["@/bistro/bistro/nodes:nodes_lib"],
+    deps = [
+        "@/bistro/bistro/nodes:nodes_lib",
+        "@/folly:conv",
+    ],
 )
 
 cpp_unittest(
     name = "test_manual_fetcher",
     srcs = ["test_manual_fetcher.cpp"],
-    deps = ["@/bistro/bistro/nodes:nodes_lib"],
+    deps = [
+        "@/bistro/bistro/nodes:nodes_lib",
+        "@/folly:conv",
+    ],
 )
 
 cpp_unittest(

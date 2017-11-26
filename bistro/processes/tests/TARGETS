@@ -40,6 +40,7 @@ cpp_unittest(
     srcs = ["test_cgroup_setup.cpp"],
     deps = [
         "@/bistro/bistro/processes:processes",
+        "@/folly:conv",
         "@/folly/experimental:test_util",
     ],
 )

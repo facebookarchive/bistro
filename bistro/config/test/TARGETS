@@ -5,6 +5,7 @@ cpp_unittest(
     ],
     deps = [
         "@/bistro/bistro/config:config_lib",
+        "@/folly:conv",
     ],
 )
 
@@ -15,6 +16,7 @@ cpp_unittest(
     ],
     deps = [
         "@/bistro/bistro/config:config_lib",
+        "@/folly:conv",
         "@/folly/experimental:test_util",
     ],
 )
@@ -36,6 +38,7 @@ cpp_unittest(
     ],
     deps = [
         "@/bistro/bistro/config:config_lib",
+        "@/folly:conv",
     ],
 )
 
@@ -56,6 +59,7 @@ cpp_unittest(
     ],
     deps = [
         "@/bistro/bistro/config:config_lib",
+        "@/folly:conv",
     ],
     external_deps = [("boost", None, "boost_filesystem")],
 )

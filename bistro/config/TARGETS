@@ -34,6 +34,7 @@ cpp_library(
         "@/folly:fbstring",
         "@/folly:folly",
         "@/folly:optional",
+        "@/folly:sorted_vector_types",
         "@/folly:synchronized",
         "@/folly/experimental:dynamic_parser",
     ],

@@ -26,6 +26,7 @@ cpp_library(
         "@/folly:exception",
         "@/folly:folly",
         "@/folly:optional",
+        "@/folly:string",
         "@/folly:synchronized",
         "@/folly/gen:file",
     ],

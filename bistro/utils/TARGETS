@@ -59,6 +59,7 @@ cpp_library(
         "@/folly:conv",
         "@/folly:folly",
         "@/folly:optional",
+        "@/folly:string",
         "@/folly:synchronized",
         "@/folly/experimental:auto_timer",
         "@/folly/experimental:threaded_repeating_function_runner",

@@ -113,6 +113,7 @@ def parse_targets(dirpath, s):
             'deps',  # Handled above
             'external_deps',  # Handled in cmake/setup.cmake
             'headers',  # CMake handles headers automatically
+            'undefined_symbols',  # Ignored
         })
 
     def cpp_unittest(name, **kwargs):

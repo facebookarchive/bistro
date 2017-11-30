@@ -12,6 +12,7 @@ cpp_library(
         "HTTPMonitorServer.h",
         "ThriftMonitor.h",
     ],
+    undefined_symbols = True,  # TODO(T23121628): fix deps and remove
     deps = [
         "@/bistro/bistro/config:config_lib",
         "@/bistro/bistro/if:if-cpp2",

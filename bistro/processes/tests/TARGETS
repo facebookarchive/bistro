@@ -16,7 +16,10 @@ cpp_unittest(
 cpp_unittest(
     name = "test_async_subprocess",
     srcs = ["test_async_subprocess.cpp"],
-    deps = ["@/bistro/bistro/processes:processes"],
+    deps = [
+        "@/bistro/bistro/processes:processes",
+        "@/folly:mpmc_queue",
+    ],
 )
 
 cpp_unittest(

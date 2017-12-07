@@ -33,6 +33,7 @@ cpp_library(
         "@/folly:conv",
         "@/folly:fbstring",
         "@/folly:folly",
+        "@/folly:memory",
         "@/folly:optional",
         "@/folly:sorted_vector_types",
         "@/folly:synchronized",

@@ -19,6 +19,7 @@ cpp_library(
         "@/bistro/bistro/sqlite:sqlite_lib",
         "@/folly:conv",
         "@/folly:logging",
+        "@/folly:memory",
         "@/folly:optional",
         "@/folly:synchronized",
     ],

@@ -25,6 +25,7 @@ cpp_binary(
     srcs = ["main.cpp"],
     deps = [
         ":bistro_worker_lib",
+        "@/folly:memory",
         "@/folly/init:init",
     ],
 )

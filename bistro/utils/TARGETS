@@ -57,6 +57,7 @@ cpp_library(
         "@/bistro/bistro/utils:hostname_lib",
         "@/bistro/bistro/utils:shell_lib",
         "@/folly:conv",
+        "@/folly:dynamic",
         "@/folly:folly",
         "@/folly:optional",
         "@/folly:string",

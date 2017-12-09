@@ -15,7 +15,9 @@ cpp_library(
     deps = [
         "@/bistro/bistro/cron/utils:cron_utils_lib",
         "@/folly:conv",
+        "@/folly:dynamic",
         "@/folly:folly",
+        "@/folly:json",
         "@/folly:optional",
     ],
     external_deps = [

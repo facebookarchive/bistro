@@ -1,7 +1,10 @@
 cpp_unittest(
     name = "test_add_time_fetcher",
     srcs = ["test_add_time_fetcher.cpp"],
-    deps = ["@/bistro/bistro/nodes:nodes_lib"],
+    deps = [
+        "@/bistro/bistro/nodes:nodes_lib",
+        "@/folly:json",
+    ],
 )
 
 cpp_unittest(

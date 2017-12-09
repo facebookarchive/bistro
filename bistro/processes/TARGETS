@@ -23,6 +23,7 @@ cpp_library(
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:conv",
         "@/folly:exception",
+        "@/folly:json",
         "@/folly:logging",
         "@/folly:mpmc_queue",
         "@/folly:string",

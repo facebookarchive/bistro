@@ -5,12 +5,17 @@ cpp_library(
     deps = [
         "@/bistro/bistro/config:config_lib",
         "@/bistro/bistro/if:if-cpp2",
+        "@/folly:dynamic",
         "@/folly:folly",
+        "@/folly:json",
     ],
 )
 
 cpp_unittest(
     name = "test_thrift_conversion",
     srcs = ["test_thrift_conversion.cpp"],
-    deps = [":conversion_lib"],
+    deps = [
+        ":conversion_lib",
+        "@/folly:json",
+    ],
 )

@@ -24,6 +24,8 @@ cpp_unittest(
     deps = [
         ":bistro_worker_test_lib",
         "@/bistro/bistro/server/test:thrift_monitor_test_thread_lib",
+        "@/folly:dynamic",
+        "@/folly:json",
         "@/folly/experimental:test_util",
     ],
 )

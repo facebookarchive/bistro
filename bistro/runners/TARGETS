@@ -24,6 +24,7 @@ cpp_library(
         "@/bistro/bistro/statuses:statuses_lib",
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:conv",
+        "@/folly:json",
         "@/folly:synchronized",
         "@/folly/gen:base",
     ],

@@ -4,6 +4,8 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/runners:runners_lib",
         "@/bistro/bistro/scheduler:scheduler_lib",
+        "@/folly:dynamic",
+        "@/folly:json",
     ],
 )
 

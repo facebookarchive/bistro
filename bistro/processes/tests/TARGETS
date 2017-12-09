@@ -34,6 +34,7 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/processes:processes",
         "@/bistro/bistro/test:test_lib",
+        "@/folly:json",
         "@/folly/experimental:test_util",
     ],
 )

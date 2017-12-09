@@ -18,6 +18,8 @@ cpp_library(
         "@/bistro/bistro/config:config_lib",
         "@/bistro/bistro/sqlite:sqlite_lib",
         "@/folly:conv",
+        "@/folly:dynamic",
+        "@/folly:json",
         "@/folly:logging",
         "@/folly:memory",
         "@/folly:optional",

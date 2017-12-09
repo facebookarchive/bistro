@@ -25,6 +25,7 @@ cpp_library(
         "@/bistro/bistro/cron:cron_lib",
         "@/bistro/bistro/utils:utils_lib",
         "@/folly:folly",
+        "@/folly:json",
         "@/folly:string",
         "@/folly:subprocess",  # for ScriptFetcher
         "@/folly/gen:file",

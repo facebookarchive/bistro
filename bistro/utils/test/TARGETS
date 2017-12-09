@@ -7,7 +7,10 @@ cpp_unittest(
 cpp_unittest(
     name = "test_settings_map",
     srcs = ["test_settings_map.cpp"],
-    deps = ["@/bistro/bistro/utils:utils_lib"],
+    deps = [
+        "@/bistro/bistro/utils:utils_lib",
+        "@/folly:dynamic",
+    ],
 )
 
 cpp_unittest(

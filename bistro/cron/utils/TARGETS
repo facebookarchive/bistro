@@ -8,6 +8,7 @@ cpp_library(
     ],
     deps = [
         "@/folly:folly",
+        "@/folly:format",
     ],
     external_deps = [
         ("boost", None, "boost_date_time"),

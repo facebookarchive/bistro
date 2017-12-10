@@ -17,6 +17,7 @@ cpp_library(
         "@/folly:conv",
         "@/folly:dynamic",
         "@/folly:folly",
+        "@/folly:format",
         "@/folly:json",
         "@/folly:optional",
     ],

@@ -24,6 +24,7 @@ cpp_library(
         "@/folly:conv",
         "@/folly:demangle",
         "@/folly:exception",
+        "@/folly:file",
         "@/folly:folly",
         "@/folly:optional",
         "@/folly:string",

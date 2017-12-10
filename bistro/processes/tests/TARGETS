@@ -4,6 +4,7 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/processes:processes",
         "@/folly:exception",
+        "@/folly:file",
     ],
 )
 

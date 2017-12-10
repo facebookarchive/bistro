@@ -11,6 +11,7 @@ cpp_library(
     deps = [
         "@/folly:base",
         "@/folly:conv",
+        "@/folly:range",
     ],
     external_deps = [
         ("boost", None, "boost_filesystem"),

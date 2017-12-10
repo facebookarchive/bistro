@@ -60,6 +60,7 @@ cpp_library(
         "@/folly:dynamic",
         "@/folly:folly",
         "@/folly:optional",
+        "@/folly:scope_guard",
         "@/folly:string",
         "@/folly:synchronized",
         "@/folly/experimental:auto_timer",

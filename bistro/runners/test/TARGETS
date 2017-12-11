@@ -22,6 +22,7 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/runners:runners_lib",
         "@/bistro/bistro/worker/test:bistro_worker_test_lib",
+        "@/folly:random",
     ],
 )
 

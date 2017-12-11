@@ -18,6 +18,7 @@ cpp_unittest(
     srcs = ["test_remote_workers.cpp"],
     deps = [
         "@/bistro/bistro/remote:remote_lib",
+        "@/folly:random",
         "@/folly/experimental:test_util",
     ],
 )

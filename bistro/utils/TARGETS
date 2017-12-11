@@ -60,6 +60,7 @@ cpp_library(
         "@/folly:dynamic",
         "@/folly:folly",
         "@/folly:optional",
+        "@/folly:random",
         "@/folly:range",
         "@/folly:scope_guard",
         "@/folly:string",

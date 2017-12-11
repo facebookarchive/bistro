@@ -14,6 +14,7 @@ cpp_library(
         "@/folly:file",
         "@/folly:json",
         "@/folly:mpmc_queue",
+        "@/folly:random",
         "@/folly:synchronized",
         "@/thrift/lib/cpp2:server",
     ],

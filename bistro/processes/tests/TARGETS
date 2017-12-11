@@ -5,6 +5,7 @@ cpp_unittest(
         "@/bistro/bistro/processes:processes",
         "@/folly:exception",
         "@/folly:file",
+        "@/folly:random",
     ],
 )
 

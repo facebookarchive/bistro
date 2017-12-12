@@ -40,6 +40,7 @@ cpp_library(
         "@/folly:sorted_vector_types",
         "@/folly:synchronized",
         "@/folly/experimental:dynamic_parser",
+        "@/folly/hash:hash",
     ],
     external_deps = [
         ("boost", None, "boost_filesystem"),

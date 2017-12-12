@@ -5,6 +5,7 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/physical:physical_lib",
         "@/folly:conv",
+        "@/folly:file_util",
         "@/folly:optional",
         "@/folly/experimental:test_util",
     ],
@@ -18,6 +19,7 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/physical:physical_lib",
         "@/folly:conv",
+        "@/folly:file_util",
         "@/folly:optional",
         "@/folly/experimental:test_util",
     ],
@@ -31,6 +33,7 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/physical:physical_lib",
         "@/folly:conv",
+        "@/folly:file_util",
         "@/folly:optional",
         "@/folly/experimental:test_util",
     ],
@@ -44,6 +47,7 @@ cpp_unittest(
     deps = [
         "@/bistro/bistro/physical:physical_lib",
         "@/folly:conv",
+        "@/folly:file_util",
         "@/folly:optional",
         "@/folly/experimental:test_util",
     ],

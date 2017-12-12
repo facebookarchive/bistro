@@ -24,6 +24,7 @@ cpp_library(
         "@/folly:conv",
         "@/folly:exception",
         "@/folly:file",
+        "@/folly:file_util",
         "@/folly:json",
         "@/folly:logging",
         "@/folly:mpmc_queue",
@@ -49,6 +50,7 @@ cpp_library(
     deps = [
         "@/folly:exception",
         "@/folly:file",
+        "@/folly:file_util",
         "@/folly:subprocess",
         "@/folly/futures:futures",
         "@/folly/gen:string",

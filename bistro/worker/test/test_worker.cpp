@@ -300,7 +300,7 @@ TEST_F(TestWorker, HandleKillTask) {
       cpp2::LogLines log;
       do {  // Wait for the kill to work
         /* sleep override */
-        this_thread::sleep_for(chrono::milliseconds(10));
+        this_thread::sleep_for(std::chrono::milliseconds(10));
         worker.getClient()->sync_getJobLogsByID(
           log,
           "statuses",

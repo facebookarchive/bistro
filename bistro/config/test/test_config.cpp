@@ -74,8 +74,8 @@ TEST(TestConfig, HandleConstruction) {
 
   Config c(d);
   EXPECT_TRUE(c.enabled);
-  EXPECT_EQ(chrono::milliseconds(500), c.workingWait);
-  EXPECT_EQ(chrono::milliseconds(5500), c.idleWait);
+  EXPECT_EQ(std::chrono::milliseconds(500), c.workingWait);
+  EXPECT_EQ(std::chrono::milliseconds(5500), c.idleWait);
   EXPECT_EQ(kSchedulePolicyRankedPriority, c.schedulerPolicyName);
 
   // Check that we throw on invalid policy names

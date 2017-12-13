@@ -89,8 +89,8 @@ BENCHMARK(MakeSpan) {
   auto config_loader = make_shared<InMemoryConfigLoader>(config);
   auto nodes_loader = make_shared<NodesLoader>(
     config_loader,
-    chrono::seconds(3600),
-    chrono::seconds(3600)
+    std::chrono::seconds(3600),
+    std::chrono::seconds(3600)
   );
   auto task_counter = make_shared<TaskCounter>();
   auto task_statuses = make_shared<TaskStatuses>(task_counter);

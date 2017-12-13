@@ -55,7 +55,7 @@ TEST(TestBenchmarkRunner, HandleTaskResult) {
     }
   );
   ASSERT_TRUE(status->isRunning());
-  this_thread::sleep_for(chrono::milliseconds(110)); // sleep an idleWait cycle
+  this_thread::sleep_for(std::chrono::milliseconds(110)); // sleep an idleWait cycle
   ASSERT_TRUE(status->isDone());
 
   FLAGS_test_failure_rate = 1; // 100% failure
@@ -70,7 +70,7 @@ TEST(TestBenchmarkRunner, HandleTaskResult) {
     }
   );
   ASSERT_TRUE(status->isRunning());
-  this_thread::sleep_for(chrono::milliseconds(110)); // sleep an idleWait cycle
+  this_thread::sleep_for(std::chrono::milliseconds(110)); // sleep an idleWait cycle
   ASSERT_TRUE(status->isInBackoff(0));
 }
 
@@ -90,7 +90,7 @@ TEST(TestBenchmarkRunner, HandleTaskOrder) {
       },
       rt,
       10); // Task 2 finishes in 10ms
-  this_thread::sleep_for(chrono::milliseconds(110)); // sleep an idleWait cycle
+  this_thread::sleep_for(std::chrono::milliseconds(110)); // sleep an idleWait cycle
   EXPECT_EQ(2, catcher->at(0));
   EXPECT_EQ(1, catcher->at(1));
 }

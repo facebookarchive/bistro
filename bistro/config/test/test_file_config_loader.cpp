@@ -45,6 +45,6 @@ TEST(TestFileConfigLoader, HandleValidConfig) {
   FileConfigLoader loader(std::chrono::milliseconds(5), file.getFilename());
   auto c = loader.getDataOrThrow();
   EXPECT_TRUE(c->enabled);
-  EXPECT_EQ(chrono::milliseconds(500), c->workingWait);
+  EXPECT_EQ(std::chrono::milliseconds(500), c->workingWait);
   EXPECT_EQ(1, c->jobs.size());
 }

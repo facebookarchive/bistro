@@ -146,7 +146,7 @@ std::chrono::milliseconds Monitor::update() noexcept {
     LOG(ERROR) << error.report(e.what());
     histograms_->clear();
   }
-  return chrono::milliseconds(FLAGS_monitor_update_ms);
+  return std::chrono::milliseconds(FLAGS_monitor_update_ms);
 }
 
 }}  // namespace facebook::bistro

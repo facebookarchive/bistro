@@ -51,8 +51,8 @@ ThriftMonitorTestThread::ThriftMonitorTestThread() {
   auto config_loader = make_shared<InMemoryConfigLoader>(config);
   auto nodes_loader = make_shared<NodesLoader>(
     config_loader,
-    chrono::hours(1),
-    chrono::hours(1)
+    std::chrono::hours(1),
+    std::chrono::hours(1)
   );
   auto done_store = make_shared<NoOpTaskStore>();
   auto task_statuses = make_shared<TaskStatuses>(done_store);

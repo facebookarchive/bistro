@@ -3,6 +3,7 @@ cpp_library(
     srcs = ["SchedulerPolicyRegistry.cpp"],
     headers = ["SchedulerPolicyRegistry.h"],
     deps = ["@/bistro/bistro/utils:exception_lib"],
+    external_deps = ["glog"],
 )
 
 cpp_library(

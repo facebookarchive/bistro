@@ -48,4 +48,5 @@ cpp_binary(
         "@/folly/init:init",
         "@/thrift/lib/cpp2:server",
     ],
+    external_deps = ["glog"],
 )

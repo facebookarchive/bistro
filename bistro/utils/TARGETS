@@ -73,5 +73,6 @@ cpp_library(
         ("boost", None, "boost_filesystem"),
         "boost",
         "gflags",
+        "glog",
     ],
 )

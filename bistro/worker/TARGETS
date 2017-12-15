@@ -31,4 +31,5 @@ cpp_binary(
         "@/folly:memory",
         "@/folly/init:init",
     ],
+    external_deps = ["glog"],
 )

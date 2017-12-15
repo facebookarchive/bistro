@@ -6,4 +6,5 @@ cpp_benchmark(
         "@/bistro/bistro:bistro_lib",
         "@/folly:benchmark",
     ],
+    external_deps = ["glog"],
 )

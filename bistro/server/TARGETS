@@ -29,7 +29,7 @@ cpp_library(
     ],
     external_deps = [
         "boost",
-        ("glog", None),
+        "glog",
         ("zlib", None, "z"),
     ],
 )

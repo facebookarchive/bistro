@@ -33,7 +33,6 @@ cpp_library(
         "@/folly:conv",
         "@/folly:dynamic",
         "@/folly:fbstring",
-        "@/folly:folly",
         "@/folly:json",
         "@/folly:memory",
         "@/folly:optional",

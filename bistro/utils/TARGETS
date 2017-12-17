@@ -58,7 +58,6 @@ cpp_library(
         "@/bistro/bistro/utils:shell_lib",
         "@/folly:conv",
         "@/folly:dynamic",
-        "@/folly:folly",
         "@/folly:optional",
         "@/folly:random",
         "@/folly:range",

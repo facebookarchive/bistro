@@ -16,7 +16,6 @@ cpp_library(
         "@/bistro/bistro/cron/utils:cron_utils_lib",
         "@/folly:conv",
         "@/folly:dynamic",
-        "@/folly:folly",
         "@/folly:format",
         "@/folly:json",
         "@/folly:optional",

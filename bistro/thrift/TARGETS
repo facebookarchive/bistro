@@ -6,7 +6,6 @@ cpp_library(
         "@/bistro/bistro/config:config_lib",
         "@/bistro/bistro/if:if-cpp2",
         "@/folly:dynamic",
-        "@/folly:folly",
         "@/folly:json",
     ],
 )

@@ -19,11 +19,11 @@ cpp_library(
         "WorkerSetID.h",
     ],
     deps = [
-        "@/bistro/bistro/flags:flags_lib",
-        "@/bistro/bistro/if:if-cpp2",
-        "@/bistro/bistro/statuses:statuses_lib",
-        "@/folly:json",
-        "@/folly:logging",
-        "@/folly:optional",
+        "//bistro/bistro/flags:flags_lib",
+        "//bistro/bistro/if:if-cpp2",
+        "//bistro/bistro/statuses:statuses_lib",
+        "//folly:json",
+        "//folly:logging",
+        "//folly:optional",
     ],
 )

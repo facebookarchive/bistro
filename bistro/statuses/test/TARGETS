@@ -2,27 +2,27 @@ cpp_unittest(
     name = "test_task_status",
     srcs = ["test_task_status.cpp"],
     deps = [
-        "@/bistro/bistro/statuses:statuses_lib",
-        "@/folly:json",
-        "@/folly:memory",
-        "@/folly:optional",
-        "@/folly/experimental:test_util",
+        "//bistro/bistro/statuses:statuses_lib",
+        "//folly:json",
+        "//folly:memory",
+        "//folly:optional",
+        "//folly/experimental:test_util",
     ],
 )
 
 cpp_unittest(
     name = "test_sqlite_task_store",
     srcs = ["test_sqlite_task_store.cpp"],
-    deps = ["@/bistro/bistro/statuses:statuses_lib"],
+    deps = ["//bistro/bistro/statuses:statuses_lib"],
 )
 
 cpp_unittest(
     name = "test_task_statuses",
     srcs = ["test_task_statuses.cpp"],
     deps = [
-        "@/bistro/bistro/config:config_lib",
-        "@/bistro/bistro/nodes:nodes_lib",
-        "@/bistro/bistro/statuses:statuses_lib",
-        "@/folly/experimental:test_util",
+        "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/nodes:nodes_lib",
+        "//bistro/bistro/statuses:statuses_lib",
+        "//folly/experimental:test_util",
     ],
 )

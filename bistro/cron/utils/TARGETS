@@ -6,7 +6,7 @@ cpp_library(
     headers = [
         "date_time.h",
     ],
-    deps = ["@/folly:format"],
+    deps = ["//folly:format"],
     external_deps = [
         ("boost", None, "boost_date_time"),
     ],

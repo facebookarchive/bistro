@@ -1,15 +1,15 @@
 cpp_unittest(
     name = "test_remote_worker_state",
     srcs = ["test_remote_worker_state.cpp"],
-    deps = ["@/bistro/bistro/remote:remote_lib"],
+    deps = ["//bistro/bistro/remote:remote_lib"],
 )
 
 cpp_unittest(
     name = "test_remote_worker",
     srcs = ["test_remote_worker.cpp"],
     deps = [
-        "@/bistro/bistro/remote:remote_lib",
-        "@/folly/experimental:test_util",
+        "//bistro/bistro/remote:remote_lib",
+        "//folly/experimental:test_util",
     ],
 )
 
@@ -17,9 +17,9 @@ cpp_unittest(
     name = "test_remote_workers",
     srcs = ["test_remote_workers.cpp"],
     deps = [
-        "@/bistro/bistro/remote:remote_lib",
-        "@/folly:random",
-        "@/folly/experimental:test_util",
+        "//bistro/bistro/remote:remote_lib",
+        "//folly:random",
+        "//folly/experimental:test_util",
     ],
 )
 
@@ -27,7 +27,7 @@ cpp_unittest(
     name = "test_worker_set_id",
     srcs = ["test_worker_set_id.cpp"],
     deps = [
-        "@/bistro/bistro/remote:remote_lib",
-        "@/folly/experimental:test_util",
+        "//bistro/bistro/remote:remote_lib",
+        "//folly/experimental:test_util",
     ],
 )

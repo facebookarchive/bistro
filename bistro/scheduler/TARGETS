@@ -2,7 +2,7 @@ cpp_library(
     name = "scheduler_policy_registry_lib",
     srcs = ["SchedulerPolicyRegistry.cpp"],
     headers = ["SchedulerPolicyRegistry.h"],
-    deps = ["@/bistro/bistro/utils:exception_lib"],
+    deps = ["//bistro/bistro/utils:exception_lib"],
     external_deps = ["glog"],
 )
 
@@ -33,14 +33,14 @@ cpp_library(
         "utils.h",
     ],
     deps = [
-        "@/bistro/bistro/config:config_lib",
-        "@/bistro/bistro/flags:flags_lib",
-        "@/bistro/bistro/nodes:nodes_lib",
-        "@/bistro/bistro/scheduler:scheduler_policy_registry_lib",
-        "@/bistro/bistro/statuses:statuses_lib",
-        "@/bistro/bistro/utils:utils_lib",
-        "@/folly:memory",
-        "@/folly:singleton",
+        "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/flags:flags_lib",
+        "//bistro/bistro/nodes:nodes_lib",
+        "//bistro/bistro/scheduler:scheduler_policy_registry_lib",
+        "//bistro/bistro/statuses:statuses_lib",
+        "//bistro/bistro/utils:utils_lib",
+        "//folly:memory",
+        "//folly:singleton",
     ],
     external_deps = ["boost"],
 )

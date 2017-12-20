@@ -9,8 +9,8 @@ cpp_library(
         "Statement.h",
     ],
     deps = [
-        "@/folly:conv",
-        "@/folly:range",
+        "//folly:conv",
+        "//folly:range",
     ],
     external_deps = [
         ("boost", None, "boost_filesystem"),

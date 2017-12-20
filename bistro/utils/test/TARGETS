@@ -1,35 +1,35 @@
 cpp_unittest(
     name = "test_symbol_table",
     srcs = ["test_symbol_table.cpp"],
-    deps = ["@/bistro/bistro/utils:utils_lib"],
+    deps = ["//bistro/bistro/utils:utils_lib"],
 )
 
 cpp_unittest(
     name = "test_settings_map",
     srcs = ["test_settings_map.cpp"],
     deps = [
-        "@/bistro/bistro/utils:utils_lib",
-        "@/folly:dynamic",
+        "//bistro/bistro/utils:utils_lib",
+        "//folly:dynamic",
     ],
 )
 
 cpp_unittest(
     name = "test_shuffled_range",
     srcs = ["test_shuffled_range.cpp"],
-    deps = ["@/bistro/bistro/utils:utils_lib"],
+    deps = ["//bistro/bistro/utils:utils_lib"],
 )
 
 cpp_unittest(
     name = "test_log_writer",
     srcs = ["test_log_writer.cpp"],
-    deps = ["@/bistro/bistro/utils:utils_lib"],
+    deps = ["//bistro/bistro/utils:utils_lib"],
 )
 
 cpp_unittest(
     name = "test_shell",
     srcs = ["test_shell.cpp"],
     deps = [
-        "@/bistro/bistro/utils:utils_lib",
-        "@/folly:subprocess",
+        "//bistro/bistro/utils:utils_lib",
+        "//folly:subprocess",
     ],
 )

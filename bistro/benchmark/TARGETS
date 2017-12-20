@@ -3,8 +3,8 @@ cpp_benchmark(
     srcs = ["db_scraping_benchmark.cpp"],
     headers = [],
     deps = [
-        "@/bistro/bistro:bistro_lib",
-        "@/folly:benchmark",
+        "//bistro/bistro:bistro_lib",
+        "//folly:benchmark",
     ],
     external_deps = ["glog"],
 )

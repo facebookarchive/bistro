@@ -8,9 +8,9 @@ thrift_library(
     thrift_cpp2_options = "stack_arguments",
     thrift_srcs = {"scheduler.thrift": ["BistroScheduler"]},
     deps = [
-        "@/bistro/bistro/if:bits",
-        "@/bistro/bistro/if:common",
-        "@/common/fb303/if:fb303",
+        "//bistro/bistro/if:bits",
+        "//bistro/bistro/if:common",
+        "//common/fb303/if:fb303",
     ],
 )
 
@@ -24,8 +24,8 @@ thrift_library(
     thrift_cpp2_options = "stack_arguments",
     thrift_srcs = {"worker.thrift": ["BistroWorker"]},
     deps = [
-        "@/bistro/bistro/if:common",
-        "@/common/fb303/if:fb303",
+        "//bistro/bistro/if:common",
+        "//common/fb303/if:fb303",
     ],
 )
 

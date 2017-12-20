@@ -2,7 +2,7 @@ def cron_test(name):
     cpp_unittest(
         name = name,
         srcs = [name + '.cpp'],
-        deps = ['@/bistro/bistro/cron:cron_lib'],
+        deps = ['//bistro/bistro/cron:cron_lib'],
     )
 
 cron_test("test_crontab_selector")

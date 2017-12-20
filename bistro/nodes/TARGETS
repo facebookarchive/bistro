@@ -21,13 +21,13 @@ cpp_library(
         "utils.h",
     ],
     deps = [
-        "@/bistro/bistro/config:config_lib",
-        "@/bistro/bistro/cron:cron_lib",
-        "@/bistro/bistro/utils:utils_lib",
-        "@/folly:json",
-        "@/folly:string",
-        "@/folly:subprocess",  # for ScriptFetcher
-        "@/folly/gen:file",
+        "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/cron:cron_lib",
+        "//bistro/bistro/utils:utils_lib",
+        "//folly:json",
+        "//folly:string",
+        "//folly:subprocess",  # for ScriptFetcher
+        "//folly/gen:file",
     ],
     external_deps = [
         "boost",

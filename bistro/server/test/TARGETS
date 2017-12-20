@@ -3,13 +3,13 @@ cpp_library(
     srcs = ["ThriftMonitorTestThread.cpp"],
     headers = ["ThriftMonitorTestThread.h"],
     deps = [
-        "@/bistro/bistro/monitor:monitor_lib",
-        "@/bistro/bistro/runners:runners_lib",
-        "@/bistro/bistro/server:http_server_lib",
-        "@/bistro/bistro/statuses:statuses_lib",
-        "@/thrift/lib/cpp/concurrency:numa2",
-        "@/thrift/lib/cpp/util:util",
-        "@/thrift/lib/cpp2:server",
+        "//bistro/bistro/monitor:monitor_lib",
+        "//bistro/bistro/runners:runners_lib",
+        "//bistro/bistro/server:http_server_lib",
+        "//bistro/bistro/statuses:statuses_lib",
+        "//thrift/lib/cpp/concurrency:numa2",
+        "//thrift/lib/cpp/util:util",
+        "//thrift/lib/cpp2:server",
     ],
 )
 
@@ -23,9 +23,9 @@ cpp_unittest(
     name = "test_node_getter",
     srcs = ["test_node_getter.cpp"],
     deps = [
-        "@/bistro/bistro/monitor:monitor_lib",
-        "@/bistro/bistro/runners:runners_lib",
-        "@/bistro/bistro/server:http_server_lib",
-        "@/bistro/bistro/test:test_lib",
+        "//bistro/bistro/monitor:monitor_lib",
+        "//bistro/bistro/runners:runners_lib",
+        "//bistro/bistro/server:http_server_lib",
+        "//bistro/bistro/test:test_lib",
     ],
 )

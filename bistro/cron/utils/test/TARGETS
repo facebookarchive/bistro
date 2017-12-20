@@ -4,6 +4,6 @@ cpp_unittest(
         "test_date_time.cpp",
     ],
     deps = [
-        "@/bistro/bistro/cron/utils:cron_utils_lib",
+        "//bistro/bistro/cron/utils:cron_utils_lib",
     ],
 )

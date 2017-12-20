@@ -9,12 +9,12 @@ cpp_library(
         "FakeBistroWorkerThread.h",
     ],
     deps = [
-        "@/bistro/bistro/test:test_lib",
-        "@/bistro/bistro/worker:bistro_worker_lib",
-        "@/thrift/lib/cpp/concurrency:numa2",
-        "@/thrift/lib/cpp/util:util",
-        "@/thrift/lib/cpp2:server",
-        "@/thrift/lib/cpp2/util:util",
+        "//bistro/bistro/test:test_lib",
+        "//bistro/bistro/worker:bistro_worker_lib",
+        "//thrift/lib/cpp/concurrency:numa2",
+        "//thrift/lib/cpp/util:util",
+        "//thrift/lib/cpp2:server",
+        "//thrift/lib/cpp2/util:util",
     ],
 )
 
@@ -23,9 +23,9 @@ cpp_unittest(
     srcs = ["test_worker.cpp"],
     deps = [
         ":bistro_worker_test_lib",
-        "@/bistro/bistro/server/test:thrift_monitor_test_thread_lib",
-        "@/folly:dynamic",
-        "@/folly:json",
-        "@/folly/experimental:test_util",
+        "//bistro/bistro/server/test:thrift_monitor_test_thread_lib",
+        "//folly:dynamic",
+        "//folly:json",
+        "//folly/experimental:test_util",
     ],
 )

@@ -13,12 +13,12 @@ cpp_library(
         "StandardCrontabItem.h",
     ],
     deps = [
-        "@/bistro/bistro/cron/utils:cron_utils_lib",
-        "@/folly:conv",
-        "@/folly:dynamic",
-        "@/folly:format",
-        "@/folly:json",
-        "@/folly:optional",
+        "//bistro/bistro/cron/utils:cron_utils_lib",
+        "//folly:conv",
+        "//folly:dynamic",
+        "//folly:format",
+        "//folly:json",
+        "//folly:optional",
     ],
     external_deps = [
         ("boost", None, "boost_date_time"),

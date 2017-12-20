@@ -2,8 +2,8 @@ cpp_unittest(
     name = "test_add_time_fetcher",
     srcs = ["test_add_time_fetcher.cpp"],
     deps = [
-        "@/bistro/bistro/nodes:nodes_lib",
-        "@/folly:json",
+        "//bistro/bistro/nodes:nodes_lib",
+        "//folly:json",
     ],
 )
 
@@ -11,8 +11,8 @@ cpp_unittest(
     name = "test_range_label_fetcher",
     srcs = ["test_range_label_fetcher.cpp"],
     deps = [
-        "@/bistro/bistro/nodes:nodes_lib",
-        "@/folly:conv",
+        "//bistro/bistro/nodes:nodes_lib",
+        "//folly:conv",
     ],
 )
 
@@ -20,25 +20,25 @@ cpp_unittest(
     name = "test_manual_fetcher",
     srcs = ["test_manual_fetcher.cpp"],
     deps = [
-        "@/bistro/bistro/nodes:nodes_lib",
-        "@/folly:conv",
+        "//bistro/bistro/nodes:nodes_lib",
+        "//folly:conv",
     ],
 )
 
 cpp_unittest(
     name = "test_script_fetcher",
     srcs = ["test_script_fetcher.cpp"],
-    deps = ["@/bistro/bistro/nodes:nodes_lib"],
+    deps = ["//bistro/bistro/nodes:nodes_lib"],
 )
 
 cpp_unittest(
     name = "test_nodes",
     srcs = ["test_nodes.cpp"],
-    deps = ["@/bistro/bistro/nodes:nodes_lib"],
+    deps = ["//bistro/bistro/nodes:nodes_lib"],
 )
 
 cpp_unittest(
     name = "test_nodes_utils",
     srcs = ["test_nodes_utils.cpp"],
-    deps = ["@/bistro/bistro/nodes:nodes_lib"],
+    deps = ["//bistro/bistro/nodes:nodes_lib"],
 )

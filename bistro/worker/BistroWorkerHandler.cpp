@@ -517,7 +517,7 @@ void BistroWorkerHandler::throwOnInstanceIDMismatch(
   );
 }
 
-chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
+std::chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
   // Not checking commitedSuicide_ here since, in rare cases, some good can
   // come out of these notifications (the tasks are already done, so we
   // might as well try to report them if the scheduler will listen).
@@ -584,7 +584,7 @@ chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
  * overwriteable "was not running" status to allow the scheduler to
  * reschedule the task.
  */
-chrono::seconds BistroWorkerHandler::notifyNotRunning() noexcept {
+std::chrono::seconds BistroWorkerHandler::notifyNotRunning() noexcept {
   // Just as with notifyFinished, there is no benefit to checking
   // committingSuicide_ here.
 
@@ -643,7 +643,7 @@ void BistroWorkerHandler::setState(
     || (new_state == RemoteWorkerState::State::HEALTHY);
 }
 
-chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
+std::chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
   if (committingSuicide_.load()) {  // Stop sending heartbeats once dying.
     return std::chrono::seconds(1);
   }
@@ -757,7 +757,7 @@ chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
   return std::chrono::seconds(worker_.heartbeatPeriodSec);
 }
 
-chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
+std::chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
   if (committingSuicide_.load()) {  // No point in updating state_ any more.
     return std::chrono::seconds(1);
   }

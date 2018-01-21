@@ -77,16 +77,16 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
       asyncSubprocess(
         evb,
         std::move(proc),
-        [evb, &num_polls](folly::Subprocess& proc) {
+        [evb, &num_polls](folly::Subprocess& p) {
           // track timeout
           if (--num_polls <= 0) {
             // kill process
             LOG(WARNING) << "Subprocess timed out, killing it...";
-            if (kill(-proc.pid(), SIGKILL) == -1) {
+            if (kill(-p.pid(), SIGKILL) == -1) {
               PLOG(ERROR) << "Failed to signal the process group"
                           << ", trying to signal the process.";
               // The previous kill should never fail, but a fallback seems ok.
-              proc.kill();
+              p.kill();
             }
           }
         },

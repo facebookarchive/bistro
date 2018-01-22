@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017, Facebook, Inc.
+ *  Copyright (c) 2017-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -409,18 +409,18 @@ void TaskSubprocessQueue::runTask(
       auto proc = [&state, &full_cmd](
         // Pass by r-value, since opts will contain an invalid pointer after
         // add_to_cgroups is destroyed below.
-        folly::Subprocess::Options&& opts
+        folly::Subprocess::Options&& options
       ) {
         if (state->cgroupName().empty()) {
-          return folly::Subprocess(full_cmd, opts);
+          return folly::Subprocess(full_cmd, options);
         }
         LOG(INFO) << "Making task cgroups named " << state->cgroupName();
         // This must live only until folly::Subprocess's constructor exits.
         AddChildToCGroups add_to_cgroups(cgroupSetup(
           state->cgroupName(), state->opts().cgroupOptions
         ));
-        opts.dangerousPostForkPreExecCallback(&add_to_cgroups);
-        return folly::Subprocess(full_cmd, opts);
+        options.dangerousPostForkPreExecCallback(&add_to_cgroups);
+        return folly::Subprocess(full_cmd, options);
       }(std::move(opts));
       // IMPORTANT: This call must be last in the block and `noexcept` to
       // ensure that the below "remove from tasks_" cannot race the "remove

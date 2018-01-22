@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -339,8 +339,8 @@ Scheduler::Result Scheduler::schedule(
         job->dependencies().cbegin(),
         job->dependencies().cend(),
         [&status_snapshot, &node](Job::ID id) {
-          const TaskStatus* s = status_snapshot.getPtr(id, node->id());
-          return s && s->isDone();
+          const TaskStatus* st = status_snapshot.getPtr(id, node->id());
+          return st && st->isDone();
         })) {
         continue;
       }

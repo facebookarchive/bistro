@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017, Facebook, Inc.
+ *  Copyright (c) 2017-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -341,21 +341,22 @@ void BistroWorkerHandler::runTask(
     cmd.empty() ? vector<string>{workerCommand_} : cmd,
     config,  // Job config argument -- DO: elide the extra copy?
     jobsDir_ / rt.job,  // Working directory for the task
-    [this](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
+    [this](const cpp2::RunningTask& runningTask, TaskStatus&& status) noexcept {
       // 10 tasks / sec
-      folly::AutoTimer<> timer(
+      folly::AutoTimer<> updateQueueTimer(
           "Task update queue was slow", std::chrono::milliseconds{100});
       notifyFinishedQueue_.blockingWrite(std::make_unique<NotifyData>(
-        TaskID{rt.job, rt.node}, std::move(status)
+        TaskID{runningTask.job, runningTask.node}, std::move(status)
       ));
-      logStateTransitionFn_("completed_task", worker_, &rt);
+      logStateTransitionFn_("completed_task", worker_, &runningTask);
     },
     [this](
-      const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&& res
+      const cpp2::RunningTask& runningTask, cpp2::TaskPhysicalResources&& res
     ) noexcept {
       SYNCHRONIZED(runningTasks_) {
-        auto it = runningTasks_.find({rt.job, rt.node});
-        CHECK (it != runningTasks_.end()) << "Bad task: " << debugString(rt);
+        auto it = runningTasks_.find({runningTask.job, runningTask.node});
+        CHECK (it != runningTasks_.end()) << "Bad task: "
+                                          << debugString(runningTask);
         it->second.physicalResources = std::move(res);
         it->second.__isset.physicalResources = true;
       }

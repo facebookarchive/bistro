@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017, Facebook, Inc.
+ *  Copyright (c) 2017-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -145,13 +145,13 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
     config.levelForTasks = std::move(s);
   });
   p.optional("resources", [&]() {
-    p.objectItems([&](std::string&& name, int64_t amount) {
-      config.resources[name] = amount;
+    p.objectItems([&](std::string&& resourceName, int64_t amount) {
+      config.resources[resourceName] = amount;
     });
   });
   p.optional("filters", [&]() {
-    p.objectItems([&](std::string&& name, const folly::dynamic& v) {
-      config.filters[name] = toThrift(v);
+    p.objectItems([&](std::string&& filterName, const folly::dynamic& v) {
+      config.filters[filterName] = toThrift(v);
     });
   });
   {

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -262,16 +262,16 @@ RemoteWorkers::processHeartbeat(
         ).second);
       },
       // A worker's WorkerSetID is getting a new version (a new echo arrived).
-      [this](RemoteWorker& w, const cpp2::WorkerSetID& worker_set_id) {
+      [this](RemoteWorker& w, const cpp2::WorkerSetID& w_set_id) {
         // Guaranteed by RemoteWorker
-        CHECK(schedulerID_ == worker_set_id.schedulerID)
+        CHECK(schedulerID_ == w_set_id.schedulerID)
           << debugString(schedulerID_) << " != "
-          << debugString(worker_set_id.schedulerID);
+          << debugString(w_set_id.schedulerID);
 
         // Update indirectVersionsOfNonMustDieWorkers_ and
         // w.indirectWorkerSetID_, if this update changes this worker's
         // indirect version.
-        updateIndirectWorkerSetVersion(&w, worker_set_id);
+        updateIndirectWorkerSetVersion(&w, w_set_id);
 
         // No need to update initialWorkerSetIDs_ or nonMustDieWorkerSetID_
         // or history_, since the scheduler's worker set has not changed.

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017, Facebook, Inc.
+ *  Copyright (c) 2017-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -264,14 +264,14 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
       },
       "json_arg",
       ".",
-      [](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
+      [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+        EXPECT_EQ("job", rt2.job);
+        EXPECT_EQ("node", rt2.node);
         EXPECT_TRUE(status.isDone());
       },
-      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
+      [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+        EXPECT_EQ("job", rt2.job);
+        EXPECT_EQ("node", rt2.node);
       },
       opts
     );
@@ -348,14 +348,14 @@ TEST_F(TestTaskSubprocessQueue, NormalRun) {
       cmd,
       "json_arg",
       ".",
-      [](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
+      [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+        EXPECT_EQ("job", rt2.job);
+        EXPECT_EQ("node", rt2.node);
         EXPECT_TRUE(status.isDone());
       },
-      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
+      [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+        EXPECT_EQ("job", rt2.job);
+        EXPECT_EQ("node", rt2.node);
       },
       cpp2::TaskSubprocessOptions()  // defaults should be ok
     );
@@ -400,16 +400,16 @@ TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
         cmd,
         "json_arg",
         ".",
-        [node](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-          EXPECT_EQ("job", rt.job);
-          EXPECT_EQ(node, rt.node);
+        [node](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+          EXPECT_EQ("job", rt2.job);
+          EXPECT_EQ(node, rt2.node);
           EXPECT_TRUE(status.isDone());
         },
         [node, this](
-          const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&
+          const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&
         ) {
-          EXPECT_EQ("job", rt.job);
-          EXPECT_EQ(node, rt.node);
+          EXPECT_EQ("job", rt2.job);
+          EXPECT_EQ(node, rt2.node);
         },
         cpp2::TaskSubprocessOptions()  // defaults should be ok
       );
@@ -448,9 +448,9 @@ TEST_F(TestTaskSubprocessQueue, NoStatus) {
       std::vector<std::string>{"/bin/echo"},
       "json_arg",
       ".",
-      [](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
+      [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+        EXPECT_EQ("job", rt2.job);
+        EXPECT_EQ("node", rt2.node);
         EXPECT_EQ(
           TaskStatusBits::Error | TaskStatusBits::UsesBackoff,
           status.bits()
@@ -460,9 +460,9 @@ TEST_F(TestTaskSubprocessQueue, NoStatus) {
           (*status.dataThreadUnsafe()).at("exception").asString()
         );
       },
-      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
+      [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+        EXPECT_EQ("job", rt2.job);
+        EXPECT_EQ("node", rt2.node);
       },
       cpp2::TaskSubprocessOptions()  // defaults should be ok
     );
@@ -626,14 +626,14 @@ TEST_F(TestTaskSubprocessQueue, RateLimitLog) {
       cmd,
       "json_arg",
       ".",
-      [](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
+      [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+        EXPECT_EQ("job", rt2.job);
+        EXPECT_EQ("node", rt2.node);
         EXPECT_TRUE(status.isDone());
       },
-      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
+      [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+        EXPECT_EQ("job", rt2.job);
+        EXPECT_EQ("node", rt2.node);
       },
       opts
     );

@@ -29,7 +29,7 @@ class Args(object):
     @classmethod
     def enrichParser(cls, parser):
         cls.PARSERS.append(parser)
-        for func in cls.ACTIONS.itervalues():
+        for func in cls.ACTIONS.itervalues():  # noqa: B301 T25377293 Grandfathered in
             func(parser)
         return parser
 

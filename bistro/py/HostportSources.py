@@ -25,7 +25,7 @@ class HostportSources(PluginCollection):
             'environment variable to "prefix{}value". Valid prefixes:\n{}'
             .format(cls.SEP, '\n'.join(
                 '  {}{} -- {}'.format(k, cls.SEP, obj.__doc__)
-                    for k, obj in cls.key_to_obj.iteritems()
+                    for k, obj in cls.key_to_obj.iteritems()  # noqa: B301 T25377293 Grandfathered in
             ))
         )
 

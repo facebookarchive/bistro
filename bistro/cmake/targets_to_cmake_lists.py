@@ -33,7 +33,7 @@ def parse_targets(dirpath, s):
     #
 
     def _dep_name(s):
-        if not re.match('^(:|@/bistro/bistro[:/])', s):
+        if not re.match('^(:|//bistro/bistro[:/])', s):
             return None
         if s.endswith('-cpp2'):
             # Handled specially by run-cmake.sh, has a special CMakeLists.txt

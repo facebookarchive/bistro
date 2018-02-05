@@ -69,12 +69,17 @@ add_subdirectory(cmake/deps/gtest-1.7.0)
 enable_testing()
 include_directories("${gtest_SOURCE_DIR}/include" "${gtest_SOURCE_DIR}")
 
+add_library(
+  folly_gtest_main STATIC
+  folly_gtest_main.cpp
+)
+
 macro(add_gtest name)
   add_executable(${name} ${name}.cpp)
   bistro_link_libraries(
     ${name}
     gtest
-    gtest_main
+    folly_gtest_main
     ${ARGN}
   )
   add_test(${name} ${name})

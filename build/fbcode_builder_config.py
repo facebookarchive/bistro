@@ -30,7 +30,7 @@ def fbcode_builder_spec(builder):
                 builder.parallel_make(),
             ]),
             builder.step('Run bistro tests', [
-                builder.run(ShellQuoted('ctest')),
+                builder.run(ShellQuoted('ctest --output-on-failure')),
             ]),
         ]
     }

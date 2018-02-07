@@ -251,23 +251,30 @@ TEST_F(TestSuicide, ViaSignal) {
   folly::test::CaptureFD stderr(2, printString);
   StopWorkerOnSignal signal_handler(
     folly::EventBaseManager::get()->getEventBase(),
-    {SIGQUIT},
+    {SIGUSR1},  // NB: FB test infra breaks SIGQUIT?!
     worker_.handler()
   );
   waitForWorkerHealthy(worker_, &stderr);
   startTasks();
 
-  pid_t my_pid = getpid();
+  pid_t my_pid = ::getpid();
   PCHECK(my_pid != -1);
-  ::kill(my_pid, SIGQUIT);
+  if (::kill(my_pid, SIGUSR1) == -1) {
+    PLOG(ERROR) << "Failed to signal " << my_pid;
+  } else {
+    LOG(INFO) << "Signaled " << my_pid;
+  }
 
   // Wait for the tasks to exit, and for the server to stop.
   while (!committedSuicide_.load()) {
-    folly::EventBaseManager::get()->getEventBase()->loopOnce();
+    printString("waiting for signal\n"); // bypass glog for ease of debugging
+    stderr.readIncremental();  // dump glog for ease of debugging
+    folly::EventBaseManager::get()->getEventBase()->loopOnce(EVLOOP_NONBLOCK);
+    /* sleep override */ this_thread::sleep_for(std::chrono::milliseconds(80));
   }
   EXPECT_PCRE_MATCH(folly::to<std::string>(
-     ".* Got signal ", SIGQUIT, ", shutting down worker.*"
-  ), stderr.readIncremental());
+     ".* Got signal ", SIGUSR1, ", shutting down worker.*"
+  ), stderr.read());
 }
 
 TEST_F(TestWorker, HandleKillTask) {

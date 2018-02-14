@@ -13,6 +13,7 @@ cpp_library(
         "//bistro/bistro/server:http_server_lib",
         "//bistro/bistro/statuses:statuses_lib",
         "//bistro/bistro/utils:utils_lib",
+        "//folly/experimental:auto_timer",
     ],
     external_deps = ["boost"],
 )

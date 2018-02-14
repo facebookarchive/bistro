@@ -10,5 +10,7 @@ cpp_library(
         "//bistro/bistro/utils:utils_lib",
         "//folly:conv",
         "//folly:synchronized",
+        "//folly/experimental:auto_timer",
+        "//folly/experimental:threaded_repeating_function_runner",
     ],
 )

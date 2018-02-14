@@ -31,8 +31,11 @@ cpp_library(
         "//folly:string",
         "//folly:subprocess",
         "//folly:synchronized",
+        "//folly/executors:io_thread_pool_executor",
+        "//folly/futures:core",
         "//folly/gen:file",
         "//folly/gen:string",
+        "//folly/io/async:async",
     ],
     external_deps = [
         ("boost", None, "boost_filesystem"),
@@ -52,8 +55,10 @@ cpp_library(
         "//folly:file",
         "//folly:file_util",
         "//folly:subprocess",
+        "//folly/futures:core",
         "//folly/futures:futures",
         "//folly/gen:string",
+        "//folly/io/async:async",
     ],
     external_deps = ["libevent"],
 )

@@ -16,7 +16,10 @@ cpp_library(
 cpp_unittest(
     name = "test_thrift_monitor",
     srcs = ["test_thrift_monitor.cpp"],
-    deps = [":thrift_monitor_test_thread_lib"],
+    deps = [
+        ":thrift_monitor_test_thread_lib",
+        "//folly/io/async:async",
+    ],
 )
 
 cpp_unittest(

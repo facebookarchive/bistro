@@ -21,6 +21,8 @@ cpp_unittest(
     deps = [
         "//bistro/bistro/processes:processes",
         "//folly:mpmc_queue",
+        "//folly/experimental:auto_timer",
+        "//folly/io/async:async",
     ],
 )
 

@@ -27,6 +27,7 @@ cpp_library(
         "//folly:json",
         "//folly:string",
         "//folly:subprocess",  # for ScriptFetcher
+        "//folly/experimental:auto_timer",
         "//folly/gen:file",
     ],
     external_deps = [

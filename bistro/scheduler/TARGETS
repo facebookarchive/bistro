@@ -33,14 +33,16 @@ cpp_library(
         "utils.h",
     ],
     deps = [
+        ":scheduler_policy_registry_lib",
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/flags:flags_lib",
         "//bistro/bistro/nodes:nodes_lib",
-        "//bistro/bistro/scheduler:scheduler_policy_registry_lib",
         "//bistro/bistro/statuses:statuses_lib",
         "//bistro/bistro/utils:utils_lib",
         "//folly:memory",
         "//folly:singleton",
+        "//folly:small_vector",
+        "//folly/experimental:auto_timer",
     ],
     external_deps = ["boost"],
 )

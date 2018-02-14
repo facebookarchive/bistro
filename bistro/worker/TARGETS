@@ -3,7 +3,6 @@ cpp_library(
     srcs = ["BistroWorkerHandler.cpp"],
     headers = ["BistroWorkerHandler.h"],
     deps = [
-        "//common/fb303/cpp:fb303",
         "//bistro/bistro/if:if-cpp2",
         "//bistro/bistro/if:worker_if-cpp2",
         "//bistro/bistro/processes:processes",
@@ -11,6 +10,9 @@ cpp_library(
         "//bistro/bistro/remote:remote_lib",
         "//bistro/bistro/statuses:statuses_lib",
         "//bistro/bistro/utils:utils_lib",
+        "//common/fb303/cpp:fb303",
+        "//folly/experimental:auto_timer",
+        "//folly/experimental:threaded_repeating_function_runner",
         "//folly:file",
         "//folly:json",
         "//folly:mpmc_queue",

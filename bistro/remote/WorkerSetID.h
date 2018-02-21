@@ -18,11 +18,13 @@ namespace facebook { namespace bistro {
 namespace detail {
 inline void addValueToHash(cpp2::SetHash* h, int64_t v) {
   h->xorAll = h->xorAll ^ v;
-  h->addAll = h->addAll + v;
+  h->addAll = static_cast<int64_t>(
+      static_cast<uint64_t>(h->addAll) + static_cast<uint64_t>(v));
 }
 inline void removeValueFromHash(cpp2::SetHash* h, int64_t v) {
   h->xorAll = h->xorAll ^ v;
-  h->addAll = h->addAll - v;
+  h->addAll = static_cast<int64_t>(
+      static_cast<uint64_t>(h->addAll) - static_cast<uint64_t>(v));
 }
 }
 

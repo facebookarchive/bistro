@@ -47,7 +47,7 @@ The only key required to be present in the config is `bistro_settings`. This det
 
 Sometimes, you want one task to run before another. If this is a preference, but **not a hard constraint**, then you should look into job `"priority"` values and the Bistro-level `"scheduler"` policy setting. You can also change the Bistro-level "node_order".
 
-If certain tasks must **definitely not run**, then you should look at job-level configs of `"filter"` and `"depends_on"`.
+If certain tasks must **definitely not run**, then you should look at job-level configs of `"filter"`, `"depends_on"`, and `"run_only_after_all_nodes_are_done_for"`.
 
 If you want tasks to run at certain times / on a schedule, check out the ["add_time" node source](https://github.com/facebook/bistro/blob/master/bistro/nodes/AddTimeFetcher.h#L25).
 
@@ -143,6 +143,13 @@ In addition to the `bistro_settings` key, each Bistro config can support 0 or mo
 - `backoff`: *(overrides `bistro_settings`)* A JSON list that overrides the global `backoff` setting for a specific job. See `bistro_settings` for the format.
 - `filters`: See "Job Filters" below.
 - `depends_on`: If the configuration for "job3" sets `"depends_on": ["job1", "job2"]`, then "job3" will only start on node "n" after both "job1" and "job2" have finished on "n". Defaults to **[]**.
+- `run_only_after_all_nodes_are_done_for`: Syntactically, this is like `"depends_on"`, but you must use it with **extreme care**. If in your use-case, the set of nodes changes while jobs run, this is **not** for you. If you want a fuzzy definition of "the job is done", like "99.9% of all nodes are done, and 100% of the 1000 most critical nodes are done", then this option is **not** for you. If you use this option, your job will **only** run if all of the following conditions are met:
+    - It is eligible to run under all the other criteria ("depends_on", "enabled", etc).
+    - All of the jobs in the list are "done", which means that each dependency:
+        - Is eligible to run now -- disabled jobs are not "done", even if all nodes are done.
+        - Has a known `level_for_tasks`. If we can't look up the nodes that must be done, the job is not "done".
+        - All of its nodes either have the status "done", or are filtered out. If your level exists, but has 0 nodes, your job is done.
+        - It is "done" in the current configuration -- if Bistro was reconfigured, "done"-ness is always evaluated relative to the latest configuration.
 - `level_for_tasks`: *(overrides `bistro_settings`)* See "Running Jobs on Different Levels" below.
 - `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: *(overrides `bistro_settings`)* See [Supervising and killing tasks](snarkmaster.github.io/bistro/docs/supervising-and-killing-tasks) for the details.
 - `host_placement`, `level_for_host_placement`:  *CAUTION* — these options are likely to change significantly in the future. Allows scheduling a job on specific hosts, primarily useful for scheduling tasks on the hosts that contain the data. Note that both options use the actual hostname of the worker process (from the structure [MachinePortLock](https://github.com/facebook/bistro/blob/master/bistro/if/common.thrift)), not the worker's ID. If both `host_placement` and `level_for_host_placement` are set, the former prevails since it is more specific.

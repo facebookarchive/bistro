@@ -125,7 +125,14 @@ bool JobFilters::operator==(const JobFilters& other) const {
     && other.cb_ == nullptr;
 }
 
-void JobFilters::setFractionOfNodes(double f) {
+void JobFilters::setFractionOfNodes(double f)
+// TODO: T26311162 fix float-cast-overflow undefined behavior
+#if defined(__has_feature)
+#if __has_feature(__address_sanitizer__)
+    __attribute__((__no_sanitize__("float-cast-overflow")))
+#endif
+#endif
+{
   // Don't allow a fraction of nodes less than 0. Usually this is a
   // configuration error.
   if (f <= 0.0) {

@@ -91,7 +91,7 @@ void parseTaskSubprocessOptions(
       p->optional(kKillWithoutFreezer, [&](bool b) {
         cgopts.killWithoutFreezer = b;
       });
-      // cpuShares and and memoryLimitInBytes will be populated on a
+      // cpuShares and memoryLimitInBytes will be populated on a
       // per-task basis, based on their worker resources using
       // PhysicalResourceConfig.  unitTestCreateFiles is for tests.
     });

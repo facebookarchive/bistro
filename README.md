@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/facebook/bistro.svg?branch=master)](https://travis-ci.org/facebook/bistro)
 
 This README is a very abbreviated introduction to Bistro. Visit
-https://bistro.io/ for a more structured introduction, and for the docs.
+http://facebook.github.io/bistro for a more structured introduction, and for the docs.
 
 Bistro is a toolkit for making distributed computation systems. It can
 schedule and run distributed tasks, including data-parallel jobs.  It
@@ -58,7 +58,7 @@ You can start Bistro's unit tests by running `ctest` in those directories.
 ## Your first Bistro run
 
 This is just one simple demo, but Bistro is a very flexible tool. Refer to
-https://bistro.io for more in-depth information.
+http://facebook.github.io/bistro/ for more in-depth information.
 
 We are going to start a single Bistro scheduler talking to one 'remote'
 worker.
@@ -145,5 +145,5 @@ gdb cmake/Debug/worker/bistro_worker -ex "r ..." 2>&1 | tee WORKER.txt
 
 When configuring a real deployment, be sure to carefully review the `--help`
 of the scheduler & worker binaries, as well as the documentation on
-https://bistro.io.  And don't hesitate to ask for help in the group:
+http://facebook.github.io/bistro.  And don't hesitate to ask for help in the group:
 https://www.facebook.com/groups/bistro.scheduler

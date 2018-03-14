@@ -13,6 +13,8 @@
 #include <thread>
 #include "bistro/bistro/server/HTTPMonitor.h"
 
+DECLARE_int32(http_server_port);
+
 namespace facebook { namespace bistro {
 
 class HTTPMonitorServer {

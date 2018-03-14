@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "processes",
     srcs = [
@@ -16,10 +18,12 @@ cpp_library(
         "TaskSubprocessQueue.h",
     ],
     deps = [
-        ":subprocess_with_timeout",
-        "//bistro/bistro/if:if-cpp2",
+        "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/physical:physical_lib",
         "//bistro/bistro/statuses:statuses_lib",
+        "//bistro/bistro/utils:exception_lib",
+        "//bistro/bistro/utils:hostname_lib",
+        "//bistro/bistro/utils:shell_lib",
         "//bistro/bistro/utils:utils_lib",
         "//folly:conv",
         "//folly:exception",
@@ -36,6 +40,7 @@ cpp_library(
         "//folly/gen:file",
         "//folly/gen:string",
         "//folly/io/async:async",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
     external_deps = [
         ("boost", None, "boost_filesystem"),
@@ -56,9 +61,7 @@ cpp_library(
         "//folly:file_util",
         "//folly:subprocess",
         "//folly/futures:core",
-        "//folly/futures:futures",
         "//folly/gen:string",
         "//folly/io/async:async",
     ],
-    external_deps = ["libevent"],
 )

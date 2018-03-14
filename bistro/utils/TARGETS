@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "exception_lib",
     srcs = ["Exception.cpp"],
@@ -51,10 +53,7 @@ cpp_library(
         "Exception.h",
     ],
     deps = [
-        ":exception_lib",
-        ":hostname_lib",
-        ":shell_lib",
-        "//bistro/bistro/if:if-cpp2",
+        "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/sqlite:sqlite_lib",
         "//folly:conv",
         "//folly:dynamic",
@@ -67,6 +66,9 @@ cpp_library(
         "//folly/experimental:auto_timer",
         "//folly/experimental:threaded_repeating_function_runner",
         "//folly/io/async:server_socket",
+        "//thrift/lib/cpp/async:socket",
+        "//thrift/lib/cpp2:header_client_channel",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
     external_deps = [
         ("boost", None, "boost_regex"),

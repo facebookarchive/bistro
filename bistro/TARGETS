@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "bistro_lib",
     srcs = [
@@ -10,10 +12,9 @@ cpp_library(
         "//bistro/bistro/nodes:nodes_lib",
         "//bistro/bistro/runners:runners_lib",
         "//bistro/bistro/scheduler:scheduler_lib",
-        "//bistro/bistro/server:http_server_lib",
         "//bistro/bistro/statuses:statuses_lib",
-        "//bistro/bistro/utils:utils_lib",
         "//folly/experimental:auto_timer",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
     external_deps = ["boost"],
 )

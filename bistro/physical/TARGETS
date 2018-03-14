@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "physical_lib",
     srcs = [
@@ -18,8 +20,9 @@ cpp_library(
         "utils.h",
     ],
     deps = [
-        "//bistro/bistro/if:common-cpp2",
+        "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/processes:subprocess_with_timeout",
+        "//bistro/bistro/utils:exception_lib",
         "//bistro/bistro/utils:utils_lib",
         "//folly:conv",
         "//folly:demangle",

@@ -1,10 +1,12 @@
+# @autodeps
+
 cpp_library(
     name = "conversion_lib",
     srcs = ["ThriftConversion.cpp"],
     headers = ["ThriftConversion.h"],
     deps = [
         "//bistro/bistro/config:config_lib",
-        "//bistro/bistro/if:if-cpp2",
+        "//bistro/bistro/if:if-cpp2-types",
         "//folly:dynamic",
         "//folly:json",
         "//folly/experimental:dynamic_parser",
@@ -16,6 +18,9 @@ cpp_unittest(
     srcs = ["test_thrift_conversion.cpp"],
     deps = [
         ":conversion_lib",
+        "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/if:if-cpp2-types",
         "//folly:json",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
 )

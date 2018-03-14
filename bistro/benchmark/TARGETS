@@ -1,9 +1,16 @@
+# @autodeps
+
 cpp_benchmark(
     name = "db_scraping_benchmark",
     srcs = ["db_scraping_benchmark.cpp"],
     headers = [],
     deps = [
         "//bistro/bistro:bistro_lib",
+        "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/monitor:monitor_lib",
+        "//bistro/bistro/nodes:nodes_lib",
+        "//bistro/bistro/runners:runners_lib",
+        "//bistro/bistro/statuses:statuses_lib",
         "//folly:benchmark",
     ],
     external_deps = ["glog"],

@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_unittest(
     name = "test_all_tasks",
     srcs = ["test_all_tasks.cpp"],

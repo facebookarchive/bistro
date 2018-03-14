@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_unittest(
     name = "test_job_filters",
     srcs = [
@@ -40,8 +42,11 @@ cpp_unittest(
     ],
     deps = [
         "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/if:common-cpp2-types",
+        "//bistro/bistro/scheduler:scheduler_policy_registry_lib",
         "//folly:conv",
         "//folly:dynamic",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
 )
 
@@ -62,6 +67,8 @@ cpp_unittest(
     ],
     deps = [
         "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/scheduler:scheduler_policy_registry_lib",
+        "//bistro/bistro/utils:utils_lib",
         "//folly:conv",
         "//folly:dynamic",
     ],

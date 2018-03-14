@@ -1,3 +1,5 @@
+# @autodeps
+
 python_library(
     name = "py",
     srcs = util.files("./**/*.py"),

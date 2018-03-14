@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_unittest(
     name = "test_symbol_table",
     srcs = ["test_symbol_table.cpp"],
@@ -22,14 +24,17 @@ cpp_unittest(
 cpp_unittest(
     name = "test_log_writer",
     srcs = ["test_log_writer.cpp"],
-    deps = ["//bistro/bistro/utils:utils_lib"],
+    deps = [
+        "//bistro/bistro/sqlite:sqlite_lib",
+        "//bistro/bistro/utils:utils_lib",
+    ],
 )
 
 cpp_unittest(
     name = "test_shell",
     srcs = ["test_shell.cpp"],
     deps = [
-        "//bistro/bistro/utils:utils_lib",
+        "//bistro/bistro/utils:shell_lib",
         "//folly:subprocess",
     ],
 )

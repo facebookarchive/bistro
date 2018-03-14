@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_unittest(
     name = "test_remote_worker_state",
     srcs = ["test_remote_worker_state.cpp"],
@@ -8,8 +10,11 @@ cpp_unittest(
     name = "test_remote_worker",
     srcs = ["test_remote_worker.cpp"],
     deps = [
+        "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/remote:remote_lib",
+        "//bistro/bistro/statuses:statuses_lib",
         "//folly/experimental:test_util",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
 )
 
@@ -17,9 +22,12 @@ cpp_unittest(
     name = "test_remote_workers",
     srcs = ["test_remote_workers.cpp"],
     deps = [
+        "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/remote:remote_lib",
+        "//bistro/bistro/statuses:statuses_lib",
         "//folly:random",
         "//folly/experimental:test_util",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
 )
 
@@ -28,6 +36,5 @@ cpp_unittest(
     srcs = ["test_worker_set_id.cpp"],
     deps = [
         "//bistro/bistro/remote:remote_lib",
-        "//folly/experimental:test_util",
     ],
 )

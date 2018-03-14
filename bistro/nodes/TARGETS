@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "nodes_lib",
     srcs = [
@@ -23,6 +25,8 @@ cpp_library(
     deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/cron:cron_lib",
+        "//bistro/bistro/utils:exception_lib",
+        "//bistro/bistro/utils:hostname_lib",
         "//bistro/bistro/utils:utils_lib",
         "//folly:json",
         "//folly:string",
@@ -33,5 +37,6 @@ cpp_library(
     external_deps = [
         "boost",
         "glog",
+        ("boost", None, "boost_date_time"),
     ],
 )

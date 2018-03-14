@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "cron_lib",
     srcs = [

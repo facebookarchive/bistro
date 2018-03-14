@@ -1,3 +1,5 @@
+# @autodeps
+
 thrift_library(
     name = "if",
     languages = [

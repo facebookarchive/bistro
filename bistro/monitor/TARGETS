@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "monitor_lib",
     srcs = ["Monitor.cpp"],
@@ -7,7 +9,6 @@ cpp_library(
         "//bistro/bistro/flags:flags_lib",
         "//bistro/bistro/nodes:nodes_lib",
         "//bistro/bistro/statuses:statuses_lib",
-        "//bistro/bistro/utils:utils_lib",
         "//folly:conv",
         "//folly:synchronized",
         "//folly/experimental:auto_timer",

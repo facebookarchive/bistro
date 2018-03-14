@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "http_server_lib",
     srcs = [
@@ -15,8 +17,16 @@ cpp_library(
     undefined_symbols = True,  # TODO(T23121628): fix deps and remove
     deps = [
         "//bistro/bistro/config:config_lib",
-        "//bistro/bistro/if:if-cpp2",
+        "//bistro/bistro/if:common-cpp2-types",
+        "//bistro/bistro/if:if-cpp2-services",
+        "//bistro/bistro/if:if-cpp2-types",
+        "//bistro/bistro/monitor:monitor_lib",
+        "//bistro/bistro/nodes:nodes_lib",
+        "//bistro/bistro/remote:remote_lib",
+        "//bistro/bistro/runners:runners_lib",
+        "//bistro/bistro/statuses:statuses_lib",
         "//bistro/bistro/thrift:conversion_lib",
+        "//bistro/bistro/utils:exception_lib",
         "//common/fb303/cpp:fb303",
         "//folly:conv",
         "//folly:dynamic",
@@ -26,11 +36,12 @@ cpp_library(
         "//folly/experimental:auto_timer",
         "//proxygen/httpserver:httpserver",
         "//thrift/lib/cpp2:server",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
     external_deps = [
         "boost",
         "glog",
-        ("zlib", None, "z"),
+        ("boost", None, "boost_asio"),
     ],
 )
 
@@ -40,8 +51,11 @@ cpp_binary(
     deps = [
         ":http_server_lib",
         "//bistro/bistro:bistro_lib",
+        "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/monitor:monitor_lib",
         "//bistro/bistro/nodes:nodes_lib",
         "//bistro/bistro/runners:runners_lib",
+        "//bistro/bistro/scheduler:scheduler_lib",
         "//bistro/bistro/statuses:statuses_lib",
         "//folly:scope_guard",
         "//folly/experimental:threaded_repeating_function_runner",

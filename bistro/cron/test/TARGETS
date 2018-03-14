@@ -1,3 +1,5 @@
+# @autodeps
+
 def cron_test(name):
     cpp_unittest(
         name = name,

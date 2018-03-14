@@ -1,3 +1,5 @@
+# @autodeps
+
 cpp_library(
     name = "statuses_lib",
     srcs = [
@@ -16,7 +18,10 @@ cpp_library(
     ],
     deps = [
         "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/if:bits-cpp2-types",
+        "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/sqlite:sqlite_lib",
+        "//bistro/bistro/utils:exception_lib",
         "//folly:conv",
         "//folly:dynamic",
         "//folly:json",
@@ -25,6 +30,7 @@ cpp_library(
         "//folly:optional",
         "//folly:synchronized",
         "//folly/experimental:auto_timer",
+        "//thrift/lib/cpp2/protocol:protocol",
     ],
     external_deps = [
         ("boost", None, "boost_filesystem"),

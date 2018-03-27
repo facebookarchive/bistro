@@ -46,8 +46,8 @@ public:
    * Check if a string passes these filters. Unlike the overload above this does
    * not check the tag whitelist.
    */
-  FOLLY_DEPRECATED("Do not add new calls. This function will go away once "
-                   "workers are Nodes, nor does it run your filter_cb")
+  [[deprecated("Do not add new calls. This function will go away once "
+                   "workers are Nodes, nor does it run your filter_cb")]]
   bool doesPass(const std::string& salt, const std::string& s) const;
 
   bool isEmpty() const;

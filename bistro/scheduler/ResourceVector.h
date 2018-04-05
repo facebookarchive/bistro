@@ -17,7 +17,7 @@ typedef folly::small_vector<
   int,
   32, /* size before overflowing to heap - not good for Bistro
        * performance to overflow */
-  uint8_t /* size_type of the underlying vector */
+  size_t /* size_type of the underlying vector */
 > ResourceVector;
 
 }}

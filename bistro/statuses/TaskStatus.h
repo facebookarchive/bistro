@@ -194,6 +194,7 @@ public:
   static TaskStatus running(DataPtr&&);
 
   static TaskStatus done();
+  static TaskStatus done(time_t timestamp);
   static TaskStatus done(DataPtr&&);
 
   static TaskStatus incomplete(DataPtr&&);
@@ -329,12 +330,15 @@ public:
   std::string toJson() const;
 
 private:
-  explicit TaskStatus(TaskStatusBits bits)
-    : timestamp_(time(nullptr)),
+  explicit TaskStatus(TaskStatusBits bits, time_t timestamp)
+    : timestamp_(timestamp),
       // Strictly speaking, we only need to initialize this for 'error'
       // statuses -- if you like, change that and see if it's faster.
       backoffDuration_(0),
       bits_(bits) {}
+
+  explicit TaskStatus(TaskStatusBits bits)
+    : TaskStatus(bits, time(nullptr)) {}
 
   explicit TaskStatus(TaskStatusBits bits, DataPtr&& d)
       : TaskStatus(bits) {

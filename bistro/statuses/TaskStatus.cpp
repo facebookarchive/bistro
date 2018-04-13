@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -38,6 +38,10 @@ TaskStatus TaskStatus::running(TaskStatus::DataPtr&& d) {
 
 TaskStatus TaskStatus::done() {
   return TaskStatus(TaskStatusBits::Done);
+}
+
+TaskStatus TaskStatus::done(time_t timestamp) {
+  return TaskStatus(TaskStatusBits::Done, timestamp);
 }
 
 TaskStatus TaskStatus::done(TaskStatus::DataPtr&& d) {

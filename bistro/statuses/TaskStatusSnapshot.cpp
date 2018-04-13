@@ -100,7 +100,11 @@ void TaskStatusSnapshot::updateForConfig(const Config& config) {
   }
   taskStore_->fetchJobTasks(
     job_names,
-    [this](const string& job, const string& node, TaskStore::TaskResult r) {
+    [this](
+        const string& job,
+        const string& node,
+        TaskStore::TaskResult r,
+        int64_t timestamp) {
       const int job_id = Job::JobNameTable.asConst()->lookup(job);
       CHECK(job_id != StringTable::NotFound) << "Job should be known: " << job;
       const int node_id = Node::NodeNameTable->insert(node);
@@ -110,7 +114,7 @@ void TaskStatusSnapshot::updateForConfig(const Config& config) {
           << job << ", " << node;
       }
       if (r == TaskStore::TaskResult::DONE) {
-        status_ref = TaskStatus::done();
+        status_ref = TaskStatus::done(timestamp);
       } else if (r == TaskStore::TaskResult::FAILED) {
         status_ref = TaskStatus::failed();
       } else {

@@ -57,10 +57,16 @@ void SQLiteTaskStore::fetchJobTasks(
   for (const auto& job_id : job_ids) {
     // TODO: Use "IN" query with up to 999 job IDs (SQLite limitation)
     auto st = db_->prepare(to<string>(
-      "SELECT job_id, node_id, result FROM ", table_, " WHERE job_id = ?"
+      "SELECT job_id, node_id, result, timestamp FROM ",
+      table_,
+      " WHERE job_id = ?"
     ));
-    for (const tuple<string, string, int>& row : st->query(job_id)) {
-      cb(get<0>(row), get<1>(row), static_cast<TaskResult>(get<2>(row)));
+    for (const tuple<string, string, int, int64_t>& row : st->query(job_id)) {
+      cb(
+        get<0>(row),
+        get<1>(row),
+        static_cast<TaskResult>(get<2>(row)),
+        get<3>(row));
     }
   }
 }

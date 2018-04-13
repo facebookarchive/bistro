@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -19,7 +19,8 @@ struct StatusCatcher {
   void operator()(
       const string& /*job*/,
       const string& node,
-      TaskStore::TaskResult r) {
+      TaskStore::TaskResult r,
+      int64_t timestamp) {
     tasks.push_back(make_tuple(node, r));
   }
 

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -29,7 +29,11 @@ struct TaskStore {
   };
 
   typedef std::function<
-    void(const std::string& job_id, const std::string& node_id, TaskResult)
+    void(
+        const std::string& job_id,
+        const std::string& node_id,
+        TaskResult,
+        int64_t timestamp)
   > Callback;
 
   virtual ~TaskStore() {}

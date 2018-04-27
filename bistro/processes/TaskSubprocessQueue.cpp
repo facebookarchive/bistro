@@ -10,9 +10,9 @@
 #include "bistro/bistro/processes/TaskSubprocessQueue.h"
 
 #include <boost/filesystem.hpp>
-#include <folly/json.h>
-#include <folly/Logging.h>
+#include <folly/GLog.h>
 #include <folly/Subprocess.h>
+#include <folly/json.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"

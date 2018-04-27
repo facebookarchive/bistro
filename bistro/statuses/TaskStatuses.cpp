@@ -9,8 +9,8 @@
  */
 #include "bistro/bistro/statuses/TaskStatuses.h"
 
+#include <folly/GLog.h>
 #include <folly/json.h>
-#include <folly/Logging.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
 #include "bistro/bistro/config/Config.h"

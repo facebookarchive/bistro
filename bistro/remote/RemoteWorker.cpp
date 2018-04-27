@@ -9,7 +9,7 @@
  */
 #include "bistro/bistro/remote/RemoteWorker.h"
 
-#include <folly/Logging.h>
+#include <folly/GLog.h>
 #include <folly/json.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 

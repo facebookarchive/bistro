@@ -22,8 +22,8 @@ cpp_library(
         "//bistro/bistro/flags:flags_lib",
         "//bistro/bistro/if:if-cpp2",
         "//bistro/bistro/statuses:statuses_lib",
+        "//folly:glog",
         "//folly:json",
-        "//folly:logging",
         "//folly:optional",
     ],
 )

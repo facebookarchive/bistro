@@ -9,7 +9,7 @@
  */
 #pragma once
 
-#include <thrift/lib/cpp/util/ScopedServerThread.h>
+#include <thrift/lib/cpp2/util/ScopedServerThread.h>
 
 #include "bistro/bistro/remote/RemoteWorkerState.h"
 #include "bistro/bistro/utils/TemporaryFile.h"

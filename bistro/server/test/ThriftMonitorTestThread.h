@@ -9,7 +9,7 @@
  */
 #pragma once
 
-#include <thrift/lib/cpp/util/ScopedServerThread.h>
+#include <thrift/lib/cpp2/util/ScopedServerThread.h>
 
 namespace folly {
   class EventBase;

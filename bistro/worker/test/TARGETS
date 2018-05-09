@@ -12,8 +12,8 @@ cpp_library(
         "//bistro/bistro/test:test_lib",
         "//bistro/bistro/worker:bistro_worker_lib",
         "//thrift/lib/cpp/concurrency:numa2",
-        "//thrift/lib/cpp/util:util",
         "//thrift/lib/cpp2:server",
+        "//thrift/lib/cpp2/util:scoped_server_thread",
         "//thrift/lib/cpp2/util:util",
     ],
 )

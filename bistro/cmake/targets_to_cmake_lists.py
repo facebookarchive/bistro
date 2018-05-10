@@ -35,7 +35,7 @@ def parse_targets(dirpath, s):
     def _dep_name(s):
         if not re.match('^(:|//bistro/bistro[:/])', s):
             return None
-        if s.endswith('-cpp2'):
+        if re.match(r'.*-cpp2(-services|-types)?$', s):
             # Handled specially by run-cmake.sh, has a special CMakeLists.txt
             return 'lib_bistro_if'
         return s.split(':', 1)[1]

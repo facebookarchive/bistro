@@ -205,101 +205,115 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
   ));
 
   // Add callbacks to wait for the subprocess and pipes on the same EventBase.
-  collectAll(
-    // 1) The moral equivalent of waitpid(), followed by wait for cgroup.
-    asyncSubprocess(  // Never yields an exception
-      evb,
-      std::move(proc),
-      // Unlike std::bind, explicitly keeps the state alive.
-      [rt, state](folly::Subprocess& p) {
-        state->asyncSubprocessCallback(rt, p);
-      },
-      pollMs(state->opts())
-    ).then([this, rt, state, evb](folly::ProcessReturnCode&& rc) noexcept {
-      logEvent(
-        google::INFO, rt, state.get(), "process_exited",
-        folly::dynamic::object("message", rc.str())
-      );  // noexcept
-      // Now that the child has exited, optionally use cgroups to kill,
-      // and/or wait for, its left-over descendant processes.
-      if (state->opts().cgroupOptions.subsystems.empty()) {
-        // No cgroups exist: shortcut early to avoid logging "cgroups_reaped".
-        return folly::Future<folly::Unit>();
-      }
-      // Usually, well-behaved descendants will have exited by this point.
-      // This reaper will write logspam, and wait until all processes in
-      // each of the task's cgroups have exited.  If the `freezer` subsystem
-      // is available, or if `killWithoutFreezer` is set, the reaper will
-      // also repeatedly send them SIGKILL.
-      //
-      // This future fires only when the task cgroups lose all their tasks.
-      return asyncCGroupReaper(
-        evb,
-        state->opts().cgroupOptions,
-        state->cgroupName(),
-        pollMs(state->opts())
-      ).then(
-        [this, rt, state](folly::Try<folly::Unit> t) noexcept {
-          t.throwIfFailed();  // The reaper never thows, crash if it does.
-          logEvent(google::INFO, rt, state.get(), "cgroups_reaped");
+  collectAllSemiFuture(
+      // 1) The moral equivalent of waitpid(), followed by wait for cgroup.
+      asyncSubprocess( // Never yields an exception
+          evb,
+          std::move(proc),
+          // Unlike std::bind, explicitly keeps the state alive.
+          [rt, state](folly::Subprocess& p) {
+            state->asyncSubprocessCallback(rt, p);
+          },
+          pollMs(state->opts()))
+          .then([ this, rt, state, evb ](
+              folly::ProcessReturnCode && rc) noexcept {
+            logEvent(
+                google::INFO,
+                rt,
+                state.get(),
+                "process_exited",
+                folly::dynamic::object("message", rc.str())); // noexcept
+            // Now that the child has exited, optionally use cgroups to kill,
+            // and/or wait for, its left-over descendant processes.
+            if (state->opts().cgroupOptions.subsystems.empty()) {
+              // No cgroups exist: shortcut early to avoid logging
+              // "cgroups_reaped".
+              return folly::Future<folly::Unit>();
+            }
+            // Usually, well-behaved descendants will have exited by this point.
+            // This reaper will write logspam, and wait until all processes in
+            // each of the task's cgroups have exited.  If the `freezer`
+            // subsystem is available, or if `killWithoutFreezer` is set, the
+            // reaper will also repeatedly send them SIGKILL.
+            //
+            // This future fires only when the task cgroups lose all their
+            // tasks.
+            return asyncCGroupReaper(
+                       evb,
+                       state->opts().cgroupOptions,
+                       state->cgroupName(),
+                       pollMs(state->opts()))
+                .then([ this, rt, state ](folly::Try<folly::Unit> t) noexcept {
+                  t.throwIfFailed(); // The reaper never thows, crash if it
+                                     // does.
+                  logEvent(google::INFO, rt, state.get(), "cgroups_reaped");
+                });
+          }),
+      // 2) Wait for the child to close all pipes
+      collectAllSemiFuture(pipe_closed_futures)
+          .toUnsafeFuture()
+          .then([ this, rt, state ](
+              std::vector<folly::Try<folly::Unit>> &&
+              all_closed) noexcept { // Logs and swallows all exceptions
+            for (auto& try_pipe_closed : all_closed) {
+              try {
+                // DO: Use folly::exception_wrapper once wangle supports it.
+                try_pipe_closed.throwIfFailed();
+              } catch (const std::exception& e) {
+                // Carry on, the pipe is known to be closed. Logging is
+                // noexcept.
+                logEvent(
+                    google::ERROR,
+                    rt,
+                    state.get(),
+                    "task_pipe_error",
+                    folly::dynamic::object("message", e.what())); // noexcept
+              }
+            }
+            logEvent(
+                google::INFO, rt, state.get(), "task_pipes_closed"); // noexcept
+          }))
+      .toUnsafeFuture()
+      .then([ this, rt, status_cob, state ](
+          // Safe to ignore exceptions, since the above callbacks are noexcept.
+          std::tuple<folly::Try<folly::Unit>, folly::Try<folly::Unit>> &&
+          // `noexcept` since this is the final handler -- nothing inspects
+          // its result.
+          ) noexcept {
+        // Parse the task's status string, if it produced one. Note that in
+        // the absence of a status, our behavior is actually racy.  The task
+        // might have spontaneously exited just before Bistro tried to kill
+        // it.  In that case, wasKilled() would be true, and we would
+        // "incorrectly" report incompleteBackoff().  This is an acceptable
+        // tradeoff, since we *need* both sides of the wasKilled() branch:
+        //  - We must decrement the retry counter on spontaneous exits
+        //    with no status (e.g. C++ program segfaults).
+        //  - We must *not* decrement the retry counter for killed tasks that
+        //    do not output a status (i.e. no SIGTERM handler), since
+        //    preemption should be maximally transparent.
+        auto status = parseStatus(state.get());
+        // Log and report the status
+        logEvent(
+            google::INFO,
+            rt,
+            state.get(),
+            "got_status",
+            // The NoTime variety omits "backoff_duration", but we lack it
+            // anyway, since only TaskStatusSnapshot calls TaskStatus::update().
+            folly::dynamic::object("status", status.toDynamicNoTime()));
+        status_cob(rt, std::move(status)); // noexcept
+        // logEvent ignores healthcheck messages; print a short note instead.
+        if (rt.job == kHealthcheckTaskJob) {
+          LOG(INFO) << "Healthcheck started at " << rt.invocationID.startTime
+                    << " quit with status '" << status.toJson() << "'";
         }
-      );
-    }),
-    // 2) Wait for the child to close all pipes
-    collectAll(pipe_closed_futures).then([this, rt, state](
-      std::vector<folly::Try<folly::Unit>>&& all_closed
-    ) noexcept {  // Logs and swallows all exceptions
-      for (auto& try_pipe_closed : all_closed) {
-        try {
-          // DO: Use folly::exception_wrapper once wangle supports it.
-          try_pipe_closed.throwIfFailed();
-        } catch (const std::exception& e) {
-          // Carry on, the pipe is known to be closed. Logging is noexcept.
-          logEvent(
-            google::ERROR, rt, state.get(), "task_pipe_error",
-            folly::dynamic::object("message", e.what())
-          );  // noexcept
+        SYNCHRONIZED(
+            tasks_) { // Remove the completed task's state from the map.
+          if (tasks_.erase(makeInvocationID(rt)) == 0) {
+            LOG(FATAL) << "Missing task: " << apache::thrift::debugString(rt);
+          }
         }
-      }
-      logEvent(google::INFO, rt, state.get(), "task_pipes_closed"); // noexcept
-    })
-  ).then([this, rt, status_cob, state](
-    // Safe to ignore exceptions, since the above callbacks are noexcept.
-    std::tuple<folly::Try<folly::Unit>, folly::Try<folly::Unit>>&&
-    // `noexcept` since this is the final handler -- nothing inspects
-    // its result.
-  ) noexcept {
-    // Parse the task's status string, if it produced one. Note that in
-    // the absence of a status, our behavior is actually racy.  The task
-    // might have spontaneously exited just before Bistro tried to kill
-    // it.  In that case, wasKilled() would be true, and we would
-    // "incorrectly" report incompleteBackoff().  This is an acceptable
-    // tradeoff, since we *need* both sides of the wasKilled() branch:
-    //  - We must decrement the retry counter on spontaneous exits
-    //    with no status (e.g. C++ program segfaults).
-    //  - We must *not* decrement the retry counter for killed tasks that
-    //    do not output a status (i.e. no SIGTERM handler), since
-    //    preemption should be maximally transparent.
-    auto status = parseStatus(state.get());
-    // Log and report the status
-    logEvent(
-      google::INFO, rt, state.get(), "got_status",
-      // The NoTime variety omits "backoff_duration", but we lack it anyway,
-      // since only TaskStatusSnapshot calls TaskStatus::update().
-      folly::dynamic::object("status", status.toDynamicNoTime())
-    );
-    status_cob(rt, std::move(status));  // noexcept
-    // logEvent ignores healthcheck messages; print a short note instead.
-    if (rt.job == kHealthcheckTaskJob) {
-      LOG(INFO) << "Healthcheck started at " << rt.invocationID.startTime
-        << " quit with status '" << status.toJson() << "'";
-    }
-    SYNCHRONIZED(tasks_) {  // Remove the completed task's state from the map.
-      if (tasks_.erase(makeInvocationID(rt)) == 0) {
-        LOG(FATAL) << "Missing task: " << apache::thrift::debugString(rt);
-      }
-    }
-  });
+      });
 }
 
 TaskSubprocessQueue::TaskSubprocessQueue(

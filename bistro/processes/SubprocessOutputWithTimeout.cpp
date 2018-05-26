@@ -72,30 +72,34 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
     int32_t num_polls =
       std::ceil(double(std::max(1U, timeoutMs)) / double(std::max(1U, pollMs)));
 
-    collectAll(
-      // subprocess
-      asyncSubprocess(
-        evb,
-        std::move(proc),
-        [evb, &num_polls](folly::Subprocess& p) {
-          // track timeout
-          if (--num_polls <= 0) {
-            // kill process
-            LOG(WARNING) << "Subprocess timed out, killing it...";
-            if (kill(-p.pid(), SIGKILL) == -1) {
-              PLOG(ERROR) << "Failed to signal the process group"
-                          << ", trying to signal the process.";
-              // The previous kill should never fail, but a fallback seems ok.
-              p.kill();
-            }
-          }
-        },
-        pollMs).then([&res](folly::ProcessReturnCode&& rc) noexcept {
-                      res = rc;
-                     }),
-      // all pipes
-      collectAll(pipe_futures).then([](
-          std::vector<folly::Try<folly::Unit>>&& allClosed) noexcept {
+    collectAllSemiFuture(
+        // subprocess
+        asyncSubprocess(
+            evb,
+            std::move(proc),
+            [evb, &num_polls](folly::Subprocess& p) {
+              // track timeout
+              if (--num_polls <= 0) {
+                // kill process
+                LOG(WARNING) << "Subprocess timed out, killing it...";
+                if (kill(-p.pid(), SIGKILL) == -1) {
+                  PLOG(ERROR) << "Failed to signal the process group"
+                              << ", trying to signal the process.";
+                  // The previous kill should never fail, but a fallback seems
+                  // ok.
+                  p.kill();
+                }
+              }
+            },
+            pollMs)
+            .then([&res](folly::ProcessReturnCode && rc) noexcept {
+              res = rc;
+            }),
+        // all pipes
+        collectAllSemiFuture(pipe_futures)
+            .toUnsafeFuture()
+            .then([](
+                std::vector<folly::Try<folly::Unit>> && allClosed) noexcept {
               for (auto& pipeClosed : allClosed) {
                 try {
                   pipeClosed.throwIfFailed();
@@ -103,12 +107,15 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
                   LOG(ERROR) << "task_pipe_error, message: " << e.what();
                 }
               }
-            })
-    ).then([evb](
-      std::tuple<folly::Try<folly::Unit>, folly::Try<folly::Unit>>&&) noexcept {
-        // all is done
-        evb->terminateLoopSoon();
-    });
+            }))
+        .toUnsafeFuture()
+        .then([evb](
+            std::tuple<
+                folly::Try<folly::Unit>,
+                folly::Try<folly::Unit>> &&) noexcept {
+          // all is done
+          evb->terminateLoopSoon();
+        });
     // completion engine pumping
     evb->loopForever();
   } catch (const std::exception& x) {

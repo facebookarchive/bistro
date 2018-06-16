@@ -40,7 +40,7 @@ void checkSleepInterrupted(bool wait_to_signal) {
   queue->blockingWrite(SIGTERM);
   while (!ret_code_future.isReady()) { evb.loop(); }
 
-  auto ret_code = ret_code_future.get();
+  auto ret_code = std::move(ret_code_future).get();
   EXPECT_TRUE(ret_code.killed());
   EXPECT_EQ(SIGTERM, ret_code.killSignal());
 }
@@ -84,7 +84,8 @@ TEST(TestAsyncSubprocess, TestWaitpidVsSignalRace) {
         sendSignalCallback(&sigterms[i])
       );
       while (!ret_code_future.isReady()) { evb.loop(); }
-      ret_code_queue.blockingWrite(std::make_pair(i, ret_code_future.get()));
+      ret_code_queue.blockingWrite(
+          std::make_pair(i, std::move(ret_code_future).get()));
     });
   }
   auto startup_duration = Clock::now() - start;

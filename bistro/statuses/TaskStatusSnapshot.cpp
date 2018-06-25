@@ -46,8 +46,8 @@ void TaskStatusSnapshot::updateForConfig(const Config& config) {
   // rows.  This happens, e.g. when a job gets removed and re-added.
   for (const auto& id_and_task : runningTasks_) {
     const auto& rt = id_and_task.second;
-    const int job_id = Job::JobNameTable.asConst()->lookup(rt.job);
-    const int node_id = Node::NodeNameTable.asConst()->lookup(rt.node);
+    const int job_id = as_const(Job::JobNameTable)->lookup(rt.job);
+    const int node_id = as_const(Node::NodeNameTable)->lookup(rt.node);
     auto& status_ref = access(job_id, node_id);
     if (!status_ref.isRunning()) {
       LOG(WARNING) << "Task in runningTasks_ was not marked as running: "
@@ -74,7 +74,7 @@ void TaskStatusSnapshot::updateForConfig(const Config& config) {
   if (count > 0) {
     timer.log(
       "Cleared statuses for ", count, " deleted jobs, including ",
-      Job::JobNameTable.asConst()->lookup(last_deleted)
+      as_const(Job::JobNameTable)->lookup(last_deleted)
     );
   }
 
@@ -105,7 +105,7 @@ void TaskStatusSnapshot::updateForConfig(const Config& config) {
         const string& node,
         TaskStore::TaskResult r,
         int64_t timestamp) {
-      const int job_id = Job::JobNameTable.asConst()->lookup(job);
+      const int job_id = as_const(Job::JobNameTable)->lookup(job);
       CHECK(job_id != StringTable::NotFound) << "Job should be known: " << job;
       const int node_id = Node::NodeNameTable->insert(node);
       auto& status_ref = access(job_id, node_id);

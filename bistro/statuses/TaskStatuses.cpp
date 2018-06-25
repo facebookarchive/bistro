@@ -111,7 +111,7 @@ void TaskStatuses::updateForConfig(const Config& config) {
 
 // TODO(#5555238): We should also erase the "failed" row from TaskStore.
 void TaskStatuses::forgiveJob(const string& job) {
-  const int job_id = Job::JobNameTable.asConst()->lookup(job);
+  const int job_id = as_const(Job::JobNameTable)->lookup(job);
   if (job_id == StringTable::NotFound) {
     throw BistroException("Invalid job id: ", job);
   }

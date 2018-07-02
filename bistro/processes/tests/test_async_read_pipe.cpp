@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, Facebook, Inc.
+ *  Copyright (c) 2016-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -112,7 +112,7 @@ TEST(TestAsyncReadPipe, CallbackException) {
     [&](AsyncReadPipe*) -> bool { throw TestError(); }
   )->pipeClosed();
   while (!closed.isReady()) { evb.loop(); }
-  EXPECT_THROW(closed.get(), TestError);
+  EXPECT_THROW(std::move(closed).get(), TestError);
 }
 
 TEST(TestAsyncReadPipe, PauseResume) {

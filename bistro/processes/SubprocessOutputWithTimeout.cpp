@@ -92,13 +92,13 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
               }
             },
             pollMs)
-            .then([&res](folly::ProcessReturnCode && rc) noexcept {
+            .thenValue([&res](folly::ProcessReturnCode && rc) noexcept {
               res = rc;
             }),
         // all pipes
         collectAllSemiFuture(pipe_futures)
             .toUnsafeFuture()
-            .then([](
+            .thenValue([](
                 std::vector<folly::Try<folly::Unit>> && allClosed) noexcept {
               for (auto& pipeClosed : allClosed) {
                 try {
@@ -109,7 +109,7 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
               }
             }))
         .toUnsafeFuture()
-        .then([evb](
+        .thenValue([evb](
             std::tuple<
                 folly::Try<folly::Unit>,
                 folly::Try<folly::Unit>> &&) noexcept {

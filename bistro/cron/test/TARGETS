@@ -1,14 +1,23 @@
-# @autodeps
+cpp_unittest(
+    name = "test_crontab_selector",
+    srcs = ["test_crontab_selector.cpp"],
+    deps = [
+        "//bistro/bistro/cron:cron_lib",
+    ],
+)
 
-def cron_test(name):
-    cpp_unittest(
-        name = name,
-        srcs = [name + '.cpp'],
-        deps = ['//bistro/bistro/cron:cron_lib'],
-    )
+cpp_unittest(
+    name = "test_epoch_crontab_item",
+    srcs = ["test_epoch_crontab_item.cpp"],
+    deps = [
+        "//bistro/bistro/cron:cron_lib",
+    ],
+)
 
-cron_test("test_crontab_selector")
-
-cron_test("test_epoch_crontab_item")
-
-cron_test("test_standard_crontab_item")
+cpp_unittest(
+    name = "test_standard_crontab_item",
+    srcs = ["test_standard_crontab_item.cpp"],
+    deps = [
+        "//bistro/bistro/cron:cron_lib",
+    ],
+)

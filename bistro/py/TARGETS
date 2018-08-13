@@ -2,7 +2,7 @@
 
 python_library(
     name = "py",
-    srcs = util.files("./**/*.py"),
+    srcs = glob(["./**/*.py"]),
     base_module = "facebook.bistro",
     external_deps = [("python-requests", "any")],
 )

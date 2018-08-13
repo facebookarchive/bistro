@@ -133,11 +133,14 @@ def parse_targets(dirpath, s):
     def thrift_library(**kwargs):
         pass  # Thrift is currently built by run-cmake.sh. TODO: Improve?
 
-    class util(object):
-        @classmethod
-        def files(cls, pattern):
-            return None  # Not currently used in Bistro?
-            # Py3.5-specific return glob.glob(pattern, recursive=True)
+    def glob(include, exclude=None):
+        return None  # Not currently used in Bistro?
+        # Py3.5-specific return glob.glob(pattern, recursive=True)
+        # import glob as py_glob
+        #all_files = (
+        #    set(py_glob.glob(include, recursive=True)) -
+        #    set(py_glob.glob(exclude, recursive=True)))
+        #return sorted(list(all_files))
 
     fn_locals = locals()
     exec s in {l: fn_locals[l] for l in (
@@ -147,7 +150,7 @@ def parse_targets(dirpath, s):
         'cpp_unittest',
         'python_library',
         'thrift_library',
-        'util',
+        'glob',
     )}
 
     return cmake_lines

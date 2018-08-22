@@ -25,6 +25,7 @@ set(
   BISTRO_LINK_DEPS
   libcrypto.so
   libfolly.so
+  libfizz.so
   libglog.so
   libgflags.so
   libboost_date_time.so

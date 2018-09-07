@@ -38,5 +38,6 @@ cpp_library(
         "boost",
         "glog",
         ("boost", None, "boost_date_time"),
+        ("boost", None, "boost_range"),
     ],
 )

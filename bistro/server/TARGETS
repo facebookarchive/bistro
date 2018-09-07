@@ -41,6 +41,7 @@ cpp_library(
     external_deps = [
         "boost",
         "glog",
+        ("boost", None, "boost_algorithm"),
         ("boost", None, "boost_asio"),
     ],
 )

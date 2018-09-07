@@ -12,8 +12,8 @@ cpp_library(
     srcs = ["hostname.cpp"],
     headers = ["hostname.h"],
     external_deps = [
-        "boost",
         "glog",  # Future: Move startsWithAny elsewhere.
+        ("boost", None, "boost_algorithm"),
     ],
 )
 
@@ -22,7 +22,9 @@ cpp_library(
     srcs = ["shell.cpp"],
     headers = ["shell.h"],
     deps = ["//folly:string"],
-    external_deps = ["boost"],
+    external_deps = [
+        ("boost", None, "boost_algorithm"),
+    ],
 )
 
 cpp_library(

@@ -15,10 +15,11 @@ cpp_library(
         "//folly:range",
     ],
     external_deps = [
-        ("boost", None, "boost_filesystem"),
         "boost",
         "glog",
         "sqlite",
+        ("boost", None, "boost_filesystem"),
+        ("boost", None, "boost_range"),
     ],
 )
 

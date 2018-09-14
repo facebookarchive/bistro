@@ -215,7 +215,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
             state->asyncSubprocessCallback(rt, p);
           },
           pollMs(state->opts()))
-          .then([ this, rt, state, evb ](
+          .thenValue([ this, rt, state, evb ](
               folly::ProcessReturnCode && rc) noexcept {
             logEvent(
                 google::INFO,
@@ -252,7 +252,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
       // 2) Wait for the child to close all pipes
       collectAllSemiFuture(pipe_closed_futures)
           .toUnsafeFuture()
-          .then([ this, rt, state ](
+          .thenValue([ this, rt, state ](
               std::vector<folly::Try<folly::Unit>> &&
               all_closed) noexcept { // Logs and swallows all exceptions
             for (auto& try_pipe_closed : all_closed) {
@@ -274,7 +274,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
                 google::INFO, rt, state.get(), "task_pipes_closed"); // noexcept
           }))
       .toUnsafeFuture()
-      .then([ this, rt, status_cob, state ](
+      .thenValue([ this, rt, status_cob, state ](
           // Safe to ignore exceptions, since the above callbacks are noexcept.
           std::tuple<folly::Try<folly::Unit>, folly::Try<folly::Unit>> &&
           // `noexcept` since this is the final handler -- nothing inspects

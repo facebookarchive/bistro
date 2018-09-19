@@ -63,5 +63,6 @@ cpp_library(
         "//folly/futures:core",
         "//folly/gen:string",
         "//folly/io/async:async",
+        "//folly/io/async:event_base_manager",
     ],
 )

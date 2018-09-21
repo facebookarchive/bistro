@@ -40,6 +40,7 @@ cpp_library(
         "//folly/gen:file",
         "//folly/gen:string",
         "//folly/io/async:async",
+        "//folly/io/async:async_base",
         "//thrift/lib/cpp2/protocol:protocol",
     ],
     external_deps = [
@@ -63,6 +64,7 @@ cpp_library(
         "//folly/futures:core",
         "//folly/gen:string",
         "//folly/io/async:async",
+        "//folly/io/async:async_base",
         "//folly/io/async:event_base_manager",
     ],
 )

@@ -18,7 +18,6 @@ cpp_unittest(
     srcs = ["test_thrift_monitor.cpp"],
     deps = [
         ":thrift_monitor_test_thread_lib",
-        "//folly/io/async:async",
         "//folly/io/async:event_base_manager",
     ],
 )

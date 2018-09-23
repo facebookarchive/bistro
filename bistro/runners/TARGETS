@@ -30,7 +30,6 @@ cpp_library(
         "//folly/experimental:auto_timer",
         "//folly/experimental:threaded_repeating_function_runner",
         "//folly/gen:base",
-        "//folly/io/async:async",
         "//folly/io/async:async_base",
     ],
     external_deps = [

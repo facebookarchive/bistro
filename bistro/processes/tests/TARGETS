@@ -26,7 +26,6 @@ cpp_unittest(
         "//bistro/bistro/processes:processes",
         "//folly:mpmc_queue",
         "//folly/experimental:auto_timer",
-        "//folly/io/async:async",
         "//folly/io/async:async_base",
     ],
 )

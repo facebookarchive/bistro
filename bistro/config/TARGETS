@@ -42,7 +42,11 @@ cpp_library(
         "//folly/hash:hash",
     ],
     external_deps = [
-        ("boost", None, "boost_filesystem"),
         "boost",
+        ("boost", None, "boost_algorithm"),
+        ("boost", None, "boost_filesystem"),
+        ("boost", None, "boost_range"),
+        ("boost", None, "boost_regex"),
+        ("boost", None, "boost_serialization"),
     ],
 )

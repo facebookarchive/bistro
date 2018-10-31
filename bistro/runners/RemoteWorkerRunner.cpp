@@ -38,15 +38,18 @@ using namespace apache::thrift;
 
 RemoteWorkerRunner::RemoteWorkerRunner(
     std::shared_ptr<TaskStatuses> task_statuses,
-    std::shared_ptr<Monitor> monitor)
+    std::shared_ptr<Monitor> monitor,
+    WorkerClientFn workerClientFn)
     : TaskRunner(), // Initializes schedulerID_
+      workerClientFn_(workerClientFn),
       workers_(folly::in_place, time(nullptr), schedulerID_),
       workerLevel_(StringTable::NotFound),
-      taskStatuses_(task_statuses),
+      taskStatuses_(std::move(task_statuses)),
       eventBase_(new folly::EventBase()),
       eventBaseThread_(bind(&folly::EventBase::loopForever, eventBase_.get())),
       inInitialWait_(true),
-      monitor_(monitor) {
+      monitor_(std::move(monitor)) {
+  DCHECK(workerClientFn_) << "workerClientFn is nullptr";
   // Monitor the workers: send healthchecks, mark them (un)healthy / lost, etc
   //
   // CAUTION: ThreadedRepeatingFunctionRunner recommends two-stage
@@ -141,6 +144,14 @@ folly::Optional<int> physicalToLogicalResource(
 }
 }  // anonymous namespace
 
+/* static */
+RemoteWorkerRunner::WorkerClientFn
+RemoteWorkerRunner::defaultWorkerClientFunction() {
+  return [](folly::EventBase* eventBase, const cpp2::ServiceAddress& addr) {
+    return getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(
+      eventBase, addr);
+  };
+}
 
 void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
   folly::AutoTimer<> timer;
@@ -299,7 +310,8 @@ LogLines getJobLogsThreadAndEventBaseSafe(
     const vector<string>& nodes,
     int64_t line_id,
     bool is_ascending,
-    const string& regex_filter) {
+    const string& regex_filter,
+    RemoteWorkerRunner::WorkerClientFn workerClientFn) {
 
   LogLines res;
   res.nextLineID = LogLine::kNotALineID;
@@ -323,8 +335,7 @@ LogLines getJobLogsThreadAndEventBaseSafe(
       folly::gen::from(services)
       | folly::gen::mapped([&](auto const& addr) {
         return folly::makeFutureWith([&]{
-          auto client =
-            getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(&eb, addr);
+          auto client = workerClientFn(&eb, addr);
           return client->future_getJobLogsByID(
               logtype,
               jobs,
@@ -476,7 +487,8 @@ LogLines RemoteWorkerRunner::getJobLogs(
     nodes,
     line_id,
     is_ascending,
-    regex_filter
+    regex_filter,
+    workerClientFn_
   );
 }
 
@@ -659,8 +671,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       cgroup_cpu_shares, cgroup_memory_limit_in_bytes
     ]() noexcept {
     try {
-      shared_ptr<cpp2::BistroWorkerAsyncClient>
-        client{getWorkerClient(worker)};
+      shared_ptr<cpp2::BistroWorkerAsyncClient> client =
+        workerClientFn_(eventBase_.get(), worker.addr);
       auto task_subproc_opts = job->taskSubprocessOptions();
       task_subproc_opts.cgroupOptions.cpuShares = cgroup_cpu_shares;
       task_subproc_opts.cgroupOptions.memoryLimitInBytes =
@@ -733,17 +745,6 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
   return RanTask;
 }
 
-///
-/// Thrift helpers
-///
-
-shared_ptr<cpp2::BistroWorkerAsyncClient> RemoteWorkerRunner::getWorkerClient(
-    const cpp2::BistroWorker& w) {
-  return getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(
-    eventBase_.get(), w.addr
-  );
-}
-
 // We deliberately don't track healthchecks that we send. This is a tiny bit
 // faster, and prevents them from being shown in the UI.  To match,
 // RemoteWorker::updateTaskStatus does not call updateRunningTasks.
@@ -764,7 +765,8 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
       }
     }
     try {
-      shared_ptr<cpp2::BistroWorkerAsyncClient> client{getWorkerClient(w)};
+      shared_ptr<cpp2::BistroWorkerAsyncClient> client =
+        workerClientFn_(eventBase_.get(), w.addr);
       // Make a barebones RunningTask; only job, startTime & shard are be used.
       cpp2::RunningTask rt;
       rt.job = kHealthcheckTaskJob;
@@ -819,7 +821,8 @@ void RemoteWorkerRunner::requestWorkerSuicide(
 
   eventBase_->runInEventBaseThread([this, w]() noexcept {
     try {
-      shared_ptr<cpp2::BistroWorkerAsyncClient> client{getWorkerClient(w)};
+      shared_ptr<cpp2::BistroWorkerAsyncClient> client =
+        workerClientFn_(eventBase_.get(), w.addr);
       client->requestSuicide(
         unique_ptr<RequestCallback>(new FunctionReplyCallback(
           [client, w](ClientReceiveState&& state) {
@@ -961,7 +964,8 @@ void RemoteWorkerRunner::checkUnsureIfRunningTasks(
   eventBase_->runInEventBaseThread([this, tasks, w]() noexcept {
     try {
       auto timer = std::make_shared<folly::AutoTimer<>>();
-      shared_ptr<cpp2::BistroWorkerAsyncClient> client{getWorkerClient(w)};
+      shared_ptr<cpp2::BistroWorkerAsyncClient> client =
+        workerClientFn_(eventBase_.get(), w.addr);
       // The sequence number increment is not atomic with respect to the
       // remote call, and that's okay.  If a runTask queries the sequence
       // number after this increment operation, it is *definitely* not part
@@ -1013,7 +1017,8 @@ void RemoteWorkerRunner::fetchRunningTasksForNewWorkers(
     eventBase_->runInEventBaseThread([this, w]() noexcept {
       try {
         auto timer = std::make_shared<folly::AutoTimer<>>();
-        shared_ptr<cpp2::BistroWorkerAsyncClient> client{getWorkerClient(w)};
+        shared_ptr<cpp2::BistroWorkerAsyncClient> client =
+          workerClientFn_(eventBase_.get(), w.addr);
         client->getRunningTasks(
           unique_ptr<RequestCallback>(new FunctionReplyCallback(
             [this, w, client, timer](ClientReceiveState&& state) {
@@ -1073,10 +1078,8 @@ void RemoteWorkerRunner::killTask(
   // Make a synchronous kill request so that the client knows when the kill
   // succeeds or fails.  This can take 10 seconds or more.
   folly::EventBase evb;
-  getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(
-    &evb,
-    maybe_worker->addr
-  )->sync_killTask(rt, schedulerID_, maybe_worker->id, req);
+  workerClientFn_(&evb, maybe_worker->addr)
+    ->sync_killTask(rt, schedulerID_, maybe_worker->id, req);
 }
 
 }}

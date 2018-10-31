@@ -28,6 +28,7 @@ namespace facebook { namespace bistro {
 namespace cpp2 {
   class BistroWorker;
   class BistroWorkerAsyncClient;
+  class ServiceAddress;
 }
 
 class Config;
@@ -40,9 +41,17 @@ class TaskStatuses;
 
 class RemoteWorkerRunner final : public TaskRunner {
 public:
-  explicit RemoteWorkerRunner(
+  // Must be thread-safe.
+  // The function will be executed in the loop of the eventBase passed in, and
+  // the behavior of the eventBase should be sololy controlled by the caller.
+  typedef std::function<std::shared_ptr<cpp2::BistroWorkerAsyncClient>(
+    folly::EventBase* eventBase, const cpp2::ServiceAddress& addr
+  )> WorkerClientFn;
+
+  RemoteWorkerRunner(
     std::shared_ptr<TaskStatuses> task_statuses,
-    std::shared_ptr<Monitor> monitor
+    std::shared_ptr<Monitor> monitor,
+    WorkerClientFn workerClientFn = defaultWorkerClientFunction()
   );
   RemoteWorkerRunner(const RemoteWorkerRunner&) = delete;
   ~RemoteWorkerRunner() override;
@@ -97,6 +106,8 @@ public:
 
   bool inInitialWaitForUnitTest() const { return inInitialWait_.load(); }
 
+  static WorkerClientFn defaultWorkerClientFunction();
+
 // TODO: Make this private once we don't have an FB-specific class
 // inheriting from this.
 protected:
@@ -109,10 +120,8 @@ protected:
          cb) noexcept override;
 
 private:
-  // Thrift helpers
-  std::shared_ptr<cpp2::BistroWorkerAsyncClient> getWorkerClient(
-    const cpp2::BistroWorker& w
-  );
+  WorkerClientFn workerClientFn_;
+
   void sendWorkerHealthcheck(const cpp2::BistroWorker&, bool) noexcept;
   void requestWorkerSuicide(const cpp2::BistroWorker& w) noexcept;
 

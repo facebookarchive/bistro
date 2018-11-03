@@ -243,11 +243,12 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
                        state->opts().cgroupOptions,
                        state->cgroupName(),
                        pollMs(state->opts()))
-                .then([ this, rt, state ](folly::Try<folly::Unit> t) noexcept {
-                  t.throwIfFailed(); // The reaper never thows, crash if it
-                                     // does.
-                  logEvent(google::INFO, rt, state.get(), "cgroups_reaped");
-                });
+                .thenTry(
+                    [ this, rt, state ](folly::Try<folly::Unit> t) noexcept {
+                      t.throwIfFailed(); // The reaper never thows, crash if it
+                                         // does.
+                      logEvent(google::INFO, rt, state.get(), "cgroups_reaped");
+                    });
           }),
       // 2) Wait for the child to close all pipes
       collectAllSemiFuture(pipe_closed_futures)

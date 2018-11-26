@@ -100,7 +100,7 @@ Optional<CrontabSelector> maybeMakeDayOfWeekSelector(const dynamic& d) {
   if (const auto* dow_dyn = d.get_ptr("day_of_week")) {
     return CrontabSelector(*dow_dyn, 1, kDaysInWeek, parseDayOfWeek);
   }
-  return nullptr;
+  return folly::none;
 }
 
 }  // detail namespace

@@ -255,7 +255,7 @@ protected:
     int r = ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     folly::checkUnixError(r, "fcntl set flags");
     // Initialize the parent class
-    initHandler(evb, fd);
+    initHandler(evb, folly::NetworkSocket::fromFd(fd));
     resume();
     // CAREFUL: we're not in the EventBase thread here, but handlerReady may
     // already be running, and this object may already be destroyed (!!!)

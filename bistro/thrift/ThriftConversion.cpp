@@ -89,7 +89,8 @@ dynamic toDynamic(const cpp2::BistroJobConfig& c) {
     config["filters"] = filters_obj;
   }
   if (c.__isset.killOrphanTasksAfterSec) {
-    config["kill_orphan_tasks_after_sec"] = c.killOrphanTasksAfterSec;
+    config["kill_orphan_tasks_after_sec"] =
+        c.killOrphanTasksAfterSec_ref().value_unchecked();
   } else {
     config["kill_orphan_tasks_after_sec"] = false;
   }
@@ -158,8 +159,7 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
     folly::Optional<std::chrono::milliseconds> maybe_kill_ms;
     parseKillOrphanTasksAfter(&p, &maybe_kill_ms);
     if (maybe_kill_ms.hasValue()) {
-      config.__isset.killOrphanTasksAfterSec = true;
-      config.killOrphanTasksAfterSec = 0.001 * maybe_kill_ms->count();
+      config.killOrphanTasksAfterSec_ref() = 0.001 * maybe_kill_ms->count();
     } else {
       config.__isset.killOrphanTasksAfterSec = false;
     }

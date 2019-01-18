@@ -357,7 +357,7 @@ void BistroWorkerHandler::runTask(
         auto it = runningTasks_.find({runningTask.job, runningTask.node});
         CHECK (it != runningTasks_.end()) << "Bad task: "
                                           << debugString(runningTask);
-        it->second.physicalResources = std::move(res);
+        it->second.physicalResources_ref().value_unchecked() = std::move(res);
         it->second.__isset.physicalResources = true;
       }
     },

@@ -90,8 +90,7 @@ TEST(TestThriftConversion, HandleJob) {
   c.levelForHostPlacement = "fakeLevel2";
   c.hostPlacement = "fakeHost";
   c.dependsOn = {"jobX", "jobY"};
-  c.killOrphanTasksAfterSec = 0.123;
-  c.__isset.killOrphanTasksAfterSec = true;
+  c.killOrphanTasksAfterSec_ref() = 0.123;
   // Set some non-default fields, but not all since Job.cpp already tests them
   c.taskSubprocessOptions.pollMs = 666;
   c.taskSubprocessOptions.parentDeathSignal = 555;

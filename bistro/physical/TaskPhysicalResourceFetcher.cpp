@@ -24,12 +24,10 @@ cpp2::TaskPhysicalResources TaskPhysicalResourceFetcher::fetch() const {
     std::chrono::system_clock::now().time_since_epoch()
   ).count();
   if (auto maybe_ms = cgroups::taskCpuTimeMs(cgpaths_)) {
-    res.cpuTimeMs = *maybe_ms;
-    res.__isset.cpuTimeMs = true;
+    res.cpuTimeMs_ref() = *maybe_ms;
   }
   if (auto maybe_mem_mb = cgroups::taskMemoryMB(cgpaths_)) {
-    res.memoryMB = *maybe_mem_mb;
-    res.__isset.memoryMB = true;
+    res.memoryMB_ref() = *maybe_mem_mb;
   }
   auto pids = cgroups::taskPids(cgpaths_);
   // Get GPUs, if GPU monitoring is enabled.

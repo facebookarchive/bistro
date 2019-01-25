@@ -47,17 +47,17 @@ update_thrift() {
 fetch_gtest() {
   mkdir -p "$build_dir/deps"
   pushd "$build_dir/deps"
-  if [[ ! -d gtest-1.7.0 ]] ; then
-    wget https://github.com/google/googletest/archive/release-1.7.0.tar.gz \
-      -O googletest-release-1.7.0.tgz
-    if [[ "$(sha1sum googletest-release-1.7.0.tgz  | cut -f 1 -d\ )" != \
-          "d7aa4b8536f3a007b480cf016be8a4333dbf4768" ]] ; then
-      echo "Invalid SHA1 checksum for googletest-release-1.7.0.tgz" 1>&2
+  if [[ ! -d gtest-1.8.1 ]] ; then
+    wget https://github.com/google/googletest/archive/release-1.8.1.tar.gz \
+      -O googletest-release-1.8.1.tgz
+    if [[ "$(sha1sum googletest-release-1.8.1.tgz  | cut -f 1 -d\ )" != \
+          "152b849610d91a9dfa1401293f43230c2e0c33f8" ]] ; then
+      echo "Invalid SHA1 checksum for googletest-release-1.8.1.tgz" 1>&2
       exit 1
     fi
     # On error, don't leave a partial directory. CMake takes care of the rest.
-    tar xzf googletest-release-1.7.0.tgz || rm -r googletest-release-1.7.0
-    mv googletest-release-1.7.0 gtest-1.7.0
+    tar xzf googletest-release-1.8.1.tgz || rm -r googletest-release-1.8.1
+    mv googletest-release-1.8.1 gtest-1.8.1
   fi
   popd
 }

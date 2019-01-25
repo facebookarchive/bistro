@@ -66,7 +66,7 @@ macro(bistro_link_libraries name)
   )
 endmacro(bistro_link_libraries)
 
-add_subdirectory(cmake/deps/gtest-1.7.0)
+add_subdirectory(cmake/deps/gtest-1.8.1)
 enable_testing()
 include_directories("${gtest_SOURCE_DIR}/include" "${gtest_SOURCE_DIR}")
 

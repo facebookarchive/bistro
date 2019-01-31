@@ -1,5 +1,7 @@
 # @autodeps
 
+load("@fbcode_macros//build_defs:thrift_library.bzl", "thrift_library")
+
 thrift_library(
     name = "if",
     languages = [

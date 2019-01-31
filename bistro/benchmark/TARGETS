@@ -1,5 +1,7 @@
 # @autodeps
 
+load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
+
 cpp_benchmark(
     name = "db_scraping_benchmark",
     srcs = ["db_scraping_benchmark.cpp"],

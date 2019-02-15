@@ -142,6 +142,16 @@ def parse_targets(dirpath, s):
         #    set(py_glob.glob(exclude, recursive=True)))
         #return sorted(list(all_files))
 
+    def load(location, symbol):
+        assert (location, symbol) in (
+            ("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark"),
+            ("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary"),
+            ("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library"),
+            ("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest"),
+            ("@fbcode_macros//build_defs:python_library.bzl", "python_library"),
+            ("@fbcode_macros//build_defs:thrift_library.bzl", "thrift_library"),
+        )
+
     fn_locals = locals()
     exec s in {l: fn_locals[l] for l in (
         'cpp_benchmark',
@@ -151,6 +161,7 @@ def parse_targets(dirpath, s):
         'python_library',
         'thrift_library',
         'glob',
+        'load',
     )}
 
     return cmake_lines

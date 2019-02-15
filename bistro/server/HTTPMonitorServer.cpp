@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2015, Facebook, Inc.
+ *  Copyright (c) 2015-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -8,9 +8,11 @@
  *
  */
 #include "bistro/bistro/server/HTTPMonitorServer.h"
+#include <folly/MPMCQueue.h>
+#include <folly/Optional.h>
 #include <proxygen/httpserver/RequestHandlerFactory.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
-#include <folly/MPMCQueue.h>
+#include <wangle/ssl/SSLContextConfig.h>
 
 DEFINE_int32(http_server_port, 8080, "Port to run HTTP server on");
 DEFINE_string(http_server_address, "::", "Address to bind to");
@@ -29,7 +31,9 @@ public:
     : monitor_(monitor) {}
 
   void onRequest(
-      std::unique_ptr<proxygen::HTTPMessage> /*headers*/) noexcept override {}
+      std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override {
+    isSecure_ = headers->isSecure();
+  }
 
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override {
     if (body_) {
@@ -43,7 +47,7 @@ public:
     auto request = body_ ? body_->moveToFbString() : fbstring();
     fbstring response;
     try {
-      response = monitor_->handleRequest(request);
+      response = monitor_->handleRequest(request, isSecure_);
     } catch (const std::exception& e) {
       response = e.what();
     }
@@ -68,6 +72,7 @@ public:
 private:
   HTTPMonitor* monitor_;
   std::unique_ptr<folly::IOBuf> body_;
+  bool isSecure_{false};
 };
 
 class BistroHTTPHandlerFactory : public proxygen::RequestHandlerFactory {
@@ -98,14 +103,40 @@ proxygen::HTTPServerOptions buildHTTPServerOptions(HTTPMonitor* monitor) {
     .build();
   return options;
 }
+
+folly::Optional<wangle::SSLContextConfig> createSslConfig() {
+  auto certPath = getenv("THRIFT_TLS_CL_CERT_PATH");
+  auto keyPath = getenv("THRIFT_TLS_CL_KEY_PATH");
+  auto caPath = getenv("THRIFT_TLS_SRV_CA_PATH");
+  if (!(certPath && keyPath && caPath)) {
+    LOG(ERROR) << "Not enabling HTTPS support because one of the environment "
+      "variables THRIFT_TLS_CL_CERT_PATH, THRIFT_TLS_CL_KEY_PATH, or "
+      "THRIFT_TLS_SRV_CA_PATH was not set";
+    return folly::none;
+  }
+
+  wangle::SSLContextConfig config;
+  config.isDefault = true;  // At least 1 config must be "default"
+  // Not setting sessionContext since that doesn't seem useful.
+  config.setNextProtocols(std::list<std::string>{"h2", "http/1.1"});
+  config.sslVersion = SSLContext::SSLVersion::TLSv1_2;
+  // Since we don't currently rely on TLS for auth, it's fine if the client
+  // does not present a certificate.
+  config.clientVerification = SSLContext::SSLVerifyPeerEnum::VERIFY;
+  config.setCertificate(certPath, keyPath, "");  // empty passwordPath
+  config.clientCAFile = caPath;
+  config.eccCurveName = "prime256v1";
+  return config;
 }
+
+}  // anon namespace
 
 HTTPMonitorServer::HTTPMonitorServer(
     shared_ptr<HTTPMonitor> monitor)
   : monitor_(monitor),
     server_(buildHTTPServerOptions(monitor_.get())) {
 
-  std::vector<proxygen::HTTPServer::IPConfig> IPs = {{
+  std::vector<proxygen::HTTPServer::IPConfig> ips = {{
     SocketAddress(
       FLAGS_http_server_address,
       FLAGS_http_server_port,
@@ -113,7 +144,19 @@ HTTPMonitorServer::HTTPMonitorServer(
     ),
     proxygen::HTTPServer::Protocol::HTTP
   }};
-  server_.bind(IPs);
+
+  // Set up TLS to allow HTTPS connections
+  auto sslConfig = createSslConfig();
+  if (sslConfig.hasValue()) {
+    LOG(INFO) << "Enabling HTTPS support";
+    for (auto& ip : ips) {
+      ip.sslConfigs.push_back(*sslConfig);
+      // T40561409: Remove this once the clients all speak HTTPS
+      ip.allowInsecureConnectionsOnSecureServer = true;
+    }
+  }
+
+  server_.bind(ips);
   folly::MPMCQueue<int> completer(1);
   serverThread_ = std::thread([this, &completer]() {
     server_.start(

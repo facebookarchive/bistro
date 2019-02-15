@@ -35,11 +35,13 @@ cpp_library(
         "//folly:dynamic",
         "//folly:json",
         "//folly:mpmc_queue",
+        "//folly:optional",
         "//folly:synchronized",
         "//folly/experimental:auto_timer",
         "//proxygen/httpserver:httpserver",
         "//thrift/lib/cpp2:server",
         "//thrift/lib/cpp2/protocol:protocol",
+        "//wangle/ssl:ssl_context_config",
     ],
     external_deps = [
         "boost",

@@ -44,9 +44,13 @@ HTTPMonitor::HTTPMonitor(
     monitor_(monitor) {
 }
 
-fbstring HTTPMonitor::handleRequest(const fbstring& request) {
+fbstring HTTPMonitor::handleRequest(const fbstring& request, bool isSecure) {
   LOG(INFO) << "HTTPMonitor request: " << request;
-  folly::AutoTimer<> timer("Handled HTTP monitor request");
+  folly::AutoTimer<> timer(
+    isSecure
+      ? "Handled HTTPS monitor request"
+      : "Handled HTTP monitor request"
+  );
   dynamic ret = dynamic::object;
   try {
     dynamic d(parseJson(request));

@@ -43,7 +43,12 @@ public:
   // Public only for unit tests
   folly::dynamic handleNodes(const Config& c, const folly::dynamic& request);
 
-  folly::fbstring handleRequest(const folly::fbstring& request);
+  folly::fbstring handleRequest(
+    // NB: isSecure is for logging HTTP vs HTTPS only, don't rely on it for
+    // authentication.
+    const folly::fbstring& request,
+    bool isSecure
+  );
 
 private:
   folly::dynamic handleSingle(const Config&, const folly::dynamic& d);

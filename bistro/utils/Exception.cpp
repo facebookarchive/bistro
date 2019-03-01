@@ -9,8 +9,6 @@
  */
 #include "bistro/bistro/utils/Exception.h"
 
-#include <glog/logging.h>
-
 namespace facebook { namespace bistro {
 
 std::string strError() {

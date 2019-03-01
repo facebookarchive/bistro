@@ -27,10 +27,7 @@ cpp_unittest(
         "//folly:optional",
         "//folly/experimental:test_util",
     ],
-    external_deps = [
-        "glog",
-        ("boost", None, "boost_filesystem"),
-    ],
+    external_deps = [("boost", None, "boost_filesystem")],
 )
 
 cpp_unittest(

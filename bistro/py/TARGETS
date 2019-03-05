@@ -4,7 +4,7 @@ load("@fbcode_macros//build_defs:python_library.bzl", "python_library")
 
 python_library(
     name = "py",
-    srcs = glob(["./**/*.py"]),
+    srcs = glob(["**/*.py"]),
     base_module = "facebook.bistro",
     external_deps = [("python-requests", "any")],
 )

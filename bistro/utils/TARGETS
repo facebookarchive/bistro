@@ -7,6 +7,9 @@ cpp_library(
     srcs = ["Exception.cpp"],
     headers = ["Exception.h"],
     deps = ["//folly:conv"],
+    external_deps = [
+        "glog",
+    ],
 )
 
 cpp_library(

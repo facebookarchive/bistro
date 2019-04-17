@@ -347,7 +347,7 @@ LogLines getJobLogsThreadAndEventBaseSafe(
               max(5000 / int(services.size()), 100),
               regex_filter);
         })
-        .onError([&](folly::exception_wrapper&& ew) {
+        .thenError([&](folly::exception_wrapper&& ew) {
           auto const service_id = debugString(addr);
           // Logging is done here so that errors are emitted as they happen,
           // rather than all at once at the end.

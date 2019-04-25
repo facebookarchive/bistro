@@ -26,6 +26,7 @@ set(
   libcrypto.so
   libfolly.so
   libfizz.so
+  libfmt.so
   libglog.so
   libgflags.so
   libboost_date_time.so

@@ -1,0 +1,9 @@
+load("@fbcode_macros//build_defs:python_unittest.bzl", "python_unittest")
+
+python_unittest(
+    name = "test",
+    srcs = glob(["*.py"]),
+    deps = [
+        "//opensource/fbcode_builder/getdeps:lib",
+    ],
+)

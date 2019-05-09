@@ -145,7 +145,9 @@ TEST(TestThriftConversion, HandleJob) {
     ASSERT_EQ(c.filters, c2.filters);
     ASSERT_EQ(c.levelForTasks, c2.levelForTasks);
     ASSERT_EQ(c.levelForHostPlacement, c2.levelForHostPlacement);
-    ASSERT_EQ(c.killOrphanTasksAfterSec, c2.killOrphanTasksAfterSec);
+    ASSERT_EQ(
+        c.killOrphanTasksAfterSec_ref().value_unchecked(),
+        c2.killOrphanTasksAfterSec_ref().value_unchecked());
     ASSERT_EQ(c.taskSubprocessOptions, c2.taskSubprocessOptions);
     ASSERT_EQ(c.killRequest, c2.killRequest);
     ASSERT_EQ(c.versionID, c2.versionID);

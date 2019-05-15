@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017, Facebook, Inc.
+ *  Copyright (c) 2017-present, Facebook, Inc.
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
@@ -131,7 +131,7 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
   statuses.updateForConfig(config);
 
   // Start a few tasks, all orphans, but some using resources on valid nodes.
-  std::vector<cpp2::RunningTask> expected_orphans;
+  std::set<cpp2::RunningTask> expected_orphans;
   for (const auto& jn : std::vector<std::pair<std::string, std::string>>{
     {"bad_job", "host2.db1"},  // "unknown job" orphan
     {"job", "bad_node"},  // "unknown node" orphan
@@ -149,7 +149,7 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
     runner.runTask(
       config, job, *node, nullptr,  // no previous status
       [&](const cpp2::RunningTask& rt, TaskStatus&& status) noexcept {
-        expected_orphans.push_back(rt);
+        expected_orphans.insert(rt);
         statuses.updateStatus(job->id(), node->id(), rt, std::move(status));
       }
     );
@@ -219,7 +219,10 @@ TEST(TestScheduler, InvokePolicyAndCheckOrphans) {
     nullptr  // No monitor to collect errors
   );
   EXPECT_TRUE(res.areTasksRunning_);
-  EXPECT_EQ(expected_orphans, res.orphanTasks_);
+  std::set<cpp2::RunningTask> actual_orphans(
+    res.orphanTasks_.begin(), res.orphanTasks_.end()
+  );
+  EXPECT_EQ(expected_orphans, actual_orphans);
 }
 
 struct ReplicaTest {

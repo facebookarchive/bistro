@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python2
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #

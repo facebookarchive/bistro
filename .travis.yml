@@ -1,6 +1,8 @@
 # Facebook projects that use `fbcode_builder` for continuous integration
 # share this Travis configuration to run builds via Docker.
 
+sudo: required
+
 # Docker disables IPv6 in containers by default. Enable it for unit tests that need [::1].
 before_script:
   - if [[ "$TRAVIS_OS_NAME" != "osx" ]];
@@ -38,7 +40,7 @@ matrix:
       install: pip install flake8
       script: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
   allow_failures:
-    - python: 3.7
+    - python: 2.7
 
 addons:
   apt:

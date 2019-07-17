@@ -17,6 +17,11 @@ import subprocess
 import sys
 import tempfile
 
+try:
+    import typing
+except ImportError:
+    pass
+
 from .envfuncs import Env, add_path_entry, path_search
 from .platform import HostType, is_windows
 

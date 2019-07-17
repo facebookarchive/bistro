@@ -6,6 +6,7 @@ python_unittest(
     resources = {
         "//opensource/fbcode_builder:manifests": "manifests",
     },
+    skip_on_mode_mac = False,
     deps = [
         "//opensource/fbcode_builder/getdeps:lib",
     ],

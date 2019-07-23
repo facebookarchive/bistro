@@ -153,7 +153,7 @@ def parse_targets(dirpath, s):
         )
 
     fn_locals = locals()
-    exec s in {l: fn_locals[l] for l in (
+    fn_locals = {symbol: fn_locals[symbol] for symbol in (
         'cpp_benchmark',
         'cpp_binary',
         'cpp_library',
@@ -163,6 +163,7 @@ def parse_targets(dirpath, s):
         'glob',
         'load',
     )}
+    exec(s, fn_locals)
 
     return cmake_lines
 

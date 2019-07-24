@@ -3,6 +3,10 @@ load("@fbcode_macros//build_defs:python_unittest.bzl", "python_unittest")
 python_unittest(
     name = "test",
     srcs = glob(["*.py"]),
+    py_version = [
+        "2.7",
+        "3.7",
+    ],
     resources = {
         "//opensource/fbcode_builder:manifests": "manifests",
     },

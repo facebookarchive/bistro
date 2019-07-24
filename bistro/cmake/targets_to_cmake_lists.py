@@ -25,6 +25,13 @@ import sys
 import textwrap
 
 
+# Work around Python2 problem:
+#   SyntaxError: unqualified exec is not allowed in function 'parse_targets'
+#   it contains a nested function with free variables
+def wrap_exec(code, scope):
+    exec(code, scope)
+
+
 def parse_targets(dirpath, s):
     cmake_lines = []
 
@@ -153,7 +160,7 @@ def parse_targets(dirpath, s):
         )
 
     fn_locals = locals()
-    exec s in {l: fn_locals[l] for l in (
+    wrap_exec(s, {symbol: fn_locals[symbol] for symbol in (
         'cpp_benchmark',
         'cpp_binary',
         'cpp_library',
@@ -162,7 +169,7 @@ def parse_targets(dirpath, s):
         'thrift_library',
         'glob',
         'load',
-    )}
+    )})
 
     return cmake_lines
 

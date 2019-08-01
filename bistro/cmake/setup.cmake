@@ -19,13 +19,13 @@ include_directories(
 
 link_directories("${CMAKE_INSTALL_PREFIX}/lib")
 
-add_definitions(-std=c++14 -Wno-deprecated)
+# We generally need to track folly here, or the build may break.  E.g.
+# having `c++14` here became incompatible with folly built with `gnu++1z`.
+add_definitions(-std=gnu++1z -Wno-deprecated)
 
 set(
   BISTRO_LINK_DEPS
-  libcrypto.so
   libfolly.so
-  libfizz.so
   libfmt.so
   libglog.so
   libgflags.so
@@ -36,6 +36,9 @@ set(
   libboost_filesystem.so
   libdouble-conversion.so
   libproxygenhttpserver.so
+  libproxygen.so
+  libcrypto.so
+  libfizz.so
   libpthread.so
   libsqlite3.so
   libwangle.so

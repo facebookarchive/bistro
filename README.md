@@ -147,3 +147,7 @@ When configuring a real deployment, be sure to carefully review the `--help`
 of the scheduler & worker binaries, as well as the documentation on
 http://facebook.github.io/bistro.  And don't hesitate to ask for help in the group:
 https://www.facebook.com/groups/bistro.scheduler
+
+## License
+
+See [LICENSE](LICENSE).

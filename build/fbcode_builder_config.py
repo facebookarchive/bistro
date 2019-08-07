@@ -11,6 +11,8 @@ import specs.proxygen as proxygen
 
 from shell_quoting import ShellQuoted
 
+_NUM_TEST_RETRIES = 5
+
 
 # Since Bistro doesn't presently have an "install" target, there is no
 # point in having its spec in the shared spec directory.
@@ -30,7 +32,16 @@ def fbcode_builder_spec(builder):
                 builder.parallel_make(),
             ]),
             builder.step('Run bistro tests', [
-                builder.run(ShellQuoted('ctest --output-on-failure')),
+                # Internally flaky tests have automation to help flag them,
+                # so the vast majority of Bistro tests should be pretty
+                # good.  Tests flaky on open-source builds can easily go
+                # unnoticed and cause noise, so let's just retry liberally.
+                builder.run(ShellQuoted(
+                    'ctest --output-on-failure || ' + ' || '.join(
+                        ['ctest --rerun-failed --output-on-failure']
+                            * (_NUM_TEST_RETRIES - 1)
+                    ),
+                )),
             ]),
         ]
     }

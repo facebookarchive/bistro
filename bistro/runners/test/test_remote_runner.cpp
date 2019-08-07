@@ -471,7 +471,12 @@ TEST_F(TestRemoteRunnerWithOneTask, DeathDueToTaskThatTookTooLongToKill) {
     "updateStatus since the invocation IDs don't match, new task "
     "RunningTask \\{.*: workerShard \\(string\\) = \"test_worker_1\",.*"
     ": workerShard \\(string\\) = \"test_worker_2\",.*\\} with status "
-    "\\{\"time\":[0-9]*,\"result_bits\":4\\}"
+    // This JSON log can be serialized in either order, so match both.
+    "("
+      "\\{\"time\":[0-9]*,\"result_bits\":4\\}"
+    "|"
+      "\\{\"result_bits\":4,\"time\":[0-9]*\\}"
+    ")"
   );
 }
 

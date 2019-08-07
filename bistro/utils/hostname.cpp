@@ -33,8 +33,14 @@ string getLocalHostName() {
   hint.ai_family = AF_UNSPEC;
   hint.ai_flags = AI_CANONNAME;
 
-  if (0 != getaddrinfo(hostname, nullptr, &hint, &info)) {
-    PLOG(ERROR) << "Failed to fully qualify local hostname";
+
+  if (auto err = getaddrinfo(hostname, nullptr, &hint, &info)) {
+    if (err == EAI_SYSTEM) {
+      PLOG(ERROR) << "System error qualifying qualify local hostname";
+    } else {
+      LOG(ERROR) << "Error qualifying qualify local hostname: "
+        << gai_strerror(err);
+    }
     return "";
   }
   const string canon_name = info->ai_canonname;

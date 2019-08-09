@@ -21,7 +21,7 @@ else
 fi
 
 # Decide if we're using CMake or the FB build system
-BISTRO_BINARY="$D/../../../_bin/bistro/bistro/server/bistro_scheduler"
+BISTRO_BINARY="$D/../../../buck-out/gen/bistro/bistro/server/bistro_scheduler"
 if [[ -x "$BISTRO_BINARY" ]] ; then
   PHABRICATOR_DOMAIN="phabricator.intern.facebook.com"
 else

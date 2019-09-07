@@ -35,7 +35,6 @@ update_thrift() {
   for f in "$@" ; do
     thrift1 -o "bistro/bistro/$(dirname $f)" \
       --gen mstch_cpp2:stack_arguments \
-      --templates $TEMPLATES_PATH \
       -I "$BISTRO_HOME" -I "$build_dir/fbinclude" "bistro/bistro/$f"
   done
   popd

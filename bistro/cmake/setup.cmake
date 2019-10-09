@@ -38,6 +38,8 @@ set(
   libpthread.so
   libsqlite3.so
   libwangle.so
+  libssl.so
+  libsodium.so
   libz.so
   libzstd.so
 
@@ -45,7 +47,7 @@ set(
   libasync.so
   libconcurrency.so
   libprotocol.so
-  libthrift.so
+  libthrift-core.so
   libthriftcpp2.so
   libthriftprotocol.so
   libtransport.so

@@ -39,27 +39,7 @@ sudo apt-get install \
 Install FB Deps:
 
 ```
-git clone https://github.com/facebook/folly && cd folly
-#./folly
-vim CMake/FollyCompilerUnix.cmake
-target_compile_options(${THETARGET}
-    PRIVATE
-      -g
-      -fPIC  #add new line!!! Add Compile option (build so file)
-   	  -std=${CXX_STD}
-      -finput-charset=UTF-8
-      -fsigned-char
-      -Wall
-      -Wno-deprecated
-      -Wno-deprecated-declarations
-      -Wno-sign-compare
-      -Wno-unused
-      -Wunused-label
-      -Wunused-result
-      ${FOLLY_CXX_FLAGS}
-  )
- 
-mkdir _build && cd _build && cmake .. -DBUILD_SHARED_LIBS=on
+git clone https://github.com/facebook/folly && cd folly && mkdir _build && cd _build && cmake .. -DBUILD_SHARED_LIBS=on
 make -j10 && sudo make install
 ```
 

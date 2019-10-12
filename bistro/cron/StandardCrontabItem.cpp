@@ -411,6 +411,10 @@ private:
     pt_ += seconds(1);
   }
 
+  void decrement() {
+    pt_ -= seconds(1);
+  }
+
   void advance(int n) {
     pt_ += seconds(n);
   }

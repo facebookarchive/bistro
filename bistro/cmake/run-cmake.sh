@@ -76,6 +76,5 @@ cmake -DCMAKE_BUILD_TYPE="$build_type" "$@" ../..
 cat <<EOF
 Bistro's cmake finished successfully. You can now change into the following
 directory, and run "make":
-
 $make_dir
 EOF

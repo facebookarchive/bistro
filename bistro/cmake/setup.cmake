@@ -38,8 +38,6 @@ set(
   libpthread.so
   libsqlite3.so
   libwangle.so
-  libssl.so
-  libsodium.so
   libz.so
   libzstd.so
 
@@ -47,10 +45,13 @@ set(
   libasync.so
   libconcurrency.so
   libprotocol.so
-  libthrift-core.so
+  libthriftd.so
   libthriftcpp2.so
   libthriftprotocol.so
   libtransport.so
+
+  # gcc8^ and clang support
+  libatomic.so
 )
 
 # Use this instead of target_link_libraries() because pretty much everything

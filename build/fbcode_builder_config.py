@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 'fbcode_builder steps to build & test Bistro'
 
 import specs.fbthrift as fbthrift
+import specs.fmt as fmt
 import specs.folly as folly
 import specs.proxygen as proxygen
 
@@ -18,7 +19,7 @@ _NUM_TEST_RETRIES = 5
 # point in having its spec in the shared spec directory.
 def fbcode_builder_spec(builder):
     return {
-        'depends_on': [folly, proxygen, fbthrift],
+        'depends_on': [fmt, folly, proxygen, fbthrift],
         'steps': [
             builder.fb_github_project_workdir('bistro/bistro'),
             builder.step('Build bistro', [

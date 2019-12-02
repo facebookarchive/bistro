@@ -333,7 +333,7 @@ TaskSubprocessQueue::TaskSubprocessQueue(
 TaskSubprocessQueue::~TaskSubprocessQueue() {
   // Blithely wait for all tasks to exit.
   while (true) {
-    auto num_tasks = tasks_->size();
+    auto num_tasks = tasks_.wlock()->size();
     if (num_tasks == 0) {
       break;
     }

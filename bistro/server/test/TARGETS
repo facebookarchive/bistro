@@ -10,7 +10,6 @@ cpp_library(
         "//bistro/bistro/runners:runners_lib",
         "//bistro/bistro/server:http_server_lib",
         "//bistro/bistro/statuses:statuses_lib",
-        "//thrift/lib/cpp/concurrency:numa2",
         "//thrift/lib/cpp2:server",
         "//thrift/lib/cpp2/util:scoped_server_thread",
     ],

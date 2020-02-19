@@ -423,7 +423,7 @@ void RemoteWorkers::pruneUnusedHistoryVersions() {
       << "WorkerSetID version was not found in the history";  // See below.
     mergeHistoryStep(p.second, &added);
     p.second.added = std::move(added);
-    p.second.removed.clear();
+    p.second.removed.reset();
     break;  // Unused versions pruned and merged.
   }
   // Versions are added to history_ by a RemoteWorker callback just as the

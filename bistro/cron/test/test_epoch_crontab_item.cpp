@@ -34,8 +34,8 @@ TEST(TestEpochCrontabItem, SingleValue) {
   EXPECT_EQ(500, ci->findFirstMatch(0).value());
   EXPECT_EQ(500, ci->findFirstMatch(499).value());
   EXPECT_EQ(500, ci->findFirstMatch(500).value());
-  EXPECT_FALSE(ci->findFirstMatch(501).hasValue());
-  EXPECT_FALSE(ci->findFirstMatch(2000000000).hasValue());
+  EXPECT_FALSE(ci->findFirstMatch(501).has_value());
+  EXPECT_FALSE(ci->findFirstMatch(2000000000).has_value());
 }
 
 TEST(TestEpochCrontabItem, Values) {
@@ -43,7 +43,7 @@ TEST(TestEpochCrontabItem, Values) {
   EXPECT_EQ(500, ci->findFirstMatch(0).value());
   EXPECT_EQ(500, ci->findFirstMatch(500).value());
   EXPECT_EQ(7000000, ci->findFirstMatch(501).value());
-  EXPECT_FALSE(ci->findFirstMatch(7000001).hasValue());
+  EXPECT_FALSE(ci->findFirstMatch(7000001).has_value());
 }
 
 TEST(TestEpochCrontabItem, Interval) {
@@ -73,5 +73,5 @@ TEST(TestEpochCrontabSelector, EndOnly) {
   EXPECT_EQ(1470, ci->findFirstMatch(1441).value());
   EXPECT_EQ(1500, ci->findFirstMatch(1471).value());
   EXPECT_EQ(1500, ci->findFirstMatch(1500).value());
-  EXPECT_FALSE(ci->findFirstMatch(1501).hasValue());
+  EXPECT_FALSE(ci->findFirstMatch(1501).has_value());
 }

@@ -77,7 +77,7 @@ TEST(TestRemoteWorkers, ProtocolMismatch) {
   // Matched version
   worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
   auto res = r.processHeartbeat(&update, worker, cpp2::WorkerSetID());
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   cpp2::WorkerSetHash wh;
   addWorkerIDToHash(&wh, worker.id);
   EXPECT_EQ(workerSetID(r, 1, wh), res->workerSetID);
@@ -192,8 +192,7 @@ TEST(TestRemoteWorkers, WorkerPools) {
         FLAGS_lose_unhealthy_worker_after - 1  // not long enough to lose w1
       );
       EXPECT_FALSE(
-        r.processHeartbeat(&update2, w1new, cpp2::WorkerSetID()).hasValue()
-      );
+          r.processHeartbeat(&update2, w1new, cpp2::WorkerSetID()).has_value());
       EXPECT_EQ(1, update2.suicideWorkers().size());
       EXPECT_EQ(w1new.id, update2.suicideWorkers().begin()->second.id);
       EXPECT_EQ(0, update2.newWorkers().size());
@@ -384,9 +383,9 @@ void addWorker(
     auto rw = r->getWorker(w.shard);
     EXPECT_EQ(RemoteWorkerState::State::NEW, rw->getState());
     EXPECT_EQ(initial_id, rw->initialWorkerSetID());
-    EXPECT_FALSE(rw->workerSetID().hasValue());
+    EXPECT_FALSE(rw->workerSetID().has_value());
     // This is set the first time the WorkerSetID changes from the initial.
-    EXPECT_FALSE(rw->firstAssociatedWorkerSetID().hasValue());
+    EXPECT_FALSE(rw->firstAssociatedWorkerSetID().has_value());
     EXPECT_EQ(expected_non_mustdie_id, r->nonMustDieWorkerSetID());
     EXPECT_EQ(expected_initial_ids, r->initialWorkerSetIDs());
   }
@@ -402,7 +401,7 @@ void addWorker(
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
     // Coverage assertion: we're about to propagate with some workers
     // lacking an indirectWorkerSetID, and that works fine.
-    EXPECT_FALSE(r->getWorker(w.shard)->indirectWorkerSetID().hasValue());
+    EXPECT_FALSE(r->getWorker(w.shard)->indirectWorkerSetID().has_value());
     r->updateState(&update);
     EXPECT_PCRE_MATCH(".*Waiting for all.*", update.initialWaitMessage());
   }
@@ -473,7 +472,7 @@ TEST_F(TestRemoteWorkersInitialWait, AchieveAndMaintainWorkerSetConsensus) {
     auto maybe_id = r.getWorker("w3")->firstAssociatedWorkerSetID();
     if (p.first == RemoteWorkerState::State::UNHEALTHY) {
       EXPECT_EQ(workerSetID(r, 3, id123.hash), res->workerSetID);
-      ASSERT_FALSE(maybe_id.hasValue());
+      ASSERT_FALSE(maybe_id.has_value());
     } else {
       EXPECT_EQ(workerSetID(r, 4, id12.hash), res->workerSetID);
       EXPECT_EQ(workerSetID(r, 3, id123.hash), maybe_id);
@@ -572,9 +571,9 @@ void addAndUpdateWorker(
   }
 
   // Need one more heartbeat for w to get a workerSetID.
-  EXPECT_FALSE(r->getWorker(w.shard)->workerSetID().hasValue());
-  EXPECT_FALSE(r->getWorker(w.shard)->indirectWorkerSetID().hasValue());
-  EXPECT_FALSE(r->getWorker(w.shard)->firstAssociatedWorkerSetID().hasValue());
+  EXPECT_FALSE(r->getWorker(w.shard)->workerSetID().has_value());
+  EXPECT_FALSE(r->getWorker(w.shard)->indirectWorkerSetID().has_value());
+  EXPECT_FALSE(r->getWorker(w.shard)->firstAssociatedWorkerSetID().has_value());
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
     EXPECT_EQ(wid, r->processHeartbeat(&update, w, wid)->workerSetID);

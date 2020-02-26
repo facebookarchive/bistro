@@ -244,7 +244,7 @@ TEST(TestStandardCrontabItem, TestAll) {
     // 2003 + 1 second => 2005
     EXPECT_EQ(1104566400, two_years->findFirstMatch(1041408001).value());
     // 2005 + 1 second => no match
-    EXPECT_FALSE(two_years->findFirstMatch(1104566401).hasValue());
+    EXPECT_FALSE(two_years->findFirstMatch(1104566401).has_value());
   }
 }
 

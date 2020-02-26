@@ -62,7 +62,7 @@ int checkedLookup(const StringTable& table, T key) {
 
 inline folly::dynamic killOrphanTasksAfterToDynamic(
     folly::Optional<std::chrono::milliseconds> v) {
-  if (v.hasValue()) {
+  if (v.has_value()) {
     return 0.001 * v->count();
   }
   return false;

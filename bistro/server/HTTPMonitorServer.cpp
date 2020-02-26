@@ -145,7 +145,7 @@ HTTPMonitorServer::HTTPMonitorServer(
 
   // Set up TLS to allow HTTPS connections
   auto sslConfig = createSslConfig();
-  if (sslConfig.hasValue()) {
+  if (sslConfig.has_value()) {
     LOG(INFO) << "Enabling HTTPS support";
     for (auto& ip : ips) {
       ip.sslConfigs.push_back(*sslConfig);

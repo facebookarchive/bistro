@@ -34,7 +34,7 @@ struct CGroupPaths {
       subsystems_(std::move(cgopts.subsystems)),
       task_(std::move(task)),
       numaPath_(std::move(numa_path)) {
-    if (task_.hasValue() && ++task_->begin() != task_->end()) {
+    if (task_.has_value() && ++task_->begin() != task_->end()) {
       throw std::runtime_error(folly::to<std::string>(
         "'task' component of cgroup path must be a single, non-nested ",
         "directory, not: ", task_->native()

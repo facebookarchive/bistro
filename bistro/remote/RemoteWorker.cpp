@@ -429,12 +429,13 @@ void RemoteWorker::updateCurrentWorker(
     //
     // NB: This criterion could be used to discard all such heartbeats, but
     // the extra complexity isn't worth the dubious gain.
-    } else if (!workerSetID_.hasValue() || WorkerSetIDEarlierThan()(
-      workerSetID_->version, worker_set_id.version
-    )) {
+    } else if (
+        !workerSetID_.has_value() ||
+        WorkerSetIDEarlierThan()(
+            workerSetID_->version, worker_set_id.version)) {
       workerSetIDChangeCob_(*this, worker_set_id);
-      if (!firstAssociatedWorkerSetID_.hasValue()) {
-        CHECK(!workerSetID_.hasValue());
+      if (!firstAssociatedWorkerSetID_.has_value()) {
+        CHECK(!workerSetID_.has_value());
         CHECK(initialWorkerSetID_ != worker_set_id)
           << debugString(initialWorkerSetID_) << " == "
           << debugString(worker_set_id);
@@ -444,7 +445,7 @@ void RemoteWorker::updateCurrentWorker(
     } else if (workerSetID_->version == worker_set_id.version) {
       CHECK(*workerSetID_ == worker_set_id)
         << debugString(*workerSetID_) << " != " << debugString(worker_set_id);
-    } else {  // This can happen occasionally (e.g. under heavy load).
+    } else { // This can happen occasionally (e.g. under heavy load).
       LOG(WARNING) << "Ignoring out-of-order WorkerSetID -- current: "
         << debugString(*workerSetID_) << ", new: "
         << debugString(worker_set_id);

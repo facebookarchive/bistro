@@ -217,7 +217,7 @@ struct FakeWorker {
         // Each FakeBistroWorker calls this just before a task's "done" cob.
         [&](const cpp2::RunningTask& rt, const cpp2::TaskSubprocessOptions&) {
           if (rt.job == "foo_job") {
-            CHECK(taskCobCob_.hasValue());
+            CHECK(taskCobCob_.has_value());
             taskCobCob_.value()(rt);
           }
         }

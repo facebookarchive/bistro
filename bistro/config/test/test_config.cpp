@@ -94,7 +94,7 @@ TEST(TestConfig, HandleConstruction) {
   EXPECT_EQ("dbmaster_children", c.nodeConfigs[2].source);
   EXPECT_EQ("val", c.nodeConfigs[2].prefs.convert<string>("key"));
 
-  EXPECT_FALSE(c.killOrphanTasksAfter.hasValue());
+  EXPECT_FALSE(c.killOrphanTasksAfter.has_value());
   EXPECT_EQ(123, c.exitInitialWaitBeforeTimestamp);
 
   // Check default and non-default enums

@@ -100,11 +100,11 @@ TEST(TestJob, HandleAll) {
   EXPECT_EQ(123456789, jd_new.at("version_id").asInt());
 
   // Check the "kill orphans" option -- first, inherited, then overridden.
-  EXPECT_FALSE(j.killOrphanTasksAfter().hasValue());
+  EXPECT_FALSE(j.killOrphanTasksAfter().has_value());
   {
     cd1[kKillOrphanTasksAfterSec] = false;
     Job jh1(Config(cd1), "bar_job", jd);
-    EXPECT_FALSE(jh1.killOrphanTasksAfter().hasValue());
+    EXPECT_FALSE(jh1.killOrphanTasksAfter().has_value());
   }
   {
     cd1[kKillOrphanTasksAfterSec] = true;

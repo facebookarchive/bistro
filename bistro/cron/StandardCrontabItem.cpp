@@ -549,7 +549,7 @@ Optional<time_t> StandardCrontabItem::findFirstMatch(
     time_t time_since_utc_epoch) const {
 
   auto maybe_time = findFirstMatchImpl(time_since_utc_epoch);
-  if (maybe_time.hasValue() && maybe_time.value() < time_since_utc_epoch) {
+  if (maybe_time.has_value() && maybe_time.value() < time_since_utc_epoch) {
     throw logic_error(format(
       "findFirstMatch went back in time {} -> {}",
       time_since_utc_epoch, maybe_time.value()
@@ -576,7 +576,7 @@ Optional<time_t> StandardCrontabItem::findFirstMatchImpl(
   ptime match_pt;
   auto maybe_utc_ts =
     findUTCTimestampsForFirstMatch(time_since_utc_epoch, &match_pt);
-  if (!maybe_utc_ts.hasValue()) {
+  if (!maybe_utc_ts.has_value()) {
     return none;
   }
   auto utc_ts = maybe_utc_ts.value();
@@ -656,7 +656,7 @@ string StandardCrontabItem::getPrintable() const {
   folly::toAppend(selectors_[3].getPrintable(), ' ', &s);
   folly::toAppend(selectors_[2].getPrintable(), ' ', &s);
   folly::toAppend(selectors_[1].getPrintable(), ' ', &s);
-  if (maybeDayOfWeekSel_.hasValue()) {
+  if (maybeDayOfWeekSel_.has_value()) {
     folly::toAppend(maybeDayOfWeekSel_->getPrintable(), ' ', &s);
   } else {
     folly::toAppend("* ", &s);

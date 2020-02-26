@@ -156,7 +156,7 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
   {
     folly::Optional<std::chrono::milliseconds> maybe_kill_ms;
     parseKillOrphanTasksAfter(&p, &maybe_kill_ms);
-    if (maybe_kill_ms.hasValue()) {
+    if (maybe_kill_ms.has_value()) {
       config.killOrphanTasksAfterSec_ref() = 0.001 * maybe_kill_ms->count();
     } else {
       config.__isset.killOrphanTasksAfterSec = false;

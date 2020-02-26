@@ -41,7 +41,7 @@ TEST_F(TestCGroupResources, UsableNumaMemory) {
   writeNumaMeminfo("node1", kNode1MB);
 
   // No subsystem, no result.
-  EXPECT_FALSE(usableNumaMemoryMB(slicePaths()).hasValue());
+  EXPECT_FALSE(usableNumaMemoryMB(slicePaths()).has_value());
   // Confirm we read cpuset.mems & nodes correctly.
   cgopts.subsystems = {"cpuset"};
   EXPECT_EQ(kNode0MB + kNode1MB, *usableNumaMemoryMB(slicePaths()));
@@ -49,7 +49,7 @@ TEST_F(TestCGroupResources, UsableNumaMemory) {
 
 TEST_F(TestCGroupResources, UsableMemoryLimit) {
   // No subsystem, no limit.
-  EXPECT_FALSE(usableMemoryLimitMB(slicePaths()).hasValue());
+  EXPECT_FALSE(usableMemoryLimitMB(slicePaths()).has_value());
 
   cgopts.subsystems = {"memory"};
   writeFilesToHierarchy(
@@ -60,7 +60,7 @@ TEST_F(TestCGroupResources, UsableMemoryLimit) {
   writeFilesToHierarchy(
     "memory/sl/ice", "memory.use_hierarchy", {{"0"}, {"0"}, {"0"}}
   );
-  EXPECT_FALSE(usableMemoryLimitMB(slicePaths()).hasValue());
+  EXPECT_FALSE(usableMemoryLimitMB(slicePaths()).has_value());
 
   writeFilesToHierarchy(
     "memory/sl/ice", "memory.use_hierarchy", {{"1"}, {"0"}, {"0"}}
@@ -76,7 +76,7 @@ TEST_F(TestCGroupResources, UsableMemoryLimit) {
 
 TEST_F(TestCGroupResources, UsableCpuCores) {
   // No subsystem, no result.
-  EXPECT_FALSE(usableCpuCores(slicePaths()).hasValue());
+  EXPECT_FALSE(usableCpuCores(slicePaths()).has_value());
 
   // Confirm that we only search as high up as needed to find a value.
   cgopts.subsystems = {"cpuset"};
@@ -90,7 +90,7 @@ TEST_F(TestCGroupResources, UsableCpuCores) {
 
 TEST_F(TestCGroupResources, TaskMemory) {
   // No subsystem, no result.
-  EXPECT_FALSE(taskMemoryMB(slicePaths()).hasValue());
+  EXPECT_FALSE(taskMemoryMB(slicePaths()).has_value());
 
   cgopts.subsystems = {"memory"};
   writeFilesToHierarchy(
@@ -101,7 +101,7 @@ TEST_F(TestCGroupResources, TaskMemory) {
 
 TEST_F(TestCGroupResources, TaskCpuTime) {
   // No subsystem, no result.
-  EXPECT_FALSE(taskCpuTimeMs(slicePaths()).hasValue());
+  EXPECT_FALSE(taskCpuTimeMs(slicePaths()).has_value());
 
   cgopts.subsystems = {"cpuacct"};
   writeFilesToHierarchy("cpuacct/sl/ice/task", "cpuacct.usage", {{"7000000"}});

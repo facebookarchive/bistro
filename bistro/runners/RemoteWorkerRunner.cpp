@@ -506,7 +506,7 @@ cpp2::SchedulerHeartbeatResponse RemoteWorkerRunner::processWorkerHeartbeat(
   // know the scheduler).  As a result, "new worker" healthchecks are
   // special-cased in BistroWorkerHandler::runTask().
   applyUpdate(&update);
-  if (!r.hasValue()) {
+  if (!r.has_value()) {
     // This is our response to workers that are not accepted as current.
     //
     // TODO(#5023846): Replacing this by a specific error would create
@@ -1069,7 +1069,7 @@ void RemoteWorkerRunner::killTask(
       maybe_worker = worker_ptr->getBistroWorker();
     }
   }
-  if (!maybe_worker.hasValue()) {
+  if (!maybe_worker.has_value()) {
     throw BistroException("Could not get worker for ", debugString(rt));
   }
 

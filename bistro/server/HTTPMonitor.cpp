@@ -168,7 +168,7 @@ dynamic HTTPMonitor::handleSingle(const Config& c, const dynamic& d) {
     const Job::ID job_id(as_const(Job::JobNameTable)->lookup(job));
     const Node::ID node_id(as_const(Node::NodeNameTable)->lookup(node));
     auto maybe_rt = taskStatuses_->copyRunningTask(job_id, node_id);
-    if (!maybe_rt.hasValue()) {
+    if (!maybe_rt.has_value()) {
       throw BistroException("Unknown running task ", job, ", ", node);
     }
     taskRunner_->killTask(*maybe_rt, jit->second->killRequest());

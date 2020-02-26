@@ -33,7 +33,7 @@ void writeFilesToHierarchy(
   auto dir_it = dir;
   for (const auto& val : values) {
     ASSERT_FALSE(dir_it.empty());  // Don't try to write to ".", that's a bug.
-    if (val.hasValue()) {
+    if (val.has_value()) {
       EXPECT_TRUE(folly::writeFile(*val + "\n", (dir_it / filename).c_str()));
     }
     dir_it = dir_it.parent_path();

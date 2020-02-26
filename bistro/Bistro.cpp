@@ -133,12 +133,12 @@ std::chrono::milliseconds Bistro::scheduleOnce(
       auto jit = config->jobs.find(rt.job);
       if (jit == config->jobs.end()) {
         // Job deleted? No problem, default to the deployment-wide policy.
-        if (!config->killOrphanTasksAfter.hasValue()) {
+        if (!config->killOrphanTasksAfter.has_value()) {
           continue;
         }
         kill_after = config->killOrphanTasksAfter.value();
       } else {
-        if (!jit->second->killOrphanTasksAfter().hasValue()) {
+        if (!jit->second->killOrphanTasksAfter().has_value()) {
           continue;
         }
         kill_after = jit->second->killOrphanTasksAfter().value();

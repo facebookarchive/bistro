@@ -14,7 +14,7 @@ void parseKillOrphanTasksAfter(
     folly::Optional<std::chrono::milliseconds>* maybe_kill_orphans) {
   // If not set: Config defaults to FLAGS_kill_job_if_disabled, Job to none.
   p->optional(kKillOrphanTasksAfterSec, [&](const folly::dynamic& val) {
-    maybe_kill_orphans->clear();  // 'false' or negative number => do not kill
+    maybe_kill_orphans->reset(); // 'false' or negative number => do not kill
     if (val.isBool()) {
       if (val.asBool()) {
         *maybe_kill_orphans = std::chrono::milliseconds(0);

@@ -329,7 +329,7 @@ LogLines getJobLogsThreadAndEventBaseSafe(
   // DANGER: Do not replace by getEventBase(), see the docstring.
   folly::EventBase eb;
 
-  auto resultsx = folly::collectAll(
+  auto resultsx = folly::collectAllUnsafe(
       folly::gen::from(services)
       | folly::gen::mapped([&](auto const& addr) {
         return folly::makeFutureWith([&]{

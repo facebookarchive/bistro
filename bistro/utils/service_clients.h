@@ -9,7 +9,7 @@
 
 #include <gflags/gflags.h>
 #include <memory>
-#include <thrift/lib/cpp/async/TAsyncSocket.h>
+#include <folly/io/async/AsyncSocket.h>
 #include <thrift/lib/cpp2/async/HeaderClientChannel.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 
@@ -43,9 +43,8 @@ std::shared_ptr<ThriftClient> getAsyncClientForAddress(
   if (receive_timeout_ms == 0) {
     receive_timeout_ms = FLAGS_thrift_receive_timeout_ms;
   }
-  using namespace apache::thrift::async;
   using namespace apache::thrift;
-  auto socket = TAsyncSocket::newSocket(
+  auto socket = folly::AsyncSocket::newSocket(
     event_base,
     addr.ip_or_host,
     addr.port,

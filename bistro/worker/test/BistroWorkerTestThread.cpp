@@ -9,7 +9,7 @@
 
 #include <thrift/lib/cpp2/server/ThriftServer.h>
 #include <thrift/lib/cpp2/async/HeaderClientChannel.h>
-#include <thrift/lib/cpp/async/TAsyncSocket.h>
+#include <folly/io/async/AsyncSocket.h>
 
 #include "bistro/bistro/utils/server_socket.h"
 #include "bistro/bistro/utils/service_clients.h"
@@ -56,7 +56,7 @@ shared_ptr<cpp2::BistroWorkerAsyncClient> BistroWorkerTestThread::getClient(
     folly::EventBase* evb) {
   return make_shared<cpp2::BistroWorkerAsyncClient>(
     HeaderClientChannel::newChannel(
-      async::TAsyncSocket::newSocket(
+      AsyncSocket::newSocket(
         evb ? evb : EventBaseManager::get()->getEventBase(),
         *sst_.getAddress()
       )

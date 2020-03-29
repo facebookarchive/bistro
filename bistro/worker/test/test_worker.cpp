@@ -10,7 +10,7 @@
 
 #include <folly/dynamic.h>
 #include <folly/json.h>
-#include <thrift/lib/cpp/async/TAsyncSocket.h>
+#include <folly/io/async/AsyncSocket.h>
 #include <thrift/lib/cpp2/protocol/DebugProtocol.h>
 #include <thrift/lib/cpp2/server/ThriftServer.h>
 #include <thrift/lib/cpp2/util/ScopedServerInterfaceThread.h>
@@ -351,7 +351,7 @@ struct SchedulerWithWorker {
       worker_([this](folly::EventBase* event_base) {
         return make_shared<cpp2::BistroSchedulerAsyncClient>(
           HeaderClientChannel::newChannel(
-            async::TAsyncSocket::newSocket(event_base, ssit_.getAddress())
+            AsyncSocket::newSocket(event_base, ssit_.getAddress())
           )
         );
       }) {}

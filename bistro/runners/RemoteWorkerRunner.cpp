@@ -31,7 +31,6 @@
 namespace facebook { namespace bistro {
 
 using namespace std;
-using namespace apache::thrift::async;
 using namespace apache::thrift;
 
 RemoteWorkerRunner::RemoteWorkerRunner(
@@ -722,7 +721,7 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
         std::move(task_subproc_opts)
       );
     } catch (const exception& e) {
-      // We can get here if client creation failed (e.g. TAsyncSocket could
+      // We can get here if client creation failed (e.g. AsyncSocket could
       // not resolve the hostname), or if the runTask request creation
       // failed.  The latter can __probably__ only happen if the connection
       // is dead at the time of the request.

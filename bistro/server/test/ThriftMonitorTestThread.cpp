@@ -9,7 +9,7 @@
 
 #include <thrift/lib/cpp2/server/ThriftServer.h>
 #include <thrift/lib/cpp2/async/HeaderClientChannel.h>
-#include <thrift/lib/cpp/async/TAsyncSocket.h>
+#include <folly/io/async/AsyncSocket.h>
 
 #include "bistro/bistro/config/InMemoryConfigLoader.h"
 #include "bistro/bistro/statuses/TaskStore.h"
@@ -78,7 +78,7 @@ shared_ptr<cpp2::BistroSchedulerAsyncClient>
 ThriftMonitorTestThread::getClient(folly::EventBase* event_base) {
   return make_shared<cpp2::BistroSchedulerAsyncClient>(
       HeaderClientChannel::newChannel(
-          async::TAsyncSocket::newSocket(event_base, *sst_.getAddress())
+          AsyncSocket::newSocket(event_base, *sst_.getAddress())
       )
   );
 }

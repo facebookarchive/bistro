@@ -4,10 +4,6 @@ load("@fbsource//tools/build_defs:export_directory.bzl", "export_directory")
 python_unittest(
     name = "test",
     srcs = glob(["*.py"]),
-    py_version = [
-        "2.7",
-        "3.7",
-    ],
     resources = {
         "//opensource/fbcode_builder:manifests": "manifests",
         ":fixtures": "fixtures",

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates.
 #
 # This source code is licensed under the MIT license found in the
@@ -12,10 +12,10 @@ Converts Facebook's internal TARGETS files into CMakeLists.txt, used by
 Using Python 2.7 until all environments come with 3.x out of the box.
 
 '''
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+
+
+
+
 
 import os
 import re

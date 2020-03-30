@@ -3,10 +3,10 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+
+
+
+
 
 import os
 
@@ -23,7 +23,7 @@ class HostportSources(PluginCollection):
             'environment variable to "prefix{}value". Valid prefixes:\n{}'
             .format(cls.SEP, '\n'.join(
                 '  {}{} -- {}'.format(k, cls.SEP, obj.__doc__)
-                    for k, obj in cls.key_to_obj.iteritems()  # noqa: B301 T25377293 Grandfathered in
+                    for k, obj in cls.key_to_obj.items()
             ))
         )
 

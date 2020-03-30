@@ -3,10 +3,10 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+
+
+
+
 
 import argparse
 
@@ -27,7 +27,7 @@ class Args(object):
     @classmethod
     def enrichParser(cls, parser):
         cls.PARSERS.append(parser)
-        for func in cls.ACTIONS.itervalues():  # noqa: B301 T25377293 Grandfathered in
+        for func in cls.ACTIONS.values():
             func(parser)
         return parser
 

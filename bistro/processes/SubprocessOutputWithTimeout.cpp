@@ -70,7 +70,7 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
     int32_t num_polls =
       std::ceil(double(std::max(1U, timeoutMs)) / double(std::max(1U, pollMs)));
 
-    collectAllSemiFuture(
+    collectAll(
         // subprocess
         asyncSubprocess(
             evb,
@@ -94,7 +94,7 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
               res = rc;
             }),
         // all pipes
-        collectAllSemiFuture(pipe_futures)
+        collectAll(pipe_futures)
             .toUnsafeFuture()
             .thenValue([](
                 std::vector<folly::Try<folly::Unit>> && allClosed) noexcept {

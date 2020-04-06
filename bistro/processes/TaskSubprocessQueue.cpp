@@ -203,7 +203,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
   ));
 
   // Add callbacks to wait for the subprocess and pipes on the same EventBase.
-  collectAllSemiFuture(
+  collectAll(
       // 1) The moral equivalent of waitpid(), followed by wait for cgroup.
       asyncSubprocess( // Never yields an exception
           evb,
@@ -249,7 +249,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
                     });
           }),
       // 2) Wait for the child to close all pipes
-      collectAllSemiFuture(pipe_closed_futures)
+      collectAll(pipe_closed_futures)
           .toUnsafeFuture()
           .thenValue([ this, rt, state ](
               std::vector<folly::Try<folly::Unit>> &&

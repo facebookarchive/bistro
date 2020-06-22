@@ -86,7 +86,7 @@ dynamic toDynamic(const cpp2::BistroJobConfig& c) {
   if (!filters_obj.empty()) {
     config["filters"] = filters_obj;
   }
-  if (c.__isset.killOrphanTasksAfterSec) {
+  if (c.killOrphanTasksAfterSec_ref()) {
     config["kill_orphan_tasks_after_sec"] =
         c.killOrphanTasksAfterSec_ref().value_unchecked();
   } else {

@@ -356,7 +356,7 @@ void BistroWorkerHandler::runTask(
         CHECK (it != runningTasks_.end()) << "Bad task: "
                                           << debugString(runningTask);
         it->second.physicalResources_ref().value_unchecked() = std::move(res);
-        it->second.__isset.physicalResources = true;
+        apache::thrift::ensure_isset_unsafe(it->second.physicalResources_ref());
       }
     },
     opts

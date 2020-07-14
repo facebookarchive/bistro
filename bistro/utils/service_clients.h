@@ -44,12 +44,12 @@ std::shared_ptr<ThriftClient> getAsyncClientForAddress(
     receive_timeout_ms = FLAGS_thrift_receive_timeout_ms;
   }
   using namespace apache::thrift;
-  auto socket = folly::AsyncSocket::newSocket(
+  auto socket = folly::to_shared_ptr(folly::AsyncSocket::newSocket(
     event_base,
     addr.ip_or_host,
     addr.port,
     connect_timeout_ms
-  );
+  ));
   auto channel = HeaderClientChannel::newChannel(socket);
   // This also sets the socket send timeout, but we overwrite it below.
   channel->setTimeout(receive_timeout_ms);

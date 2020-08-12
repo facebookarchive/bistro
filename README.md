@@ -39,7 +39,7 @@ The CLI tools and web UI will be shipping shortly.
 ## Install the dependencies and build
 
 Bistro needs a 64-bit Linux, Folly, FBThrift, Proxygen, boost, and
-libsqlite3.  You need 2-3GB of RAM to build, as well as GCC 4.9 or above.
+libsqlite3.  You need 2-3GB of RAM to build as well as GCC 4.9 or above.
 
 `build/README.md` documents the usage of Docker-based scripts that build
 Bistro on Ubuntu 14.04, 16.04, and Debian 8.6.  You should be able to follow
@@ -50,7 +50,7 @@ a full list of Bistro's external dependencies (direct and indirect).  We
 gratefully accept patches that improve Bistro's builds, or add support for
 various flavors of Linux and Mac OS.
 
-The binaries will be in `bistro/cmake/{Debug,Release}`.  Available build
+The binaries will be in `bistro/cmake/{Debug, Release}`.  Available build
 targets are explained here:
    http://cmake.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools
 You can start Bistro's unit tests by running `ctest` in those directories.
@@ -67,7 +67,7 @@ Aside: The scheduler tracks jobs, and data shards on which to execute them.
 It also makes sure only to start new tasks when the required resources are
 available.  The remote worker is a module for executing centrally scheduled
 work on many machines.  The UI can aggregate many schedulers at once, so
-using remote workers is optional --- a share-nothing, many-scheduler system
+using remote workers is optional --- a share-nothing, the many-scheduler system
 is sometimes preferable.
 
 Let's make a task to execute:

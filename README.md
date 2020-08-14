@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://facebook.github.io/flux/img/flux-logo-color.svg" alt="logo" width="20%" />
+  <img src="/images/logo.png" alt="logo" width="20%" />
 </p>
 <h1 align="center">
   Bistro

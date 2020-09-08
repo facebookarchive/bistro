@@ -68,8 +68,8 @@ namespace {
 template<typename... Args>
 cpp2::BistroWorkerException BistroWorkerException(Args&&... args) {
   cpp2::BistroWorkerException ex;
-  ex.message = folly::to<std::string>(std::forward<Args>(args)...);
-  LOG(ERROR) << "Replying with exception: " << ex.message;
+  *ex.message_ref() = folly::to<std::string>(std::forward<Args>(args)...);
+  LOG(ERROR) << "Replying with exception: " << *ex.message_ref();
   return ex;
 }
 
@@ -86,17 +86,18 @@ cpp2::BistroWorker makeWorker(
   // for MachinePortLock to see why.
   auto hostname = getLocalHostName();
   cpp2::BistroWorker worker;
-  worker.shard = FLAGS_shard_id.empty() ? hostname : FLAGS_shard_id;
-  worker.machineLock.hostname = hostname;
-  worker.machineLock.port = locked_port;
-  worker.addr = addr;
+  *worker.shard_ref() = FLAGS_shard_id.empty() ? hostname : FLAGS_shard_id;
+  *worker.machineLock_ref()->hostname_ref() = hostname;
+  *worker.machineLock_ref()->port_ref() = locked_port;
+  *worker.addr_ref() = addr;
   // Give the worker instance a unique ID.
-  worker.id.startTime = time(nullptr);
+  *worker.id_ref()->startTime_ref() = time(nullptr);
   // Seeded from /dev/urandom, which is important given that it would be
   // pretty useless if rand correlated with startTime.
-  worker.id.rand = folly::Random::rand64(folly::ThreadLocalPRNG());
-  worker.heartbeatPeriodSec = FLAGS_heartbeat_period_sec;
-  worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
+  *worker.id_ref()->rand_ref() =
+      folly::Random::rand64(folly::ThreadLocalPRNG());
+  *worker.heartbeatPeriodSec_ref() = FLAGS_heartbeat_period_sec;
+  *worker.protocolVersion_ref() = cpp2::common_constants::kProtocolVersion();
   LOG(INFO) << "Worker is ready: " << debugString(worker);
   log_state_transition_fn("initializing", worker, nullptr);
   return worker;
@@ -112,34 +113,33 @@ BistroWorkerHandler::BistroWorkerHandler(
     const string& worker_command,
     const cpp2::ServiceAddress& addr,
     int32_t locked_port)
-  : fb303::FacebookBase2("BistroWorker"),
-    logStateTransitionFn_(log_state_transition_fn),
-    schedulerClientFn_(scheduler_client_fn),
-    workerCommand_(worker_command),
-    taskQueue_(std::make_unique<LogWriter>(
-      data_dir / FLAGS_log_db_file_name
-    )),
-    notifyFinishedQueue_(100000),
-    notifyNotRunningQueue_(10000),
-    jobsDir_(data_dir / "jobs"),
-    worker_(makeWorker(addr, locked_port, logStateTransitionFn_)),
-    state_(RemoteWorkerState(worker_.id.startTime)),
-    gotNewSchedulerInstance_(true),
-    canConnectToMyself_(false),
-    server_(std::move(server)) {
-
+    : fb303::FacebookBase2("BistroWorker"),
+      logStateTransitionFn_(log_state_transition_fn),
+      schedulerClientFn_(scheduler_client_fn),
+      workerCommand_(worker_command),
+      taskQueue_(
+          std::make_unique<LogWriter>(data_dir / FLAGS_log_db_file_name)),
+      notifyFinishedQueue_(100000),
+      notifyNotRunningQueue_(10000),
+      jobsDir_(data_dir / "jobs"),
+      worker_(makeWorker(addr, locked_port, logStateTransitionFn_)),
+      state_(RemoteWorkerState(*worker_.id_ref()->startTime_ref())),
+      gotNewSchedulerInstance_(true),
+      canConnectToMyself_(false),
+      server_(std::move(server)) {
   // No scheduler associated yet, so use a dummy instance ID and timeouts
-  schedulerState_->id.startTime = 0;
-  schedulerState_->id.rand = 0;
+  *schedulerState_->id_ref()->startTime_ref() = 0;
+  *schedulerState_->id_ref()->rand_ref() = 0;
   // Become unhealthy instantly
-  schedulerState_->maxHealthcheckGap = 0;
-  schedulerState_->heartbeatGracePeriod = 0;
-  schedulerState_->workerCheckInterval = 0;
+  *schedulerState_->maxHealthcheckGap_ref() = 0;
+  *schedulerState_->heartbeatGracePeriod_ref() = 0;
+  *schedulerState_->workerCheckInterval_ref() = 0;
   // Default to needing 60 years to get lost, so we don't suicide on startup.
-  schedulerState_->loseUnhealthyWorkerAfter = numeric_limits<int32_t>::max();
-  schedulerState_->workerState = static_cast<int>(
-    RemoteWorkerState::State::NEW  // not used
-  );
+  *schedulerState_->loseUnhealthyWorkerAfter_ref() =
+      numeric_limits<int32_t>::max();
+  *schedulerState_->workerState_ref() =
+      static_cast<int>(RemoteWorkerState::State::NEW // not used
+      );
   // ->workerSetID defaults to 'no workers' and a scheduler ID of 0/0, which
   // ensures that the scheduler perceives this set as belonging to a
   // different scheduler (take care to initialize your scheduler ID in unit
@@ -172,9 +172,11 @@ BistroWorkerHandler::~BistroWorkerHandler() {
 void BistroWorkerHandler::throwIfSuicidal() {
   if (committingSuicide_.load()) {
     throw BistroWorkerException(
-      "Worker ", worker_.id.startTime, "/" , worker_.id.rand,
-      " is committing suicide"
-    );
+        "Worker ",
+        *worker_.id_ref()->startTime_ref(),
+        "/",
+        *worker_.id_ref()->rand_ref(),
+        " is committing suicide");
   }
 }
 
@@ -189,17 +191,22 @@ void BistroWorkerHandler::getRunningTasks(
 
   throwIfSuicidal();
 
-  if (worker != worker_.id) {
+  if (worker != *worker_.id_ref()) {
     throw BistroWorkerException(
-      "Worker ", worker_.id.startTime, "/" , worker_.id.rand,
-      " ignored getRunningTasks for ", worker.startTime, "/", worker.rand
-    );
+        "Worker ",
+        *worker_.id_ref()->startTime_ref(),
+        "/",
+        *worker_.id_ref()->rand_ref(),
+        " ignored getRunningTasks for ",
+        *worker.startTime_ref(),
+        "/",
+        *worker.rand_ref());
   }
 
   SYNCHRONIZED_CONST(runningTasks_) {
     for (const auto& id_and_task : runningTasks_) {
       // The scheduler doesn't track healthcheck jobs, don't confuse it.
-      if (id_and_task.second.job != kHealthcheckTaskJob) {
+      if (*id_and_task.second.job_ref() != kHealthcheckTaskJob) {
         out_running_tasks.push_back(id_and_task.second);
       }
     }
@@ -223,14 +230,13 @@ void BistroWorkerHandler::runTask(
   // 100 ms per log => 10 tasks/sec
   AutoTimer<> timer("runTask was slow", std::chrono::milliseconds{100});
 
-  bool isHealthcheck = rt.job == kHealthcheckTaskJob;
+  bool isHealthcheck = *rt.job_ref() == kHealthcheckTaskJob;
   // Tells the scheduler that we aren't even going to try running this.  Run
   // healthchecks even if we're unhealthy, because otherwise we'd never be
   // able to recover from missing a healthcheck.
   if (state_->state_ != RemoteWorkerState::State::HEALTHY && !isHealthcheck) {
     throw BistroWorkerException(
-      "Unhealthy, not running task: ", rt.job, ", ", rt.node
-    );
+        "Unhealthy, not running task: ", *rt.job_ref(), ", ", *rt.node_ref());
   }
   // Accept "new worker" healthchecks even if the scheduler ID doesn't
   // match.  This is important since those healthchecks often arrive just
@@ -247,12 +253,9 @@ void BistroWorkerHandler::runTask(
   // 'alternative' scheduler ID on the worker side, which serves to
   // authenticate the scheduler in the common case of the the healthcheck's
   // runTask arriving before the next heartbeat.
-  if (
-    isHealthcheck
-    && worker == worker_.id
-    && rt.node == kHealthcheckTaskNewWorkerNode
-    && scheduler != schedulerState_->id
-  ) {
+  if (isHealthcheck && worker == *worker_.id_ref() &&
+      *rt.node_ref() == kHealthcheckTaskNewWorkerNode &&
+      scheduler != *schedulerState_->id_ref()) {
     LOG(INFO) << "Accepting a 'new worker' healthcheck from an unknown "
       << "scheduler, in the hopes that its heartbeat response is just about "
       << "to arrive.";
@@ -276,24 +279,26 @@ void BistroWorkerHandler::runTask(
       // However, both are too much hassle with the current PeriodicPoller,
       // and it's too much hassle to roll a custom poller.
       if (!usablePhysicalResources_.monitor_) {
-        LOG(WARNING) << "CGroups set: " << debugString(opts.cgroupOptions);
+        LOG(WARNING) << "CGroups set: "
+                     << debugString(*opts.cgroupOptions_ref());
         usablePhysicalResources_.monitor_ =
-          std::make_unique<UsablePhysicalResourceMonitor>(
-            CGroupPaths(opts.cgroupOptions, folly::none),
-            FLAGS_physical_resources_subprocess_timeout_ms,
-            std::chrono::seconds(FLAGS_refresh_usable_physical_resources_sec)
-          );
-        usablePhysicalResources_.cgroupOpts_ = opts.cgroupOptions;
-      } else if (opts.cgroupOptions != usablePhysicalResources_.cgroupOpts_) {
-        LOG(WARNING) << "CGroups changed: " << debugString(opts.cgroupOptions);
+            std::make_unique<UsablePhysicalResourceMonitor>(
+                CGroupPaths(*opts.cgroupOptions_ref(), folly::none),
+                FLAGS_physical_resources_subprocess_timeout_ms,
+                std::chrono::seconds(
+                    FLAGS_refresh_usable_physical_resources_sec));
+        usablePhysicalResources_.cgroupOpts_ = *opts.cgroupOptions_ref();
+      } else if (
+          *opts.cgroupOptions_ref() != usablePhysicalResources_.cgroupOpts_) {
+        LOG(WARNING) << "CGroups changed: "
+                     << debugString(*opts.cgroupOptions_ref());
         usablePhysicalResources_.monitor_->updateCGroupPaths(
-          CGroupPaths(opts.cgroupOptions, folly::none)
-        );
-        usablePhysicalResources_.cgroupOpts_ = opts.cgroupOptions;
+            CGroupPaths(*opts.cgroupOptions_ref(), folly::none));
+        usablePhysicalResources_.cgroupOpts_ = *opts.cgroupOptions_ref();
       }
     }
     LOG(INFO) << "Queueing healthcheck started at "
-      << rt.invocationID.startTime;
+              << *rt.invocationID_ref()->startTime_ref();
   } else {
     LOG(INFO) << "Queueing task: " << debugString(rt);
   }
@@ -314,14 +319,17 @@ void BistroWorkerHandler::runTask(
     }
 
     // Mark the task as "running", if it was not already running.
-    auto it_and_success = runningTasks_.emplace(TaskID{rt.job, rt.node}, rt);
+    auto it_and_success =
+        runningTasks_.emplace(TaskID{*rt.job_ref(), *rt.node_ref()}, rt);
     if (!it_and_success.second) {
       if (isHealthcheck) {
         // The scheduler doesn't track healtchecks, it might send duplicates.
         throw BistroWorkerException("Another healtcheck is already running.");
       }
-      CHECK (it_and_success.first->second.invocationID != rt.invocationID)
-        << "RunningTask was runTask'd more than once: " << debugString(rt);
+      CHECK(
+          *it_and_success.first->second.invocationID_ref() !=
+          *rt.invocationID_ref())
+          << "RunningTask was runTask'd more than once: " << debugString(rt);
       // This can happen if updateStatus succeeds on the scheduler, and
       // fails on the worker.  In this case, the scheduler might send the
       // next invocation of the same task before the next updateStatus retry.
@@ -338,21 +346,21 @@ void BistroWorkerHandler::runTask(
     rt,
     cmd.empty() ? vector<string>{workerCommand_} : cmd,
     config,  // Job config argument -- DO: elide the extra copy?
-    jobsDir_ / rt.job,  // Working directory for the task
+    jobsDir_ / *rt.job_ref(),  // Working directory for the task
     [this](const cpp2::RunningTask& runningTask, TaskStatus&& status) noexcept {
       // 10 tasks / sec
       folly::AutoTimer<> updateQueueTimer(
           "Task update queue was slow", std::chrono::milliseconds{100});
       notifyFinishedQueue_.blockingWrite(std::make_unique<NotifyData>(
-        TaskID{runningTask.job, runningTask.node}, std::move(status)
-      ));
+          TaskID{*runningTask.job_ref(), *runningTask.node_ref()},
+          std::move(status)));
       logStateTransitionFn_("completed_task", worker_, &runningTask);
     },
     [this](
       const cpp2::RunningTask& runningTask, cpp2::TaskPhysicalResources&& res
     ) noexcept {
       SYNCHRONIZED(runningTasks_) {
-        auto it = runningTasks_.find({runningTask.job, runningTask.node});
+        auto it = runningTasks_.find({*runningTask.job_ref(), *runningTask.node_ref()});
         CHECK (it != runningTasks_.end()) << "Bad task: "
                                           << debugString(runningTask);
         it->second.physicalResources_ref().value_unchecked() = std::move(res);
@@ -392,11 +400,11 @@ void BistroWorkerHandler::notifyIfTasksNotRunning(
       notify_if_tasks_not_running_sequence_num;
 
     for (const auto& rt : rts) {
-      auto it = runningTasks_.find(TaskID{rt.job, rt.node});
+      auto it = runningTasks_.find(TaskID{*rt.job_ref(), *rt.node_ref()});
       if (it == runningTasks_.end()) {
         // Don't blockingWrite() here, since we are holding locks.
         not_running_tasks.push_back(rt);
-      } else if (rt.invocationID != it->second.invocationID) {
+      } else if (*rt.invocationID_ref() != *it->second.invocationID_ref()) {
         // This can happen, albeit rarely, if the query is much delayed, and
         // a new invocation of the same task is started up.
         LOG(WARNING) << "Got notifyIfTasksNotRunning query with mismatched "
@@ -462,7 +470,7 @@ void BistroWorkerHandler::killTasksAndStop() noexcept {
   logStateTransitionFn_("kill_all_tasks", worker_, nullptr);  // noexcept
   // While there are tasks, TERM-wait-KILL, rinse, and repeat.
   cpp2::KillRequest req;
-  req.method = cpp2::KillMethod::TERM_WAIT_KILL;
+  *req.method_ref() = cpp2::KillMethod::TERM_WAIT_KILL;
   // req's timeout is set per-task.
   while (true) {
     size_t num_running_tasks = 0;
@@ -471,7 +479,7 @@ void BistroWorkerHandler::killTasksAndStop() noexcept {
         if (taskQueue_.isRunning(p.second)) {
           ++num_running_tasks;
         }
-        req.killWaitMs = p.second.workerSuicideTaskKillWaitMs;
+        *req.killWaitMs_ref() = *p.second.workerSuicideTaskKillWaitMs_ref();
         // This can throw if the task had just exited, or if its
         // signal-processing is backlogged.
         try {
@@ -504,16 +512,30 @@ void BistroWorkerHandler::throwOnInstanceIDMismatch(
     const cpp2::BistroInstanceID& worker) const {
 
   // Make a copy for a consistent error message
-  auto scheduler_id = schedulerState_->id;
-  if (scheduler == scheduler_id && worker == worker_.id) {
+  auto scheduler_id = *schedulerState_->id_ref();
+  if (scheduler == scheduler_id && worker == *worker_.id_ref()) {
     return;
   }
   throw BistroWorkerException(
-    "Worker ", worker_.id.startTime, "/" , worker_.id.rand, " with "
-    "associated scheduler ", scheduler_id.startTime, "/", scheduler_id.rand,
-    " ignored ", func_name, " for ", worker.startTime, "/", worker.rand,
-    " from ", scheduler.startTime, "/", scheduler.rand
-  );
+      "Worker ",
+      *worker_.id_ref()->startTime_ref(),
+      "/",
+      *worker_.id_ref()->rand_ref(),
+      " with "
+      "associated scheduler ",
+      *scheduler_id.startTime_ref(),
+      "/",
+      *scheduler_id.rand_ref(),
+      " ignored ",
+      func_name,
+      " for ",
+      *worker.startTime_ref(),
+      "/",
+      *worker.rand_ref(),
+      " from ",
+      *scheduler.startTime_ref(),
+      "/",
+      *scheduler.rand_ref());
 }
 
 std::chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
@@ -548,14 +570,13 @@ std::chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
     // Don't hold locks during this call, not just for better performance,
     // but also to avoid contention with e.g. notifyIfTasksNotRunning.
     try {
-      auto scheduler_id = schedulerState_->id;  // Don't hold the lock
+      auto scheduler_id = *schedulerState_->id_ref(); // Don't hold the lock
       client->sync_updateStatus(
-        rt,
-        // The scheduler would ignore the timestamp anyway.
-        folly::toJson(nd->status.toDynamicNoTime()),
-        scheduler_id,
-        worker_.id
-      );
+          rt,
+          // The scheduler would ignore the timestamp anyway.
+          folly::toJson(nd->status.toDynamicNoTime()),
+          scheduler_id,
+          *worker_.id_ref());
     } catch (const exception& e) {
       logStateTransitionFn_("scheduler_failed_to_acknowledge", worker_, &rt);
       LOG(ERROR) << "Unable to return status to scheduler: " << e.what();
@@ -567,8 +588,9 @@ std::chrono::seconds BistroWorkerHandler::notifyFinished() noexcept {
         << "Already removed " << nd->taskID.first << "/" << nd->taskID.second;
     }
     // Update internal health state to match the scheduler's
-    if (rt.job == kHealthcheckTaskJob && nd->status.isDone()) {
-      state_->timeLastGoodHealthcheckSent_ = rt.invocationID.startTime;
+    if (*rt.job_ref() == kHealthcheckTaskJob && nd->status.isDone()) {
+      state_->timeLastGoodHealthcheckSent_ =
+          *rt.invocationID_ref()->startTime_ref();
     }
     logStateTransitionFn_("acknowledged_by_scheduler", worker_, &rt);
   }
@@ -603,14 +625,13 @@ std::chrono::seconds BistroWorkerHandler::notifyNotRunning() noexcept {
       return std::chrono::seconds(1);
     }
     try {
-      auto scheduler_id = schedulerState_->id;  // Don't hold the lock
+      auto scheduler_id = *schedulerState_->id_ref(); // Don't hold the lock
       client->sync_updateStatus(
-        rt,
-        // The scheduler would ignore the timestamp anyway.
-        folly::toJson(TaskStatus::wasNotRunning().toDynamicNoTime()),
-        scheduler_id,
-        worker_.id
-      );
+          rt,
+          // The scheduler would ignore the timestamp anyway.
+          folly::toJson(TaskStatus::wasNotRunning().toDynamicNoTime()),
+          scheduler_id,
+          *worker_.id_ref());
     } catch (const exception& e) {
       LOG(ERROR) << "Cannot send non-running task to scheduler: " << e.what();
       notifyNotRunningQueue_.blockingWrite(std::move(rt));
@@ -654,16 +675,13 @@ std::chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
       // accessible via the external address to be used for heartbeats.
       cpp2::LogLines ignored;
       getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(
-        &evb,
-        worker_.addr
-      )->sync_getJobLogsByID(
-        ignored, "statuses", {}, {}, 0, false, 1, ""
-      );
+          &evb, *worker_.addr_ref())
+          ->sync_getJobLogsByID(ignored, "statuses", {}, {}, 0, false, 1, "");
       canConnectToMyself_ = true;
       // Fall through to sending a heartbeat
     } catch (const apache::thrift::TException& e) {
       LOG(WARNING) << "Waiting for this worker to start listening on "
-        << debugString(worker_.addr) << ": " << e.what();
+                   << debugString(*worker_.addr_ref()) << ": " << e.what();
       return std::chrono::seconds(1);
     }
     logStateTransitionFn_("listening", worker_, nullptr);
@@ -676,8 +694,8 @@ std::chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
       // The monitor is created during the first healthcheck.
       if (usablePhysicalResources_.monitor_) {
         try {
-          worker.usableResources =
-            *usablePhysicalResources_.monitor_->getDataOrThrow();
+          *worker.usableResources_ref() =
+              *usablePhysicalResources_.monitor_->getDataOrThrow();
         } catch (const std::exception& ex) {
           LOG(WARNING) << "Failed to refresh worker's usable physical "
             << "resources: " << ex.what();
@@ -685,15 +703,14 @@ std::chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
       }
     }
     auto scheduler_state = schedulerState_.copy();  // Take the lock only once
-    schedulerClientFn_(
-      folly::EventBaseManager::get()->getEventBase()
-    )->sync_processHeartbeat(res, worker, scheduler_state.workerSetID);
+    schedulerClientFn_(folly::EventBaseManager::get()->getEventBase())
+        ->sync_processHeartbeat(
+            res, worker, *scheduler_state.workerSetID_ref());
     enforceWorkerSchedulerProtocolVersion(
-      worker_.protocolVersion, res.protocolVersion
-    );
-    CHECK(res.workerSetID.schedulerID == res.id);
+        *worker_.protocolVersion_ref(), *res.protocolVersion_ref());
+    CHECK(*res.workerSetID_ref()->schedulerID_ref() == *res.id_ref());
 
-    gotNewSchedulerInstance_ = scheduler_state.id != res.id;
+    gotNewSchedulerInstance_ = *scheduler_state.id_ref() != *res.id_ref();
     if (gotNewSchedulerInstance_) {
       LOG(INFO) << "Connected to new scheduler " << debugString(res);
       logStateTransitionFn_("connected_to_new_scheduler", worker_, nullptr);
@@ -723,22 +740,26 @@ std::chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
       state_.timeLastHeartbeatReceived_ = cur_time;
       // Normally, the healthcheck thread overwrites state_.state_, but this
       // is the only way to get out of RemoteWorkerState::State::NEW.
-      setState(&state_, RemoteWorkerState::State(res.workerState), cur_time);
+      setState(
+          &state_, RemoteWorkerState::State(*res.workerState_ref()), cur_time);
 
       // Don't allow the worker set version to go backwards. NB: It could be
       // better to also ignore other scheduler state, but this version is
       // updated too rarely to be a useful sequence number.
-      if (!gotNewSchedulerInstance_ && WorkerSetIDEarlierThan()(
-        res.workerSetID.version, scheduler_state.workerSetID.version
-      )) {
+      if (!gotNewSchedulerInstance_ &&
+          WorkerSetIDEarlierThan()(
+              *res.workerSetID_ref()->version_ref(),
+              *scheduler_state.workerSetID_ref()->version_ref())) {
         LOG(ERROR) << "Got scheduler response with older WorkerSetID "
-          << "version, not updating workerSetID -- current: "
-          << debugString(scheduler_state.workerSetID) << ", received: "
-          << debugString(res.workerSetID);
+                   << "version, not updating workerSetID -- current: "
+                   << debugString(*scheduler_state.workerSetID_ref())
+                   << ", received: " << debugString(*res.workerSetID_ref());
         // Holding back the workerSetID cannot cause schedulerState_.id and
         // schedulerState_.workerSetID.schedulerID to diverge.
-        CHECK(scheduler_state.workerSetID.schedulerID == res.id);
-        res.workerSetID = scheduler_state.workerSetID;
+        CHECK(
+            *scheduler_state.workerSetID_ref()->schedulerID_ref() ==
+            *res.id_ref());
+        *res.workerSetID_ref() = *scheduler_state.workerSetID_ref();
       }
 
       // Update scheduler timeouts _inside_ the state_ lock, so that from
@@ -753,7 +774,7 @@ std::chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
     LOG(ERROR) << "Unable to send heartbeat to scheduler: " << e.what();
     logStateTransitionFn_("error_sending_heartbeat", worker_, nullptr);
   }
-  return std::chrono::seconds(worker_.heartbeatPeriodSec);
+  return std::chrono::seconds(*worker_.heartbeatPeriodSec_ref());
 }
 
 std::chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
@@ -766,22 +787,22 @@ std::chrono::seconds BistroWorkerHandler::healthcheck() noexcept {
       // Lock state_ first, then schedulerState_ -- and don't hold this lock.
       auto scheduler_state = schedulerState_.copy();
       auto new_state_and_disallowed = state_.computeState(
-        cur_time,
-        scheduler_state.maxHealthcheckGap,
-        worker_.heartbeatPeriodSec + scheduler_state.heartbeatGracePeriod,
-        scheduler_state.loseUnhealthyWorkerAfter
-          // "Is the worker lost?" is checked periodically by the scheduler.
-          // So, the scheduler may notice a lost worker some seconds later
-          // than it should have been lost.  Since it's important for
-          // workers to be lost in a timely fashion (to avoid duplicate
-          // tasks, e.g.), the worker tries to die a bit sooner than the
-          // scheduler would lose it.
-          - scheduler_state.workerCheckInterval,
-        // The worker never "transiently" allows itself to be healthy.
-        // Instead, this state transition happens when a heartbeat response
-        // updates state_->hasBeenHealthy_.
-        false
-      );
+          cur_time,
+          *scheduler_state.maxHealthcheckGap_ref(),
+          *worker_.heartbeatPeriodSec_ref() +
+              *scheduler_state.heartbeatGracePeriod_ref(),
+          *scheduler_state.loseUnhealthyWorkerAfter_ref()
+              // "Is the worker lost?" is checked periodically by the scheduler.
+              // So, the scheduler may notice a lost worker some seconds later
+              // than it should have been lost.  Since it's important for
+              // workers to be lost in a timely fashion (to avoid duplicate
+              // tasks, e.g.), the worker tries to die a bit sooner than the
+              // scheduler would lose it.
+              - *scheduler_state.workerCheckInterval_ref(),
+          // The worker never "transiently" allows itself to be healthy.
+          // Instead, this state transition happens when a heartbeat response
+          // updates state_->hasBeenHealthy_.
+          false);
       if (new_state_and_disallowed.second) {
         LOG(INFO) << "Will be healthy upon achieving WorkerSetID consensus.";
       }
@@ -822,12 +843,15 @@ void BistroWorkerHandler::getJobLogsByID(
     regex_filter
   );
 
-  out.nextLineID = log.nextLineID;
+  *out.nextLineID_ref() = log.nextLineID;
   for (const auto& l : log.lines) {
-    out.lines.emplace_back(
-      apache::thrift::FragileConstructor::FRAGILE,
-      l.jobID, l.nodeID, l.time, l.line, l.lineID
-    );
+    out.lines_ref()->emplace_back(
+        apache::thrift::FragileConstructor::FRAGILE,
+        l.jobID,
+        l.nodeID,
+        l.time,
+        l.line,
+        l.lineID);
   }
 }
 

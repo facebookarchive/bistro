@@ -39,7 +39,7 @@ TaskRunnerResponse LocalRunner::runTaskImpl(
   // saying "there should only be **one** LocalRunner per whatever your
   // current cgroup namespace happens to be.  That's probably not what
   // people want, but until a use case comes up, this is good enough.
-  running_task.workerShard = "local";
+  *running_task.workerShard_ref() = "local";
 
   // Since it runs locally, the task treats the instance node as the worker.
   auto instance_node = Nodes::getInstanceNodeName();
@@ -50,15 +50,14 @@ TaskRunnerResponse LocalRunner::runTaskImpl(
 
   cb(running_task, TaskStatus::running());
   taskQueue_.runTask(
-    running_task,
-    job->command().empty()
-      ? std::vector<std::string>{cmd_.native()} : job->command(),
-    folly::toJson(job_args),  // Job config argument
-    jobsDir_ / running_task.job,  // Working directory for the task
-    cb,
-    [](const cpp2::RunningTask&, cpp2::TaskPhysicalResources&&){},
-    job->taskSubprocessOptions()
-  );
+      running_task,
+      job->command().empty() ? std::vector<std::string>{cmd_.native()}
+                             : job->command(),
+      folly::toJson(job_args), // Job config argument
+      jobsDir_ / *running_task.job_ref(), // Working directory for the task
+      cb,
+      [](const cpp2::RunningTask&, cpp2::TaskPhysicalResources&&) {},
+      job->taskSubprocessOptions());
   return RanTask;
 }
 

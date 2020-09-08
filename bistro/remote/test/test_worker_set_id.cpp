@@ -13,8 +13,8 @@ using namespace facebook::bistro;
 
 cpp2::BistroInstanceID instanceID(int64_t start_time, int64_t rand) {
   cpp2::BistroInstanceID id;
-  id.startTime = start_time;
-  id.rand = rand;
+  *id.startTime_ref() = start_time;
+  *id.rand_ref() = rand;
   return id;
 }
 
@@ -37,7 +37,7 @@ TEST(TestWorkerSetHash, Exact) {
   cpp2::WorkerSetHash w1w2;
   addWorkerIDToHash(&w1w2, id1);
   addWorkerIDToHash(&w1w2, id2);
-  EXPECT_EQ(2, w1w2.numWorkers);
+  EXPECT_EQ(2, *w1w2.numWorkers_ref());
 
   cpp2::WorkerSetHash w2w1;
   addWorkerIDToHash(&w2w1, id2);
@@ -46,10 +46,10 @@ TEST(TestWorkerSetHash, Exact) {
   EXPECT_EQ(w1w2, w2w1);  // Commutative
 
   // Also check exact values
-  EXPECT_EQ(add(s1, s2), w1w2.startTime.addAll);
-  EXPECT_EQ(add(r1, r2), w1w2.rand.addAll);
-  EXPECT_EQ(s1 ^ s2, w1w2.startTime.xorAll);
-  EXPECT_EQ(r1 ^ r2, w1w2.rand.xorAll);
+  EXPECT_EQ(add(s1, s2), *w1w2.startTime_ref()->addAll_ref());
+  EXPECT_EQ(add(r1, r2), *w1w2.rand_ref()->addAll_ref());
+  EXPECT_EQ(s1 ^ s2, *w1w2.startTime_ref()->xorAll_ref());
+  EXPECT_EQ(r1 ^ r2, *w1w2.rand_ref()->xorAll_ref());
 
   // Removing w2 should leave w1
   removeWorkerIDFromHash(&w1w2, id2);
@@ -62,11 +62,11 @@ TEST(TestWorkerSetHash, Exact) {
   cpp2::WorkerSetHash w2;
   addWorkerIDToHash(&w2, id2);
   EXPECT_EQ(w2, w2w1);
-  EXPECT_EQ(id2.startTime, w2w1.startTime.addAll);
-  EXPECT_EQ(id2.startTime, w2w1.startTime.xorAll);
-  EXPECT_EQ(id2.rand, w2w1.rand.addAll);
-  EXPECT_EQ(id2.rand, w2w1.rand.xorAll);
-  EXPECT_EQ(1, w2w1.numWorkers);
+  EXPECT_EQ(*id2.startTime_ref(), *w2w1.startTime_ref()->addAll_ref());
+  EXPECT_EQ(*id2.startTime_ref(), *w2w1.startTime_ref()->xorAll_ref());
+  EXPECT_EQ(*id2.rand_ref(), *w2w1.rand_ref()->addAll_ref());
+  EXPECT_EQ(*id2.rand_ref(), *w2w1.rand_ref()->xorAll_ref());
+  EXPECT_EQ(1, *w2w1.numWorkers_ref());
 
   // Removing both leaves the empty hash.
   removeWorkerIDFromHash(&w2w1, id2);

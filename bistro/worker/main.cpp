@@ -53,28 +53,27 @@ int main(int argc, char* argv[]) {
 
   cpp2::ServiceAddress scheduler_addr;
   // DO: It would be faster & more robust to pre-resolve the hostname here.
-  scheduler_addr.ip_or_host = FLAGS_scheduler_host;
-  scheduler_addr.port = FLAGS_scheduler_port;
+  *scheduler_addr.ip_or_host_ref() = FLAGS_scheduler_host;
+  *scheduler_addr.port_ref() = FLAGS_scheduler_port;
 
   auto my_socket_and_addr = getServerSocketAndAddress();
   auto server = std::make_shared<apache::thrift::ThriftServer>();
   auto handler = std::make_shared<BistroWorkerHandler>(
-    server,  // The handler calls server->stop() on suicide.
-    FLAGS_data_dir,
-    [](const char*, const cpp2::BistroWorker&, const cpp2::RunningTask*) {
-      // Do not log state transitions. This would be a good place to hook up
-      // a popular OSS tool for collecting operational charts.
-    },
-    [scheduler_addr](folly::EventBase* event_base) {
-      // Future: add plugins to poll various discovery mechanisms here.
-      return getAsyncClientForAddress<cpp2::BistroSchedulerAsyncClient>(
-        event_base,
-        scheduler_addr
-      );
-    },
-    FLAGS_worker_command,
-    my_socket_and_addr.second,  // Could change in the presence of proxies
-    my_socket_and_addr.second.port  // Actual local port the worker has locked
+      server, // The handler calls server->stop() on suicide.
+      FLAGS_data_dir,
+      [](const char*, const cpp2::BistroWorker&, const cpp2::RunningTask*) {
+        // Do not log state transitions. This would be a good place to hook up
+        // a popular OSS tool for collecting operational charts.
+      },
+      [scheduler_addr](folly::EventBase* event_base) {
+        // Future: add plugins to poll various discovery mechanisms here.
+        return getAsyncClientForAddress<cpp2::BistroSchedulerAsyncClient>(
+            event_base, scheduler_addr);
+      },
+      FLAGS_worker_command,
+      my_socket_and_addr.second, // Could change in the presence of proxies
+      *my_socket_and_addr.second
+           .port_ref() // Actual local port the worker has locked
   );
   StopWorkerOnSignal signal_handler(
     folly::EventBaseManager::get()->getEventBase(),

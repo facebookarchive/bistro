@@ -86,7 +86,7 @@ bool assertReadBackSameValue(int64_t written, int64_t read_back) {
 // O_APPEND isn't necessary, but in case of bad paths being passed in, it's
 // less destructive to data on disk.
 int cgFileFlags(cpp2::CGroupOptions opts) {
-  return O_WRONLY | O_APPEND | (opts.unitTestCreateFiles ? O_CREAT : 0);
+  return O_WRONLY | O_APPEND | (*opts.unitTestCreateFiles_ref() ? O_CREAT : 0);
 }
 
 // Write a value to a cgroups file, and read it back. Use check_read_back_fn
@@ -154,8 +154,9 @@ std::vector<std::string> cgroupSetup(
   std::vector<std::string> procs_paths;  // The return value.
   boost::system::error_code ec;  // Reused, error messages go into `errors`.
   std::vector<std::string> errors;
-  for (const auto& subsystem : cg.subsystems) {
-    auto slice_dir = boost::filesystem::path(cg.root) / subsystem / cg.slice;
+  for (const auto& subsystem : *cg.subsystems_ref()) {
+    auto slice_dir =
+        boost::filesystem::path(*cg.root_ref()) / subsystem / *cg.slice_ref();
     // The root & slice have to exist, otherwise the system is misconfigured.
     if (!boost::filesystem::is_directory(slice_dir, ec) || ec) {
       errors.emplace_back(folly::to<std::string>(
@@ -199,9 +200,13 @@ std::vector<std::string> cgroupSetup(
       continue;
     }
     // Limit CPU usage.
-    if (subsystem == kCPU && cg.cpuShares && !writeToCGroupFile(
-      &errors, dirs.back(), kCPUShares, cg.cpuShares, cgFileFlags(cg)
-    )) {
+    if (subsystem == kCPU && *cg.cpuShares_ref() &&
+        !writeToCGroupFile(
+            &errors,
+            dirs.back(),
+            kCPUShares,
+            *cg.cpuShares_ref(),
+            cgFileFlags(cg))) {
       continue;
     }
     // Limit RAM usage.
@@ -209,14 +214,17 @@ std::vector<std::string> cgroupSetup(
     // NB If you ever decide to use the OOM notifier instead of a hard limit,
     // keep in mind that this can race with the freezer. Details here:
     // https://issues.apache.org/jira/browse/MESOS-1689 & MESOS-1758
-    if (subsystem == kMemory && cg.memoryLimitInBytes
-        && !writeToCGroupFile(
-          &errors, dirs.back(), kMemoryLimitInBytes, cg.memoryLimitInBytes,
-          cgFileFlags(cg), [&] (int64_t written, int64_t read_back) {
-            // We don't mind if the kernel rounds up by up to 1MB.
-            return read_back >= written && (written - read_back <= (1 << 20));
-          }
-        )) {
+    if (subsystem == kMemory && *cg.memoryLimitInBytes_ref() &&
+        !writeToCGroupFile(
+            &errors,
+            dirs.back(),
+            kMemoryLimitInBytes,
+            *cg.memoryLimitInBytes_ref(),
+            cgFileFlags(cg),
+            [&](int64_t written, int64_t read_back) {
+              // We don't mind if the kernel rounds up by up to 1MB.
+              return read_back >= written && (written - read_back <= (1 << 20));
+            })) {
       continue;
     }
   }

@@ -122,15 +122,15 @@ TEST(TestConfig, HandleConstruction) {
       (kSubsystems, dynamic::array("sys1", "sys2"))
       (kKillWithoutFreezer, true)
     );
-  task_opts.pollMs = 111;
-  task_opts.maxLogLinesPerPollInterval = 222;
-  task_opts.parentDeathSignal = 333;
-  task_opts.processGroupLeader = true;
-  task_opts.useCanaryPipe = false;
-  task_opts.cgroupOptions.root = "root";
-  task_opts.cgroupOptions.slice = "slice";
-  task_opts.cgroupOptions.subsystems = {"sys1", "sys2"};
-  task_opts.cgroupOptions.killWithoutFreezer = true;
+  *task_opts.pollMs_ref() = 111;
+  *task_opts.maxLogLinesPerPollInterval_ref() = 222;
+  *task_opts.parentDeathSignal_ref() = 333;
+  *task_opts.processGroupLeader_ref() = true;
+  *task_opts.useCanaryPipe_ref() = false;
+  *task_opts.cgroupOptions_ref()->root_ref() = "root";
+  *task_opts.cgroupOptions_ref()->slice_ref() = "slice";
+  *task_opts.cgroupOptions_ref()->subsystems_ref() = {"sys1", "sys2"};
+  *task_opts.cgroupOptions_ref()->killWithoutFreezer_ref() = true;
   EXPECT_EQ(task_opts, Config(d).taskSubprocessOptions);
 
   // Check toDynamic here, since it's easy to forget to update test_job.cpp
@@ -167,27 +167,28 @@ TEST(TestConfig, HandleConstruction) {
     Config config(d);
 
     cpp2::PhysicalResourceConfig ram_prc;
-    ram_prc.physical = cpp2::PhysicalResource::RAM_MBYTES;
-    ram_prc.logical = "my_ram_gb";
-    ram_prc.logicalResourceID = config.resourceNames.lookup("my_ram_gb");
-    ram_prc.multiplyLogicalBy = 1024;
-    ram_prc.enforcement = cpp2::PhysicalResourceEnforcement::HARD;
-    ram_prc.physicalReserveAmount = 1536;  // MB
+    *ram_prc.physical_ref() = cpp2::PhysicalResource::RAM_MBYTES;
+    *ram_prc.logical_ref() = "my_ram_gb";
+    *ram_prc.logicalResourceID_ref() = config.resourceNames.lookup("my_ram_gb");
+    *ram_prc.multiplyLogicalBy_ref() = 1024;
+    *ram_prc.enforcement_ref() = cpp2::PhysicalResourceEnforcement::HARD;
+    *ram_prc.physicalReserveAmount_ref() = 1536; // MB
 
     cpp2::PhysicalResourceConfig cpu_prc;
-    cpu_prc.physical = cpp2::PhysicalResource::CPU_CORES;
-    cpu_prc.logical = "my_cpu_centicore";
-    cpu_prc.logicalResourceID =
-      config.resourceNames.lookup("my_cpu_centicore");
-    cpu_prc.multiplyLogicalBy = 0.001;
-    cpu_prc.enforcement = cpp2::PhysicalResourceEnforcement::SOFT;
+    *cpu_prc.physical_ref() = cpp2::PhysicalResource::CPU_CORES;
+    *cpu_prc.logical_ref() = "my_cpu_centicore";
+    *cpu_prc.logicalResourceID_ref() =
+        config.resourceNames.lookup("my_cpu_centicore");
+    *cpu_prc.multiplyLogicalBy_ref() = 0.001;
+    *cpu_prc.enforcement_ref() = cpp2::PhysicalResourceEnforcement::SOFT;
 
     cpp2::PhysicalResourceConfig gpu_prc;
-    gpu_prc.physical = cpp2::PhysicalResource::GPU_CARDS;
-    gpu_prc.logical = "my_gpu_card";
-    gpu_prc.logicalResourceID = config.resourceNames.lookup("my_gpu_card");
-    gpu_prc.multiplyLogicalBy = 1;
-    gpu_prc.enforcement = cpp2::PhysicalResourceEnforcement::NONE;
+    *gpu_prc.physical_ref() = cpp2::PhysicalResource::GPU_CARDS;
+    *gpu_prc.logical_ref() = "my_gpu_card";
+    *gpu_prc.logicalResourceID_ref() =
+        config.resourceNames.lookup("my_gpu_card");
+    *gpu_prc.multiplyLogicalBy_ref() = 1;
+    *gpu_prc.enforcement_ref() = cpp2::PhysicalResourceEnforcement::NONE;
 
     // We don't know what order physicalResourceConfigs will have.
     ASSERT_EQ(3, config.physicalResourceConfigs.size());
@@ -202,13 +203,13 @@ TEST(TestConfig, HandleConstruction) {
   cpp2::KillRequest kill_req;
   EXPECT_EQ(kill_req, c.killRequest);
   // Does the Thrift enum have a sane default?
-  EXPECT_EQ(cpp2::KillMethod::TERM, c.killRequest.method);
+  EXPECT_EQ(cpp2::KillMethod::TERM, *c.killRequest.method_ref());
 
   // Non-default kill request
   d[kKillSubprocess] =
     folly::dynamic::object(kMethod, kKill)(kKillWaitMs, 987);
-  kill_req.method = cpp2::KillMethod::KILL;
-  kill_req.killWaitMs = 987;
+  *kill_req.method_ref() = cpp2::KillMethod::KILL;
+  *kill_req.killWaitMs_ref() = 987;
   EXPECT_EQ(kill_req, Config(d).killRequest);
 
   // levelForTasks defaults to the bottom (non-worker) level

@@ -130,7 +130,7 @@ std::chrono::milliseconds Bistro::scheduleOnce(
     // Is it time to kill any of the currently orphaned tasks?
     for (auto&& rt : sched_result.orphanTasks_) {
       std::chrono::milliseconds kill_after;
-      auto jit = config->jobs.find(rt.job);
+      auto jit = config->jobs.find(*rt.job_ref());
       if (jit == config->jobs.end()) {
         // Job deleted? No problem, default to the deployment-wide policy.
         if (!config->killOrphanTasksAfter.has_value()) {
@@ -143,7 +143,7 @@ std::chrono::milliseconds Bistro::scheduleOnce(
         }
         kill_after = jit->second->killOrphanTasksAfter().value();
       }
-      auto id = std::make_pair(rt.job, rt.node);
+      auto id = std::make_pair(*rt.job_ref(), *rt.node_ref());
       auto it = orphanTaskIDToKillTime_.find(id);
       auto kill_time = (it == orphanTaskIDToKillTime_.end())
         ? (time_since_epoch + kill_after) : it->second;

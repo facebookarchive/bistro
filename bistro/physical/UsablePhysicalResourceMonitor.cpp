@@ -35,16 +35,16 @@ struct Fetcher {
     }
     UsablePhysicalResourceFetcher fetcher(std::move(*latest_cgpaths));
     auto res = std::make_shared<cpp2::UsablePhysicalResources>();
-    res->msSinceEpoch =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()
-      ).count();
+    *res->msSinceEpoch_ref() =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count();
     // In principle, cgroups can change our CPU or RAM allocation, so we
     // want to refresh these periodically.
-    res->cpuCores = fetcher.cpuCores();
-    res->memoryMB = fetcher.memoryMB();
+    *res->cpuCores_ref() = fetcher.cpuCores();
+    *res->memoryMB_ref() = fetcher.memoryMB();
     // nVidia GPUs can become 'lost' on the PCI bus, so also refresh.
-    res->gpus = fetcher.gpus(subprocessTimeoutMs_);
+    *res->gpus_ref() = fetcher.gpus(subprocessTimeoutMs_);
     *out = res;
     return true;  // Got new data
   }

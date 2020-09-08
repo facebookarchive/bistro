@@ -86,8 +86,8 @@ ThriftMonitorTestThread::getClient(folly::EventBase* event_base) {
 cpp2::ServiceAddress ThriftMonitorTestThread::getAddress() const {
   cpp2::ServiceAddress addr;
   auto fs = sst_.getAddress();
-  addr.ip_or_host = fs->getAddressStr();
-  addr.port = fs->getPort();
+  *addr.ip_or_host_ref() = fs->getAddressStr();
+  *addr.port_ref() = fs->getPort();
   return addr;
 }
 

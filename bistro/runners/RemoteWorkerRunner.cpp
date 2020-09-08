@@ -125,7 +125,7 @@ void logicalToIntPhysicalResource(
     T* phys,
     const cpp2::PhysicalResourceConfig& p,
     const cpp2::Resource& r) {
-  clampPhysical(phys, ::round(p.multiplyLogicalBy * r.amount), r);
+  clampPhysical(phys, ::round(*p.multiplyLogicalBy_ref() * r.amount), r);
 }
 
 folly::Optional<int> physicalToLogicalResource(
@@ -136,7 +136,8 @@ folly::Optional<int> physicalToLogicalResource(
   if (physical == 0) {
     return folly::none;
   }
-  auto r = ::trunc((physical - c.physicalReserveAmount) / c.multiplyLogicalBy);
+  auto r = ::trunc(
+      (physical - *c.physicalReserveAmount_ref()) / *c.multiplyLogicalBy_ref());
   return r < 0 ? 0 : r;
 }
 }  // anonymous namespace
@@ -173,36 +174,36 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
     for (const auto& wconn : workers_.workerPool()) {
       const auto& w = wconn.second->getBistroWorker();
 
-      auto& w_res = workerResources_[w.shard];
+      auto& w_res = workerResources_[*w.shard_ref()];
       w_res = def_resources;  // Start with the defaults.
 
       // Apply any known physical resources.
       for (const auto& prc : config->physicalResourceConfigs) {
         // Apply CPU, RAM, # of GPU cards.
         if (const auto val = [&]() -> folly::Optional<int> {
-          switch (prc.physical) {
-            case cpp2::PhysicalResource::RAM_MBYTES:
-              return
-                physicalToLogicalResource(prc, w.usableResources.memoryMB);
-            case cpp2::PhysicalResource::CPU_CORES:
-              return
-                physicalToLogicalResource(prc, w.usableResources.cpuCores);
-            case cpp2::PhysicalResource::GPU_CARDS:
-              return
-                physicalToLogicalResource(prc, w.usableResources.gpus.size());
-            default:
-              return folly::none;
-          }
-        }()) {
-          CHECK_GE(prc.logicalResourceID, 0);
-          CHECK_LT(prc.logicalResourceID, w_res.size());
-          w_res[prc.logicalResourceID] = *val;
+              switch (*prc.physical_ref()) {
+                case cpp2::PhysicalResource::RAM_MBYTES:
+                  return physicalToLogicalResource(
+                      prc, *w.usableResources_ref()->memoryMB_ref());
+                case cpp2::PhysicalResource::CPU_CORES:
+                  return physicalToLogicalResource(
+                      prc, *w.usableResources_ref()->cpuCores_ref());
+                case cpp2::PhysicalResource::GPU_CARDS:
+                  return physicalToLogicalResource(
+                      prc, w.usableResources_ref()->gpus_ref()->size());
+                default:
+                  return folly::none;
+              }
+            }()) {
+          CHECK_GE(*prc.logicalResourceID_ref(), 0);
+          CHECK_LT(*prc.logicalResourceID_ref(), w_res.size());
+          w_res[*prc.logicalResourceID_ref()] = *val;
         }
         // If the user configured special resources for GPU card models,
         // populate them too.
-        if (prc.physical == cpp2::PhysicalResource::GPU_CARDS) {
-          for (const auto& gpu : w.usableResources.gpus) {
-            auto r_name = "GPU: " + gpu.name;
+        if (*prc.physical_ref() == cpp2::PhysicalResource::GPU_CARDS) {
+          for (const auto& gpu : *w.usableResources_ref()->gpus_ref()) {
+            auto r_name = "GPU: " + *gpu.name_ref();
             auto rid = config->resourceNames.lookup(r_name);
             if (rid != StringTable::NotFound) {
               CHECK_GE(rid, 0);
@@ -222,16 +223,18 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
 
       // Apply manual worker resource overrides.
       // Try for hostport, and fallback to hostname, then shard name
-      auto it = config->workerResourcesOverride.find(
-        folly::to<string>(w.machineLock.hostname, ':', w.machineLock.port)
-      );
+      auto it = config->workerResourcesOverride.find(folly::to<string>(
+          *w.machineLock_ref()->hostname_ref(),
+          ':',
+          *w.machineLock_ref()->port_ref()));
       if (it == config->workerResourcesOverride.end()) {
-        it = config->workerResourcesOverride.find(w.machineLock.hostname);
+        it = config->workerResourcesOverride.find(
+            *w.machineLock_ref()->hostname_ref());
       }
       if (it == config->workerResourcesOverride.end()) {
         // I added the shard-name lookup for TestBusiestSelector, but it
         // seems like a reasonable idea in general.
-        it = config->workerResourcesOverride.find(w.shard);
+        it = config->workerResourcesOverride.find(*w.shard_ref());
       }
 
       if (it != config->workerResourcesOverride.end()) {
@@ -250,16 +253,17 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
     auto running_tasks = taskStatuses_->copyRunningTasks();
     for (const auto& id_and_task : running_tasks) {
       const auto& rt = id_and_task.second;
-      for (const auto& nr : rt.nodeResources) {
-        if (nr.node != rt.workerShard) {
+      for (const auto& nr : *rt.nodeResources_ref()) {
+        if (nr.node != *rt.workerShard_ref()) {
           continue;  // These are tracked in Scheduler
         }
-        auto it = workerResources_.find(rt.workerShard);
+        auto it = workerResources_.find(*rt.workerShard_ref());
         if (it == workerResources_.end()) {
           LOG(ERROR) << error.report(
-            "Resources for unknown worker ", rt.workerShard, " from ",
-            debugString(rt)
-          );
+              "Resources for unknown worker ",
+              *rt.workerShard_ref(),
+              " from ",
+              debugString(rt));
           break;  // cannot use this running task's resources
         }
         auto& resources = it->second;
@@ -267,17 +271,27 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
           auto rid = config->resourceNames.lookup(r.name);
           if (rid == StringTable::NotFound || rid >= resources.size()) {
             LOG(ERROR) << error.report(
-              "Resource ", r.name, "/", rid, " not valid or known for worker ",
-              rt.workerShard, ": ", debugString(rt)
-            );
+                "Resource ",
+                r.name,
+                "/",
+                rid,
+                " not valid or known for worker ",
+                *rt.workerShard_ref(),
+                ": ",
+                debugString(rt));
             continue;
           }
           resources[rid] -= r.amount;
           if (resources[rid] < 0) {
             LOG(ERROR) << error.report(
-              "Resource ", r.name, " is ", resources[rid], " on worker ",
-              rt.workerShard, " for ", debugString(rt)
-            );
+                "Resource ",
+                r.name,
+                " is ",
+                resources[rid],
+                " on worker ",
+                *rt.workerShard_ref(),
+                " for ",
+                debugString(rt));
           }
         }
       }
@@ -369,14 +383,13 @@ LogLines getJobLogsThreadAndEventBaseSafe(
   // Find the most restrictive nextLineID among all hosts
   for (const auto& log : results) {
     if (
-      // This value marks "no more lines" in LogWriter, so exclude it.
-      (log.nextLineID != LogLine::kNotALineID) && (
-        // This line only matches initially due to the previous comparison
-        (res.nextLineID == LogLine::kNotALineID) ||
-        ((res.nextLineID > log.nextLineID) == is_ascending)
-      )
-    ) {
-      res.nextLineID = log.nextLineID;
+        // This value marks "no more lines" in LogWriter, so exclude it.
+        (*log.nextLineID_ref() != LogLine::kNotALineID) &&
+        (
+            // This line only matches initially due to the previous comparison
+            (res.nextLineID == LogLine::kNotALineID) ||
+            ((res.nextLineID > *log.nextLineID_ref()) == is_ascending))) {
+      res.nextLineID = *log.nextLineID_ref();
     }
   }
 
@@ -388,15 +401,17 @@ LogLines getJobLogsThreadAndEventBaseSafe(
   // client-side, and the non-sequential lines could be displayed
   // separately, but this seems too confusing for casual users.
   for (const auto& log : results) {
-    for (const cpp2::LogLine& l : log.lines) {
+    for (const cpp2::LogLine& l : *log.lines_ref()) {
       if (
-        // If we are on the last page of results on all hosts, drop nothing.
-        (res.nextLineID == LogLine::kNotALineID) ||
-        ((l.lineID < res.nextLineID) == is_ascending)
-      ) {
+          // If we are on the last page of results on all hosts, drop nothing.
+          (res.nextLineID == LogLine::kNotALineID) ||
+          ((*l.lineID_ref() < res.nextLineID) == is_ascending)) {
         res.lines.emplace_back(
-          l.jobID, l.nodeID, l.time, l.line, l.lineID
-        );
+            *l.jobID_ref(),
+            *l.nodeID_ref(),
+            *l.time_ref(),
+            *l.line_ref(),
+            *l.lineID_ref());
       }
     }
   }
@@ -444,11 +459,11 @@ LogLines RemoteWorkerRunner::getJobLogs(
       // error right away.
       auto state = wconn.second->getState();
       if (state == RemoteWorkerState::State::UNHEALTHY) {
-        unhealthy_workers.push_back(w.shard);
+        unhealthy_workers.push_back(*w.shard_ref());
       } else if (state == RemoteWorkerState::State::MUST_DIE) {
-        lost_workers.push_back(w.shard);
+        lost_workers.push_back(*w.shard_ref());
       } else {
-        services.push_back(w.addr);
+        services.push_back(*w.addr_ref());
       }
     }
   }
@@ -513,7 +528,7 @@ cpp2::SchedulerHeartbeatResponse RemoteWorkerRunner::processWorkerHeartbeat(
     // commit suicide simply on account of its heartbeat being rejected.
     throw std::runtime_error("Worker shouldn't associate with this scheduler");
   }
-  r->id = schedulerID_;
+  *r->id_ref() = schedulerID_;
   return r.value();
 }
 
@@ -526,10 +541,19 @@ void RemoteWorkerRunner::remoteUpdateStatus(
 
   if (scheduler_id != schedulerID_) {
     throw BistroException(
-      "Got a status for ", rt.job, ", ", rt.node, " from a different ",
-      "scheduler. My ID: ", schedulerID_.startTime, ", ", schedulerID_.rand,
-      ", received ID: ", scheduler_id.startTime, ", ", scheduler_id.rand
-    );
+        "Got a status for ",
+        *rt.job_ref(),
+        ", ",
+        *rt.node_ref(),
+        " from a different ",
+        "scheduler. My ID: ",
+        *schedulerID_.startTime_ref(),
+        ", ",
+        *schedulerID_.rand_ref(),
+        ", received ID: ",
+        *scheduler_id.startTime_ref(),
+        ", ",
+        *scheduler_id.rand_ref());
   }
   SYNCHRONIZED(workers_) {
     // Contract of RemoteWorker::recordNonRunningTaskStatus: Throws if the
@@ -539,8 +563,8 @@ void RemoteWorkerRunner::remoteUpdateStatus(
     // invocation IDs.  Records health-check replies, and returns false.
     // Updates the RemoteWorker's internal "running" and "unsure if running"
     // task lists.
-    if (workers_.mutableWorkerOrThrow(rt.workerShard)
-          ->recordNonRunningTaskStatus(rt, status, worker_id)) {
+    if (workers_.mutableWorkerOrThrow(*rt.workerShard_ref())
+            ->recordNonRunningTaskStatus(rt, status, worker_id)) {
       // IMPORTANT: Update TaskStatuses **inside** the workers_ lock
       taskStatuses_->updateStatus(rt, std::move(status));
     }
@@ -594,43 +618,44 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       if (response != RanTask) {
         return response;
       }
-      rt.workerShard = worker.shard;
-      job_args["worker_node"] = rt.workerShard;
-      job_args["worker_host"] = worker.machineLock.hostname;
+      *rt.workerShard_ref() = *worker.shard_ref();
+      job_args["worker_node"] = *rt.workerShard_ref();
+      job_args["worker_host"] = *worker.machineLock_ref()->hostname_ref();
 
       // Add worker resources to rt **before** recording this task as running.
       // Future: support this in LocalRunner mode as well.
       auto& resources_by_node = job_args["resources_by_node"];
-      CHECK(resources_by_node.find(rt.workerShard)
-            == resources_by_node.items().end())
-        << "Cannot have both a node and a worker named: " << rt.workerShard
-        << " -- if you are running a worker and the central scheduler on the "
-        << "same host, you should specify --instance_node_name global.";
+      CHECK(
+          resources_by_node.find(*rt.workerShard_ref()) ==
+          resources_by_node.items().end())
+          << "Cannot have both a node and a worker named: "
+          << *rt.workerShard_ref()
+          << " -- if you are running a worker and the central scheduler on the "
+          << "same host, you should specify --instance_node_name global.";
       if (const auto* nr = addNodeResourcesToRunningTask(
-        &rt,
-        &resources_by_node,
-        // This config is stale, but it's consistent with workerResources_.
-        *config,
-        rt.workerShard,
-        workerLevel_,
-        job->resources()
-      )) {
+              &rt,
+              &resources_by_node,
+              // This config is stale, but it's consistent with
+              // workerResources_.
+              *config,
+              *rt.workerShard_ref(),
+              workerLevel_,
+              job->resources())) {
         for (const auto& r : nr->resources) {
           auto phys_it = config->logicalToPhysical.find(r.name);
           if (phys_it != config->logicalToPhysical.end()) {
             const auto& p =  // at() is like CHECK, since this is `noexcept`
               config->physicalResourceConfigs.at(phys_it->second);
-            if (
-              p.physical == cpp2::PhysicalResource::RAM_MBYTES
-              && p.enforcement == cpp2::PhysicalResourceEnforcement::HARD
-            ) {
+            if (*p.physical_ref() == cpp2::PhysicalResource::RAM_MBYTES &&
+                *p.enforcement_ref() ==
+                    cpp2::PhysicalResourceEnforcement::HARD) {
               logicalToIntPhysicalResource(
                 &cgroup_memory_limit_in_bytes, p, r
               );
             } else if (
-              p.physical == cpp2::PhysicalResource::CPU_CORES
-              && p.enforcement == cpp2::PhysicalResourceEnforcement::SOFT
-            ) {
+                *p.physical_ref() == cpp2::PhysicalResource::CPU_CORES &&
+                *p.enforcement_ref() ==
+                    cpp2::PhysicalResourceEnforcement::SOFT) {
               logicalToIntPhysicalResource(&cgroup_cpu_shares, p, r);
               // Multiply by 2 here since cgroup cpu.shares must be >= 2.
               clampPhysical(&cgroup_cpu_shares, 2*cgroup_cpu_shares, r);
@@ -643,15 +668,13 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       // otherwise an intervening updateConfig() could free the resources we
       // just grabbed.
       auto status = TaskStatus::running(
-        // Pass some additional metadata to TaskStatusObservers that log
-        make_shared<folly::dynamic>(folly::dynamic::object
-          ("shard", worker.shard)
-          ("hostname", worker.machineLock.hostname)
-          ("port", worker.machineLock.port)
-        )
-      );
-      workers_.mutableWorkerOrAbort(worker.shard)
-        ->recordRunningTaskStatus(rt, status);
+          // Pass some additional metadata to TaskStatusObservers that log
+          make_shared<folly::dynamic>(
+              folly::dynamic::object("shard", *worker.shard_ref())(
+                  "hostname", *worker.machineLock_ref()->hostname_ref())(
+                  "port", *worker.machineLock_ref()->port_ref())));
+      workers_.mutableWorkerOrAbort(*worker.shard_ref())
+          ->recordRunningTaskStatus(rt, status);
       // IMPORTANT: Update TaskStatuses **inside** the workers_ lock,
       // otherwise e.g.  a worker could get lost before cb runs, failing the
       // TaskStatusSnapshot::updateStatus() check for "when a task is not
@@ -669,57 +692,60 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
     ]() noexcept {
     try {
       shared_ptr<cpp2::BistroWorkerAsyncClient> client =
-        workerClientFn_(eventBase_.get(), worker.addr);
+          workerClientFn_(eventBase_.get(), *worker.addr_ref());
       auto task_subproc_opts = job->taskSubprocessOptions();
-      task_subproc_opts.cgroupOptions.cpuShares = cgroup_cpu_shares;
-      task_subproc_opts.cgroupOptions.memoryLimitInBytes =
-        cgroup_memory_limit_in_bytes;
+      *task_subproc_opts.cgroupOptions_ref()->cpuShares_ref() =
+          cgroup_cpu_shares;
+      *task_subproc_opts.cgroupOptions_ref()->memoryLimitInBytes_ref() =
+          cgroup_memory_limit_in_bytes;
       client->runTask(
-        unique_ptr<RequestCallback>(new FunctionReplyCallback(
-          [this, cb, client, rt, worker, did_not_run_sequence_num](
-              ClientReceiveState&& state) noexcept {
-            // TODO(#5025478): Convert this, and the other recv_* calls in
-            // this file to use recv_wrapped_*.
-            try {
-              client->recv_runTask(state);
-            } catch (const cpp2::BistroWorkerException& e) {
-              LOG(ERROR) << "Worker never started task "
-                << debugString(rt) << ": " << e.message;
-              // Okay to mark the task "not running" since we know for sure
-              // that the worker received & processed our request, and
-              // decided not to run it.
-              SYNCHRONIZED(workers_) {
-                auto status = TaskStatus::neverStarted(e.message);
-                workers_.mutableWorkerOrAbort(worker.shard)
-                  ->recordFailedTask(rt, status);
-                // IMPORTANT: Update TaskStatuses **inside** the workers_ lock
-                cb(rt, std::move(status));
-              }
-            } catch (const std::exception& e) {
-              // The task may or may not be running, so do NOT invoke the
-              // callback, or the scheduler might schedule duplicate tasks,
-              // exceed resource limits, etc.
-              LOG(ERROR) << "The runTask request hit an error on "
-                << debugString(rt) << ", will have to poll to find if the "
-                "task is running: " << e.what();
-              SYNCHRONIZED(workers_) {
-                workers_.mutableWorkerOrAbort(worker.shard)
-                  ->addUnsureIfRunningTask(rt);
-              }
-            }
-          }
-        )),
-        rt,
-        folly::toJson(job_args),
-        job->command().empty()
-          ? std::vector<std::string>{/*--worker_command*/} : job->command(),
-        schedulerID_,
-        worker.id,
-        // The real sequence number may have been incremented after we found
-        // the worker, but this is okay, the worker simply rejects the task.
-        did_not_run_sequence_num,
-        std::move(task_subproc_opts)
-      );
+          unique_ptr<RequestCallback>(new FunctionReplyCallback(
+              [ this, cb, client, rt, worker, did_not_run_sequence_num ](
+                  ClientReceiveState && state) noexcept {
+                // TODO(#5025478): Convert this, and the other recv_* calls in
+                // this file to use recv_wrapped_*.
+                try {
+                  client->recv_runTask(state);
+                } catch (const cpp2::BistroWorkerException& e) {
+                  LOG(ERROR) << "Worker never started task " << debugString(rt)
+                             << ": " << *e.message_ref();
+                  // Okay to mark the task "not running" since we know for sure
+                  // that the worker received & processed our request, and
+                  // decided not to run it.
+                  SYNCHRONIZED(workers_) {
+                    auto status = TaskStatus::neverStarted(*e.message_ref());
+                    workers_.mutableWorkerOrAbort(*worker.shard_ref())
+                        ->recordFailedTask(rt, status);
+                    // IMPORTANT: Update TaskStatuses **inside** the workers_
+                    // lock
+                    cb(rt, std::move(status));
+                  }
+                } catch (const std::exception& e) {
+                  // The task may or may not be running, so do NOT invoke the
+                  // callback, or the scheduler might schedule duplicate tasks,
+                  // exceed resource limits, etc.
+                  LOG(ERROR) << "The runTask request hit an error on "
+                             << debugString(rt)
+                             << ", will have to poll to find if the "
+                                "task is running: "
+                             << e.what();
+                  SYNCHRONIZED(workers_) {
+                    workers_.mutableWorkerOrAbort(*worker.shard_ref())
+                        ->addUnsureIfRunningTask(rt);
+                  }
+                }
+              })),
+          rt,
+          folly::toJson(job_args),
+          job->command().empty()
+              ? std::vector<std::string>{/*--worker_command*/}
+              : job->command(),
+          schedulerID_,
+          *worker.id_ref(),
+          // The real sequence number may have been incremented after we found
+          // the worker, but this is okay, the worker simply rejects the task.
+          did_not_run_sequence_num,
+          std::move(task_subproc_opts));
     } catch (const exception& e) {
       // We can get here if client creation failed (e.g. AsyncSocket could
       // not resolve the hostname), or if the runTask request creation
@@ -732,8 +758,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
       LOG(ERROR) << "Error connecting to the worker: " << e.what();
       SYNCHRONIZED(workers_) {
         auto status = TaskStatus::neverStarted(e.what());
-        workers_.mutableWorkerOrAbort(worker.shard)
-          ->recordFailedTask(rt, status);
+        workers_.mutableWorkerOrAbort(*worker.shard_ref())
+            ->recordFailedTask(rt, status);
         // IMPORTANT: Update TaskStatuses **inside** the workers_ lock
         cb(rt, std::move(status));
       }
@@ -763,49 +789,46 @@ void RemoteWorkerRunner::sendWorkerHealthcheck(
     }
     try {
       shared_ptr<cpp2::BistroWorkerAsyncClient> client =
-        workerClientFn_(eventBase_.get(), w.addr);
+          workerClientFn_(eventBase_.get(), *w.addr_ref());
       // Make a barebones RunningTask; only job, startTime & shard are be used.
       cpp2::RunningTask rt;
-      rt.job = kHealthcheckTaskJob;
+      *rt.job_ref() = kHealthcheckTaskJob;
       // BistroWorkerHandler::runTask doesn't check the scheduler ID for new
       // worker healthchecks.
-      rt.node = is_new_worker ? kHealthcheckTaskNewWorkerNode : "";
-      rt.invocationID.startTime = time(nullptr);
+      *rt.node_ref() = is_new_worker ? kHealthcheckTaskNewWorkerNode : "";
+      *rt.invocationID_ref()->startTime_ref() = time(nullptr);
       // Leaving .rand == 0 for healthchecks makes their cgroups easy to find.
-      rt.workerShard = w.shard;
+      *rt.workerShard_ref() = *w.shard_ref();
       // .nextBackoffDuration is not applicable
       client->runTask(
-        unique_ptr<RequestCallback>(new FunctionReplyCallback(
-          [client, w](ClientReceiveState&& state) {
-            try {
-              client->recv_runTask(state);
-            } catch (const exception& e) {
-              // Don't track 'unsure if running' errors for healthchecks
-              // because they have protection against replays, and there's
-              // no harm in missing a few.
-              //
-              // DO: This and the below error could be reported to the
-              // monitor on a per-worker basis, but the trick would be to
-              // clear the message once the worker is lost / "must die".  An
-              // alternative would be to make "errors with expiration",
-              // which could allow the reporting of RemoteWorker logs too.
-              LOG(ERROR) << "Error health-checking " << debugString(w)
-                << ": " << e.what();
-            }
-          }
-        )),
-        rt,
-        "", // No task config (3rd command-line argument)
-        // Short script that prints "done" to our status pipe. The last
-        // argument becomes $0 for the shell, making it look nicer in "ps".
-        vector<string>{
-          "/bin/sh", "-c", "echo done > $2", kHealthcheckTaskJob
-        },
-        schedulerID_,
-        w.id,
-        0,  // healtchecks don't use "notifyIfTasksNotRunning"
-        task_subprocess_opts
-      );
+          unique_ptr<RequestCallback>(new FunctionReplyCallback(
+              [client, w](ClientReceiveState&& state) {
+                try {
+                  client->recv_runTask(state);
+                } catch (const exception& e) {
+                  // Don't track 'unsure if running' errors for healthchecks
+                  // because they have protection against replays, and there's
+                  // no harm in missing a few.
+                  //
+                  // DO: This and the below error could be reported to the
+                  // monitor on a per-worker basis, but the trick would be to
+                  // clear the message once the worker is lost / "must die".  An
+                  // alternative would be to make "errors with expiration",
+                  // which could allow the reporting of RemoteWorker logs too.
+                  LOG(ERROR) << "Error health-checking " << debugString(w)
+                             << ": " << e.what();
+                }
+              })),
+          rt,
+          "", // No task config (3rd command-line argument)
+          // Short script that prints "done" to our status pipe. The last
+          // argument becomes $0 for the shell, making it look nicer in "ps".
+          vector<string>{
+              "/bin/sh", "-c", "echo done > $2", kHealthcheckTaskJob},
+          schedulerID_,
+          *w.id_ref(),
+          0, // healtchecks don't use "notifyIfTasksNotRunning"
+          task_subprocess_opts);
     } catch (const exception& e) {
       LOG(ERROR) << "Error sending health-check to " << debugString(w)
         << ": " << e.what();  // See DO on the other ERROR in this function.
@@ -819,10 +842,12 @@ void RemoteWorkerRunner::requestWorkerSuicide(
   eventBase_->runInEventBaseThread([this, w]() noexcept {
     try {
       shared_ptr<cpp2::BistroWorkerAsyncClient> client =
-        workerClientFn_(eventBase_.get(), w.addr);
+          workerClientFn_(eventBase_.get(), *w.addr_ref());
       client->requestSuicide(
-        unique_ptr<RequestCallback>(new FunctionReplyCallback(
-          [client, w](ClientReceiveState&& state) {
+          unique_ptr<
+              RequestCallback>(new FunctionReplyCallback([client,
+                                                          w](ClientReceiveState&&
+                                                                 state) {
             try {
               client->recv_requestSuicide(state);
             } catch (const exception& e) {
@@ -832,11 +857,9 @@ void RemoteWorkerRunner::requestWorkerSuicide(
                 << " returned an error. We expect the client to disconnect "
                 << " on success, so use your judgement: " << e.what();
             }
-          }
-        )),
-        schedulerID_,
-        w.id
-      );
+          })),
+          schedulerID_,
+          *w.id_ref());
     } catch (const exception& e) {
       LOG(ERROR) << "Error sending suicide request to " << debugString(w)
         << ": " << e.what();
@@ -919,30 +942,32 @@ void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
       // (this assumses that the EventBase threads aren't *too* backed up.
       auto tweaked_rt = id_and_task.second;
       const int32_t kSafeBackoffSec =
-        RemoteWorkerState::workerSuicideBackoffSafetyMarginSec()
-          + (tweaked_rt.workerSuicideTaskKillWaitMs == 0
-              ? RemoteWorkerState::workerSuicideTaskKillWaitMs()
-              : tweaked_rt.workerSuicideTaskKillWaitMs) / 1000
-          + 1;  // a lazy way of rounding up, same as in my "initial wait" math
-      if (kSafeBackoffSec > original_rt.nextBackoffDuration.seconds) {
+          RemoteWorkerState::workerSuicideBackoffSafetyMarginSec() +
+          (*tweaked_rt.workerSuicideTaskKillWaitMs_ref() == 0
+               ? RemoteWorkerState::workerSuicideTaskKillWaitMs()
+               : *tweaked_rt.workerSuicideTaskKillWaitMs_ref()) /
+              1000 +
+          1; // a lazy way of rounding up, same as in my "initial wait" math
+      if (kSafeBackoffSec > original_rt.nextBackoffDuration_ref()->seconds) {
         // This safe value will be used even if `noMoreBackoffs` is true,
         // and the task is forgiven -- `TaskStatus::forgive()` makes a
         // special provision for this.
-        tweaked_rt.nextBackoffDuration.seconds = kSafeBackoffSec;
+        tweaked_rt.nextBackoffDuration_ref()->seconds = kSafeBackoffSec;
       }
       // IMPORTANT: Do not call recordFailedTask here because the lost tasks
       // are automatically recorded by RemoteWorker::loseRunningTasks.  See
       // its code for an explanation of how we maintain status consistency
       // between RemoteWorker & TaskStatuses, even though the two updates
       // are not atomic.
-      taskStatuses_->updateStatus(tweaked_rt, TaskStatus::workerLost(
-        original_rt.workerShard,
-        // Save the unmodified nextBackoffDuration value, since this is the
-        // job-configured backoff value the status would have had **after**
-        // the update().  Storing it before the update() is hacky, but who's
-        // watching?
-        original_rt.nextBackoffDuration.seconds
-      ));
+      taskStatuses_->updateStatus(
+          tweaked_rt,
+          TaskStatus::workerLost(
+              *original_rt.workerShard_ref(),
+              // Save the unmodified nextBackoffDuration value, since this is
+              // the job-configured backoff value the status would have had
+              // **after** the update().  Storing it before the update() is
+              // hacky, but who's watching?
+              original_rt.nextBackoffDuration_ref()->seconds));
     }
   }
   // This may change the state of a worker from NEW to UNHEALTHY. For
@@ -962,41 +987,43 @@ void RemoteWorkerRunner::checkUnsureIfRunningTasks(
     try {
       auto timer = std::make_shared<folly::AutoTimer<>>();
       shared_ptr<cpp2::BistroWorkerAsyncClient> client =
-        workerClientFn_(eventBase_.get(), w.addr);
+          workerClientFn_(eventBase_.get(), *w.addr_ref());
       // The sequence number increment is not atomic with respect to the
       // remote call, and that's okay.  If a runTask queries the sequence
       // number after this increment operation, it is *definitely* not part
       // of our argument "tasks", so we don't care about the order of
       // arrival at the worker of this call vs the runTask.
-      int64_t sequence_num = workers_->mutableWorkerOrAbort(w.shard)
-        ->calledNotifyIfTasksNotRunning();
+      int64_t sequence_num = workers_->mutableWorkerOrAbort(*w.shard_ref())
+                                 ->calledNotifyIfTasksNotRunning();
       client->notifyIfTasksNotRunning(
-        unique_ptr<RequestCallback>(new FunctionReplyCallback(
-          // It's a little lame to copy tasks twice, but that's okay.
-          [this, tasks, w, client, timer](ClientReceiveState&& state) {
-            // TODO(#5025478): Convert this, and the other recv_* calls in
-            // this file to use recv_wrapped_*.
-            try {
-              client->recv_notifyIfTasksNotRunning(state);
-            } catch (const std::exception& e) {
-              LOG(ERROR) << "notifyIfTasksNotRunning failed: " << e.what();
-              return;
-            }
-            // This is not "clear" because new ones might have been added.
-            workers_->mutableWorkerOrAbort(w.shard)
-              ->eraseUnsureIfRunningTasks(tasks);
-            timer->log(
-              "Queried ", tasks.size(), " 'unsure if running ",
-              "tasks from worker ", debugString(w), tasks.empty() ? "" :
-                (", sample task: " + debugString(tasks.front()))
-            );
-          }
-        )),
-        tasks,
-        schedulerID_,
-        w.id,
-        sequence_num
-      );
+          unique_ptr<RequestCallback>(new FunctionReplyCallback(
+              // It's a little lame to copy tasks twice, but that's okay.
+              [this, tasks, w, client, timer](ClientReceiveState&& state) {
+                // TODO(#5025478): Convert this, and the other recv_* calls in
+                // this file to use recv_wrapped_*.
+                try {
+                  client->recv_notifyIfTasksNotRunning(state);
+                } catch (const std::exception& e) {
+                  LOG(ERROR) << "notifyIfTasksNotRunning failed: " << e.what();
+                  return;
+                }
+                // This is not "clear" because new ones might have been added.
+                workers_->mutableWorkerOrAbort(*w.shard_ref())
+                    ->eraseUnsureIfRunningTasks(tasks);
+                timer->log(
+                    "Queried ",
+                    tasks.size(),
+                    " 'unsure if running ",
+                    "tasks from worker ",
+                    debugString(w),
+                    tasks.empty()
+                        ? ""
+                        : (", sample task: " + debugString(tasks.front())));
+              })),
+          tasks,
+          schedulerID_,
+          *w.id_ref(),
+          sequence_num);
     } catch (const exception& e) {
       LOG(ERROR) << "Error connecting to the worker: " << e.what();
     }
@@ -1015,40 +1042,44 @@ void RemoteWorkerRunner::fetchRunningTasksForNewWorkers(
       try {
         auto timer = std::make_shared<folly::AutoTimer<>>();
         shared_ptr<cpp2::BistroWorkerAsyncClient> client =
-          workerClientFn_(eventBase_.get(), w.addr);
+            workerClientFn_(eventBase_.get(), *w.addr_ref());
         client->getRunningTasks(
-          unique_ptr<RequestCallback>(new FunctionReplyCallback(
-            [this, w, client, timer](ClientReceiveState&& state) {
-              std::vector<cpp2::RunningTask> running_tasks;
-              // TODO(#5025478): Convert this, and the other recv_* calls in
-              // this file to use recv_wrapped_*.
-              try {
-                client->recv_getRunningTasks(running_tasks, state);
-              } catch (const std::exception& e) {
-                LOG(ERROR) << "getRunningTasks failed: " << e.what();
-                return;  // RemoteWorker::updateState will trigger a retry
-              }
-              timer->log(
-                "Got ", running_tasks.size(), " running tasks from worker ",
-                debugString(w), running_tasks.empty() ? "" :
-                  (", sample task: " + debugString(running_tasks.front()))
-              );
-              // Atomically update RemoteWorker & TaskStatuses
-              SYNCHRONIZED(workers_) {
-                workers_.initializeRunningTasks(w, running_tasks);
-                // IMPORTANT: Update TaskStatuses **inside** the workers_ lock
-                for (const auto& rt : running_tasks) {
-                  taskStatuses_->updateStatus(rt, TaskStatus::running());
-                }
-              }
-              timer->log(
-                "Recorded ", running_tasks.size() , " new running tasks for ",
-                w.shard
-              );
-            }
-          )),
-          w.id
-        );
+            unique_ptr<RequestCallback>(new FunctionReplyCallback(
+                [this, w, client, timer](ClientReceiveState&& state) {
+                  std::vector<cpp2::RunningTask> running_tasks;
+                  // TODO(#5025478): Convert this, and the other recv_* calls in
+                  // this file to use recv_wrapped_*.
+                  try {
+                    client->recv_getRunningTasks(running_tasks, state);
+                  } catch (const std::exception& e) {
+                    LOG(ERROR) << "getRunningTasks failed: " << e.what();
+                    return; // RemoteWorker::updateState will trigger a retry
+                  }
+                  timer->log(
+                      "Got ",
+                      running_tasks.size(),
+                      " running tasks from worker ",
+                      debugString(w),
+                      running_tasks.empty()
+                          ? ""
+                          : (", sample task: " +
+                             debugString(running_tasks.front())));
+                  // Atomically update RemoteWorker & TaskStatuses
+                  SYNCHRONIZED(workers_) {
+                    workers_.initializeRunningTasks(w, running_tasks);
+                    // IMPORTANT: Update TaskStatuses **inside** the workers_
+                    // lock
+                    for (const auto& rt : running_tasks) {
+                      taskStatuses_->updateStatus(rt, TaskStatus::running());
+                    }
+                  }
+                  timer->log(
+                      "Recorded ",
+                      running_tasks.size(),
+                      " new running tasks for ",
+                      *w.shard_ref());
+                })),
+            *w.id_ref());
       } catch (const exception& e) {
         LOG(ERROR) << "Error connecting to the worker: " << e.what();
       }
@@ -1063,7 +1094,7 @@ void RemoteWorkerRunner::killTask(
   // Look up the worker for the task
   folly::Optional<cpp2::BistroWorker> maybe_worker;
   SYNCHRONIZED(workers_) {
-    auto* worker_ptr = workers_.getWorker(rt.workerShard);
+    auto* worker_ptr = workers_.getWorker(*rt.workerShard_ref());
     if (worker_ptr != nullptr) {
       maybe_worker = worker_ptr->getBistroWorker();
     }
@@ -1075,8 +1106,8 @@ void RemoteWorkerRunner::killTask(
   // Make a synchronous kill request so that the client knows when the kill
   // succeeds or fails.  This can take 10 seconds or more.
   folly::EventBase evb;
-  workerClientFn_(&evb, maybe_worker->addr)
-    ->sync_killTask(rt, schedulerID_, maybe_worker->id, req);
+  workerClientFn_(&evb, *maybe_worker->addr_ref())
+      ->sync_killTask(rt, schedulerID_, *maybe_worker->id_ref(), req);
 }
 
 }}

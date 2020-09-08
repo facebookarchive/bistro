@@ -113,7 +113,7 @@ TEST(TestTaskStatus, NeverStarted) {
 void updateStatus(TaskStatus* s, TaskStatus&& new_status) {
   JobBackoffSettings jbs(dynamic::array(1, 2, 4, "fail"));
   cpp2::RunningTask rt;
-  rt.nextBackoffDuration = jbs.getNext(s->configuredBackoffDuration());
+  *rt.nextBackoffDuration_ref() = jbs.getNext(s->configuredBackoffDuration());
   s->update(rt, std::move(new_status));
 }
 
@@ -140,8 +140,8 @@ TEST(TestTaskStatus, WorkerLostIntoBackoff) {
   for (int backoff_to_fail = 0; backoff_to_fail <= 1; ++backoff_to_fail) {
     auto s = TaskStatus::running();
     cpp2::RunningTask rt;
-    rt.nextBackoffDuration.noMoreBackoffs = backoff_to_fail;
-    rt.nextBackoffDuration.seconds = kEffectiveBackoff;
+    rt.nextBackoffDuration_ref()->noMoreBackoffs = backoff_to_fail;
+    rt.nextBackoffDuration_ref()->seconds = kEffectiveBackoff;
     // workerLost() is always used with update()
     s.update(rt, TaskStatus::workerLost("worker1", kConfiguredBackoff));
 

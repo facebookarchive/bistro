@@ -40,16 +40,16 @@ struct TestRemoteRunner : public ::testing::Test {
 
 cpp2::BistroInstanceID randInstanceID() {
   cpp2::BistroInstanceID id;
-  id.startTime = folly::Random::rand64();
-  id.rand = folly::Random::rand64();
+  *id.startTime_ref() = folly::Random::rand64();
+  *id.rand_ref() = folly::Random::rand64();
   return id;
 }
 
 cpp2::WorkerSetID addToWorkerSetID(
     cpp2::WorkerSetID wsid,
     const FakeBistroWorkerThread& wt) {
-  addWorkerIDToHash(&wsid.hash, wt.getBistroWorker().id);
-  ++wsid.version;
+  addWorkerIDToHash(&(*wsid.hash_ref()), *wt.getBistroWorker().id_ref());
+  ++(*wsid.version_ref());
   return wsid;
 }
 
@@ -78,8 +78,9 @@ cpp2::WorkerSetID addFakeWorker(
     RemoteWorkerUpdate()
   );
   wsid = addToWorkerSetID(wsid, wt);
-  EXPECT_EQ(wsid, res.workerSetID) << apache::thrift::debugString(wsid)
-    << " != " << apache::thrift::debugString(res.workerSetID);
+  EXPECT_EQ(wsid, *res.workerSetID_ref())
+      << apache::thrift::debugString(wsid)
+      << " != " << apache::thrift::debugString(*res.workerSetID_ref());
 
   // Wait the Runner to get running tasks & to request a healthcheck, in
   // either order.
@@ -94,24 +95,24 @@ cpp2::WorkerSetID addFakeWorker(
 
   // Fake a reply to the healthcheck -- does not run RemoteWorker::updateState.
   cpp2::RunningTask rt;
-  rt.job = kHealthcheckTaskJob;
-  rt.workerShard = wt.shard();
-  rt.invocationID.startTime = cur_time;  // For "time since healthcheck"
+  *rt.job_ref() = kHealthcheckTaskJob;
+  *rt.workerShard_ref() = wt.shard();
+  *rt.invocationID_ref()->startTime_ref() =
+      cur_time; // For "time since healthcheck"
   runner->remoteUpdateStatus(
-    rt,
-    TaskStatus::done(),
-    runner->getSchedulerID(),
-    wt.getBistroWorker().id
-  );
+      rt,
+      TaskStatus::done(),
+      runner->getSchedulerID(),
+      *wt.getBistroWorker().id_ref());
 
   // The minimum worker_check_interval is 1 second, so send heartbeats to
   // speed up the worker becoming healthy.  We need two -- the first sets
   // RemoteWorker::workerSetID_, the second triggers 'consensus permits'.
   for (int i = 0; i < 2; ++i) {
     runner->processWorkerHeartbeat(
-      wt.getBistroWorker(), res.workerSetID,  // As if the worker echoed the ID
-      RemoteWorkerUpdate()
-    );
+        wt.getBistroWorker(),
+        *res.workerSetID_ref(), // As if the worker echoed the ID
+        RemoteWorkerUpdate());
   }
 
   waitForRegexOnFd(&stderr, folly::to<std::string>(
@@ -139,9 +140,8 @@ TEST_F(TestRemoteRunner, HandleResources) {
   // unable to talk to the worker).
   const auto worker_id = randInstanceID();
   FakeBistroWorkerThread worker(
-    "test_worker",
-    [&worker_id](cpp2::BistroWorker* w) { w->id = worker_id; }
-  );
+      "test_worker",
+      [&worker_id](cpp2::BistroWorker* w) { *w->id_ref() = worker_id; });
 
   const auto kConfig = std::make_shared<Config>(dynamic::object
     ("enabled", true)
@@ -175,25 +175,26 @@ TEST_F(TestRemoteRunner, HandleResources) {
   ASSERT_EQ(TaskRunnerResponse::DoNotRunMoreTasks, res);
 
   cpp2::WorkerSetID wsid;
-  wsid.schedulerID = runner.getSchedulerID();
+  *wsid.schedulerID_ref() = runner.getSchedulerID();
   addFakeWorker(&runner, kConfig, worker, wsid);
   waitToExitInitialWait(runner);
 
   // The first task will consume all of `test_worker`'s `concurrency`.
   {
     folly::Promise<folly::Unit> cob_ran;
-    ASSERT_EQ(TaskRunnerResponse::RanTask, runner.runTask(
-      *kConfig,
-      job,
-      node1,
-      nullptr,  // no previous status
-      [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
-        ASSERT_EQ("foo_job", rt.job);
-        ASSERT_EQ("test_node1", rt.node);
-        ASSERT_TRUE(status.isRunning());
-        cob_ran.setValue();
-      }
-    ));
+    ASSERT_EQ(
+        TaskRunnerResponse::RanTask,
+        runner.runTask(
+            *kConfig,
+            job,
+            node1,
+            nullptr, // no previous status
+            [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
+              ASSERT_EQ("foo_job", *rt.job_ref());
+              ASSERT_EQ("test_node1", *rt.node_ref());
+              ASSERT_TRUE(status.isRunning());
+              cob_ran.setValue();
+            }));
     cob_ran.getFuture().get();  // Ensure the cob runs.
   }
 
@@ -210,18 +211,18 @@ TEST_F(TestRemoteRunner, HandleResources) {
 
 struct FakeWorker {
   explicit FakeWorker(std::string shard)
-    : workerID_(randInstanceID()),
-      worker_(
-        shard,
-        [&](cpp2::BistroWorker* w) { w->id = workerID_; },
-        // Each FakeBistroWorker calls this just before a task's "done" cob.
-        [&](const cpp2::RunningTask& rt, const cpp2::TaskSubprocessOptions&) {
-          if (rt.job == "foo_job") {
-            CHECK(taskCobCob_.has_value());
-            taskCobCob_.value()(rt);
-          }
-        }
-      ) {}
+      : workerID_(randInstanceID()),
+        worker_(
+            shard,
+            [&](cpp2::BistroWorker* w) { *w->id_ref() = workerID_; },
+            // Each FakeBistroWorker calls this just before a task's "done" cob.
+            [&](const cpp2::RunningTask& rt,
+                const cpp2::TaskSubprocessOptions&) {
+              if (*rt.job_ref() == "foo_job") {
+                CHECK(taskCobCob_.has_value());
+                taskCobCob_.value()(rt);
+              }
+            }) {}
 
   // **MUST** be called before running any tasks.
   void connect(
@@ -229,22 +230,20 @@ struct FakeWorker {
       std::shared_ptr<const Config> config,
       std::shared_ptr<RemoteWorkerRunner> runner,
       int64_t cur_time) {
-
     taskCobCob_ = [this, runner](const cpp2::RunningTask& rt) {
       runner->remoteUpdateStatus(
-        rt,
-        // Fake receiving a reply from the remote worker, **after** the test
-        // permits this.
-        workerMayReturnStatus_.getFuture().get(),
-        runner->getSchedulerID(),
-        worker_.getBistroWorker().id
-      );
+          rt,
+          // Fake receiving a reply from the remote worker, **after** the test
+          // permits this.
+          workerMayReturnStatus_.getFuture().get(),
+          runner->getSchedulerID(),
+          *worker_.getBistroWorker().id_ref());
       // Allows us to wait until a worker successfully marks the task done.
       workerReturnedStatus_.setValue();
     };
 
-    wsid_.schedulerID = runner->getSchedulerID();
-    wsid_.version = wsid_version;
+    *wsid_.schedulerID_ref() = runner->getSchedulerID();
+    *wsid_.version_ref() = wsid_version;
     wsid_ = addFakeWorker(runner.get(), config, worker_, wsid_, cur_time);
   }
 
@@ -315,23 +314,23 @@ struct TestRemoteRunnerWithOneTask : TestRemoteRunner {
     bool cob_ran = false;
     auto outer_thread = std::this_thread::get_id();
     auto status_snapshot = taskStatuses_->copySnapshot();
-    ASSERT_EQ(TaskRunnerResponse::RanTask, runner_->runTask(
-      *config_,
-      job_,
-      node_,
-      // The previous status, if any.
-      status_snapshot.getPtr(job_->id(), node_.id()),
-      [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
-        ASSERT_EQ(kOneTaskJobName, rt.job);
-        ASSERT_EQ(kOneTaskNodeName, rt.node);
-        ASSERT_TRUE(status.isRunning());
-        ASSERT_EQ(outer_thread, std::this_thread::get_id());
-        taskStatuses_->updateStatus(
-          job_->id(), node_.id(), rt, std::move(status)
-        );
-        cob_ran = true;
-      }
-    ));
+    ASSERT_EQ(
+        TaskRunnerResponse::RanTask,
+        runner_->runTask(
+            *config_,
+            job_,
+            node_,
+            // The previous status, if any.
+            status_snapshot.getPtr(job_->id(), node_.id()),
+            [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
+              ASSERT_EQ(kOneTaskJobName, *rt.job_ref());
+              ASSERT_EQ(kOneTaskNodeName, *rt.node_ref());
+              ASSERT_TRUE(status.isRunning());
+              ASSERT_EQ(outer_thread, std::this_thread::get_id());
+              taskStatuses_->updateStatus(
+                  job_->id(), node_.id(), rt, std::move(status));
+              cob_ran = true;
+            }));
     ASSERT_TRUE(cob_ran);
   }
 
@@ -618,17 +617,17 @@ TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
   folly::Promise<folly::Unit> tso_cob_ran;
   const auto worker_id = randInstanceID();
   FakeBistroWorkerThread worker(
-    "test_worker",
-    [&worker_id](cpp2::BistroWorker* w) { w->id = worker_id; },
-    [&](const cpp2::RunningTask& rt, const cpp2::TaskSubprocessOptions& tso) {
-      if (rt.job == kHealthcheckTaskJob) {
-        return;
-      }
-      EXPECT_EQ(6, tso.cgroupOptions.cpuShares);  // Tests rounding
-      EXPECT_EQ(3072, tso.cgroupOptions.memoryLimitInBytes);
-      tso_cob_ran.setValue();
-    }
-  );
+      "test_worker",
+      [&worker_id](cpp2::BistroWorker* w) { *w->id_ref() = worker_id; },
+      [&](const cpp2::RunningTask& rt, const cpp2::TaskSubprocessOptions& tso) {
+        if (*rt.job_ref() == kHealthcheckTaskJob) {
+          return;
+        }
+        EXPECT_EQ(
+            6, *tso.cgroupOptions_ref()->cpuShares_ref()); // Tests rounding
+        EXPECT_EQ(3072, *tso.cgroupOptions_ref()->memoryLimitInBytes_ref());
+        tso_cob_ran.setValue();
+      });
 
   const auto kConfig = std::make_shared<Config>(dynamic::object
     ("enabled", true)
@@ -663,23 +662,24 @@ TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
   Node node("node");
 
   cpp2::WorkerSetID wsid;
-  wsid.schedulerID = runner.getSchedulerID();
+  *wsid.schedulerID_ref() = runner.getSchedulerID();
   addFakeWorker(&runner, kConfig, worker, wsid);
 
   waitToExitInitialWait(runner);
   folly::Promise<folly::Unit> status_cob_ran;
-  ASSERT_EQ(TaskRunnerResponse::RanTask, runner.runTask(
-    *kConfig,
-    job,
-    node,
-    nullptr,  // no previous status
-    [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
-      ASSERT_EQ("job", rt.job);
-      ASSERT_EQ("node", rt.node);
-      ASSERT_TRUE(status.isRunning());
-      status_cob_ran.setValue();
-    }
-  ));
+  ASSERT_EQ(
+      TaskRunnerResponse::RanTask,
+      runner.runTask(
+          *kConfig,
+          job,
+          node,
+          nullptr, // no previous status
+          [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
+            ASSERT_EQ("job", *rt.job_ref());
+            ASSERT_EQ("node", *rt.node_ref());
+            ASSERT_TRUE(status.isRunning());
+            status_cob_ran.setValue();
+          }));
   // Check that both our cobs got executed.
   status_cob_ran.getFuture().get();
   tso_cob_ran.getFuture().get();
@@ -701,23 +701,25 @@ void checkTasksRunOnWorkersLeavingResources(
   // Run a bunch of different jobs with different resources, and check results.
   for (auto& t : jobs_on_workers_with_resources) {
     folly::Promise<folly::Unit> cob_ran;
-    ASSERT_EQ(TaskRunnerResponse::RanTask, runner->runTask(
-      *config,
-      std::make_shared<Job>(*config, std::get<0>(t), dynamic::object
-        ("enabled", true)
-        ("owner", "owner")
-        ("resources", std::get<2>(t))
-      ),
-      Node("test_node"),
-      nullptr,  // no previous status
-      [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
-        ASSERT_EQ(std::get<0>(t), rt.job);
-        ASSERT_EQ("test_node", rt.node);
-        ASSERT_EQ(std::get<1>(t), rt.workerShard) << std::get<0>(t);
-        ASSERT_TRUE(status.isRunning());
-        cob_ran.setValue();
-      }
-    ));
+    ASSERT_EQ(
+        TaskRunnerResponse::RanTask,
+        runner->runTask(
+            *config,
+            std::make_shared<Job>(
+                *config,
+                std::get<0>(t),
+                dynamic::object("enabled", true)("owner", "owner")(
+                    "resources", std::get<2>(t))),
+            Node("test_node"),
+            nullptr, // no previous status
+            [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
+              ASSERT_EQ(std::get<0>(t), *rt.job_ref());
+              ASSERT_EQ("test_node", *rt.node_ref());
+              ASSERT_EQ(std::get<1>(t), *rt.workerShard_ref())
+                  << std::get<0>(t);
+              ASSERT_TRUE(status.isRunning());
+              cob_ran.setValue();
+            }));
     cob_ran.getFuture().get();  // Ensure the cob runs.
     // Check that the resources are what we expect
     auto worker_resources = runner->copyResourcesForUnitTest();
@@ -765,20 +767,18 @@ TEST_F(TestRemoteRunner, TestBusiestSelector) {
 
   // Like in HandleResources, make the workers before making the runner.
   const auto w1_id = randInstanceID();
-  FakeBistroWorkerThread worker1("w1", [&w1_id](cpp2::BistroWorker* w) {
-    w->id = w1_id;
-  });
+  FakeBistroWorkerThread worker1(
+      "w1", [&w1_id](cpp2::BistroWorker* w) { *w->id_ref() = w1_id; });
   const auto w2_id = randInstanceID();
-  FakeBistroWorkerThread worker2("w2", [&w2_id](cpp2::BistroWorker* w) {
-    w->id = w2_id;
-  });
+  FakeBistroWorkerThread worker2(
+      "w2", [&w2_id](cpp2::BistroWorker* w) { *w->id_ref() = w2_id; });
 
   auto task_statuses =
     std::make_shared<TaskStatuses>(std::make_shared<NoOpTaskStore>());
   RemoteWorkerRunner runner(task_statuses, std::shared_ptr<Monitor>());
 
   cpp2::WorkerSetID wsid;
-  wsid.schedulerID = runner.getSchedulerID();
+  *wsid.schedulerID_ref() = runner.getSchedulerID();
   wsid = addFakeWorker(&runner, kConfig, worker1, wsid);
   // Fake that w1 knows about w2, for consensusPermitsBecomingHealthy.
   runner.processWorkerHeartbeat(
@@ -975,28 +975,29 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
   // Like in HandleResources, make the workers before making the runner.
   const auto w1_id = randInstanceID();
   FakeBistroWorkerThread worker1("w1", [&w1_id](cpp2::BistroWorker* w) {
-    w->id = w1_id;
-    w->usableResources.memoryMB = 10;
-    w->usableResources.cpuCores = 2;
-    w->usableResources.gpus.emplace_back();
-    w->usableResources.gpus.back().name = "a";
+    *w->id_ref() = w1_id;
+    *w->usableResources_ref()->memoryMB_ref() = 10;
+    *w->usableResources_ref()->cpuCores_ref() = 2;
+    w->usableResources_ref()->gpus_ref()->emplace_back();
+    *w->usableResources_ref()->gpus_ref()->back().name_ref() = "a";
   });
   const auto w2_id = randInstanceID();
   FakeBistroWorkerThread worker2("w2", [&w2_id](cpp2::BistroWorker* w) {
-    w->id = w2_id;
-    w->usableResources.memoryMB = 8;
-    w->usableResources.cpuCores = 2;
-    w->usableResources.gpus.emplace_back();
-    w->usableResources.gpus.back().name = "a";
+    *w->id_ref() = w2_id;
+    *w->usableResources_ref()->memoryMB_ref() = 8;
+    *w->usableResources_ref()->cpuCores_ref() = 2;
+    w->usableResources_ref()->gpus_ref()->emplace_back();
+    *w->usableResources_ref()->gpus_ref()->back().name_ref() = "a";
   });
   const auto w3_id = randInstanceID();
   FakeBistroWorkerThread worker3("w3", [&w3_id](cpp2::BistroWorker* w) {
-    w->id = w3_id;
-    w->usableResources.memoryMB = 5;  // Minus 1 reserve, over 2 => 2 logical
-    w->usableResources.cpuCores = 2;
-    w->usableResources.gpus.emplace_back();
+    *w->id_ref() = w3_id;
+    *w->usableResources_ref()->memoryMB_ref() =
+        5; // Minus 1 reserve, over 2 => 2 logical
+    *w->usableResources_ref()->cpuCores_ref() = 2;
+    w->usableResources_ref()->gpus_ref()->emplace_back();
     // We have no model-specific resource "GPU: b", so it won't show up.
-    w->usableResources.gpus.back().name = "b";
+    *w->usableResources_ref()->gpus_ref()->back().name_ref() = "b";
   });
 
   auto task_statuses =
@@ -1004,7 +1005,7 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
   RemoteWorkerRunner runner(task_statuses, std::shared_ptr<Monitor>());
 
   cpp2::WorkerSetID wsid;
-  wsid.schedulerID = runner.getSchedulerID();
+  *wsid.schedulerID_ref() = runner.getSchedulerID();
   wsid = addFakeWorker(&runner, kConfig, worker1, wsid);
   // Fake that w1 knows about w2, for consensusPermitsBecomingHealthy.
   runner.processWorkerHeartbeat(

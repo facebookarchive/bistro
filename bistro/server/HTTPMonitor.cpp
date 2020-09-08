@@ -407,8 +407,9 @@ dynamic HTTPMonitor::handleTaskRuntime(const dynamic& d) {
   auto running_tasks = taskStatuses_->copyRunningTasks();
   for (const auto& pair : running_tasks) {
     const cpp2::RunningTask& rt = pair.second;
-    if (job_names.empty() || job_names.count(rt.job)) {
-      ret.setDefault(rt.job)[rt.node] = now - rt.invocationID.startTime;
+    if (job_names.empty() || job_names.count(*rt.job_ref())) {
+      ret.setDefault(*rt.job_ref())[*rt.node_ref()] =
+          now - *rt.invocationID_ref()->startTime_ref();
     }
   }
   return ret;
@@ -424,10 +425,10 @@ dynamic HTTPMonitor::handleRunningTasks(const dynamic& d) {
   auto running_tasks = taskStatuses_->copyRunningTasks();
   for (const auto& pair : running_tasks) {
     const cpp2::RunningTask& rt = pair.second;
-    if (job_names.empty() || job_names.count(rt.job)) {
-      ret.setDefault(rt.job)[rt.node] = dynamic::object()
-        ("start_time", rt.invocationID.startTime)
-        ("worker_shard", rt.workerShard);
+    if (job_names.empty() || job_names.count(*rt.job_ref())) {
+      ret.setDefault(*rt.job_ref())[*rt.node_ref()] = dynamic::object()(
+          "start_time", *rt.invocationID_ref()->startTime_ref())(
+          "worker_shard", *rt.workerShard_ref());
     }
   }
   return ret;

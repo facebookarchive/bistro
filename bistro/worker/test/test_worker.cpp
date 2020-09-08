@@ -126,24 +126,25 @@ TEST_F(TestWorker, HandleNormal) {
       ""
     );
     if (logtype != "statuses") {
-      ASSERT_EQ(1, log.lines.size());
-      ASSERT_EQ("my_" + logtype + "\n", log.lines.back().line);
+      ASSERT_EQ(1, log.lines_ref()->size());
+      ASSERT_EQ("my_" + logtype + "\n", *log.lines_ref()->back().line_ref());
     } else {
-      ASSERT_EQ(4, log.lines.size());
-      ASSERT_LE(start_time, log.lines[0].time);
-      ASSERT_EQ("test_job", log.lines[0].jobID);
-      ASSERT_EQ("test_node", log.lines[0].nodeID);
-      EXPECT_EQ("running", parseJson(log.lines[0].line)["event"].asString());
+      ASSERT_EQ(4, log.lines_ref()->size());
+      ASSERT_LE(start_time, *log.lines[0].time_ref());
+      ASSERT_EQ("test_job", *log.lines[0].jobID_ref());
+      ASSERT_EQ("test_node", *log.lines[0].nodeID_ref());
+      EXPECT_EQ(
+          "running", parseJson(*log.lines[0].line_ref())["event"].asString());
       // Not bothering to verify 1 & 2 since test_task_subprocess_queue
       // and test_local_runner cover these well.
-      auto j = parseJson(log.lines[3].line);
+      auto j = parseJson(*log.lines[3].line_ref());
       ASSERT_EQ("got_status", j["event"].asString());
       ASSERT_EQ("done", j["raw_status"].asString());
     }
-    ASSERT_LE(start_time, log.lines.back().time);
-    ASSERT_EQ("test_job", log.lines.back().jobID);
-    ASSERT_EQ("test_node", log.lines.back().nodeID);
-    ASSERT_EQ(LogLine::kNotALineID, log.nextLineID);
+    ASSERT_LE(start_time, *log.lines_ref()->back().time_ref());
+    ASSERT_EQ("test_job", *log.lines_ref()->back().jobID_ref());
+    ASSERT_EQ("test_node", *log.lines_ref()->back().nodeID_ref());
+    ASSERT_EQ(LogLine::kNotALineID, *log.nextLineID_ref());
   }
 }
 
@@ -159,8 +160,8 @@ bool findInLog(
   worker.getClient(evb)->sync_getJobLogsByID(
     ll, logtype, {job}, {node}, 0, true, num_lines, ""
   );
-  for (const auto& l : ll.lines) {
-    if (l.line == target) {
+  for (const auto& l : *ll.lines_ref()) {
+    if (*l.line_ref() == target) {
       return true;
     }
   }
@@ -201,7 +202,7 @@ struct TestSuicide : public TestWorker {
     for (size_t i = 0; i < 2; ++i) {
       const auto node = folly::to<std::string>("n", i);
       cpp2::TaskSubprocessOptions subproc_opts;
-      subproc_opts.processGroupLeader = true;  // So we kill the `sleep`
+      *subproc_opts.processGroupLeader_ref() = true; // So we kill the `sleep`
       worker_.runTask("j", node, std::vector<std::string>{
         // Use "" to break up the two strings we want to regex-match, so
         // that we don't match the worker echoing the command.
@@ -237,8 +238,7 @@ TEST_F(TestSuicide, ViaSchedulerRequest) {
   // TERM-wait-KILL all tasks, and stop the server.  This takes ~1 second
   // since it is not implemented very efficiently.
   worker_.handler()->requestSuicide(
-    worker_.getSchedulerID(), worker_.getWorker().id
-  );
+      worker_.getSchedulerID(), *worker_.getWorker().id_ref());
 
   // Wait for the tasks to exit, and for the server to stop.
   while (!committedSuicide_.load()) {
@@ -291,45 +291,44 @@ TEST_F(TestWorker, HandleKillTask) {
   }
 
   vector<cpp2::RunningTask> rts;
-  worker.getClient()->sync_getRunningTasks(rts, worker.getWorker().id);
+  worker.getClient()->sync_getRunningTasks(rts, *worker.getWorker().id_ref());
   ASSERT_EQ(kNumTasks, rts.size());
 
   // Kill one task at a time.
   for (int task_to_kill = 0; task_to_kill < kNumTasks; ++task_to_kill) {
     worker.getClient()->sync_killTask(
-      rt[task_to_kill],
-      worker.getSchedulerID(),
-      worker.getWorker().id,
-      cpp2::KillRequest()
-    );
+        rt[task_to_kill],
+        worker.getSchedulerID(),
+        *worker.getWorker().id_ref(),
+        cpp2::KillRequest());
     for (int i = 0; i < kNumTasks; i++) {
       cpp2::LogLines log;
       do {  // Wait for the kill to work
         /* sleep override */
         this_thread::sleep_for(std::chrono::milliseconds(10));
         worker.getClient()->sync_getJobLogsByID(
-          log,
-          "statuses",
-          vector<string>({"test_job"}),
-          vector<string>({rt[i].node}),
-          0,
-          true,
-          10,
-          ""
-        );
-      } while (i == task_to_kill && log.lines.size() < 4);
-      ASSERT_LE(1, log.lines.size());
-      EXPECT_EQ("running", parseJson(log.lines[0].line)["event"].asString());
+            log,
+            "statuses",
+            vector<string>({"test_job"}),
+            vector<string>({*rt[i].node_ref()}),
+            0,
+            true,
+            10,
+            "");
+      } while (i == task_to_kill && log.lines_ref()->size() < 4);
+      ASSERT_LE(1, log.lines_ref()->size());
+      EXPECT_EQ(
+          "running", parseJson(*log.lines[0].line_ref())["event"].asString());
       if (i <= task_to_kill) {
-        ASSERT_EQ(4, log.lines.size());
-        auto j = folly::parseJson(log.lines[3].line);
+        ASSERT_EQ(4, log.lines_ref()->size());
+        auto j = folly::parseJson(*log.lines[3].line_ref());
         EXPECT_EQ("got_status", j["event"].asString());
         EXPECT_EQ(
           "Task killed, no status returned",
           j["status"]["data"]["exception"].asString()
         );
       } else {
-        EXPECT_EQ(1, log.lines.size());
+        EXPECT_EQ(1, log.lines_ref()->size());
       }
     }
     // Once this event fires, the worker no longer considers the task running.
@@ -338,7 +337,7 @@ TEST_F(TestWorker, HandleKillTask) {
       "test_job / node", task_to_kill, "\n.*"
     );
     waitForRegexOnFd(&stderr, re.c_str());
-    worker.getClient()->sync_getRunningTasks(rts, worker.getWorker().id);
+    worker.getClient()->sync_getRunningTasks(rts, *worker.getWorker().id_ref());
     EXPECT_EQ(kNumTasks - task_to_kill - 1, rts.size());
   }
 }
@@ -367,9 +366,10 @@ struct ProtocolVerFakeScheduler : public virtual cpp2::BistroSchedulerSvIf {
       cpp2::SchedulerHeartbeatResponse& res,
       const cpp2::BistroWorker& /*worker*/,
       const cpp2::WorkerSetID& /*worker_set_id*/) override {
-    res.protocolVersion = protocolVersion_.copy();
-    res.id.startTime = 123;  // The "no scheduler" ID is 0/0, so change it.
-    res.workerSetID.schedulerID = res.id;
+    *res.protocolVersion_ref() = protocolVersion_.copy();
+    *res.id_ref()->startTime_ref() =
+        123; // The "no scheduler" ID is 0/0, so change it.
+    *res.workerSetID_ref()->schedulerID_ref() = *res.id_ref();
   }
   folly::Synchronized<int16_t> protocolVersion_;
 };
@@ -394,16 +394,16 @@ TEST_F(TestWorker, HandleBadProtocolVersion) {
 
 cpp2::BistroInstanceID bistroWorkerID() {
   cpp2::BistroInstanceID id;
-  id.startTime = 89342789023740;
-  id.rand = 129309723890472;
+  *id.startTime_ref() = 89342789023740;
+  *id.rand_ref() = 129309723890472;
   return id;
 }
 
 struct WorkerSetIDFakeScheduler : public virtual cpp2::BistroSchedulerSvIf {
   WorkerSetIDFakeScheduler() {
     // The "no scheduler" ID is 0/0, so change it.
-    workerSetID_->schedulerID.startTime = 123;
-    addWorkerIDToHash(&workerSetID_->hash, bistroWorkerID());
+    *workerSetID_->schedulerID_ref()->startTime_ref() = 123;
+    addWorkerIDToHash(&(*workerSetID_->hash_ref()), bistroWorkerID());
   }
   void processHeartbeat(
       cpp2::SchedulerHeartbeatResponse& res,
@@ -412,16 +412,16 @@ struct WorkerSetIDFakeScheduler : public virtual cpp2::BistroSchedulerSvIf {
     SYNCHRONIZED (workerSetIDs_) {
       if (!workerSetIDs_.empty()) {
         // Only the first heartbeat can be non-echoed.
-        ASSERT_NE(0, worker_set_id.schedulerID.startTime);
+        ASSERT_NE(0, *worker_set_id.schedulerID_ref()->startTime_ref());
       }
       if (workerSetIDs_.empty() || workerSetIDs_.back() != worker_set_id) {
         workerSetIDs_.emplace_back(worker_set_id);
       }
     }
-    res.protocolVersion = cpp2::common_constants::kProtocolVersion();
+    *res.protocolVersion_ref() = cpp2::common_constants::kProtocolVersion();
     SYNCHRONIZED (workerSetID_) {
-      res.id = workerSetID_.schedulerID;
-      res.workerSetID = workerSetID_;
+      *res.id_ref() = *workerSetID_.schedulerID_ref();
+      *res.workerSetID_ref() = workerSetID_;
     }
   }
   folly::Synchronized<std::vector<cpp2::WorkerSetID>> workerSetIDs_;
@@ -443,21 +443,21 @@ TEST_F(TestWorker, EchoWorkerSetID) {
   }
 
   // Move the version forward.
-  sw.scheduler_->workerSetID_->version = 1;
+  *sw.scheduler_->workerSetID_->version_ref() = 1;
   while (sw.scheduler_->workerSetIDs_->size() < 3) {
     /* sleep override */ this_thread::sleep_for(std::chrono::milliseconds(5));
   }
   SYNCHRONIZED(ids, sw.scheduler_->workerSetIDs_) {
     ASSERT_EQ(3, ids.size());
-    EXPECT_EQ(1, ids[2].version);
+    EXPECT_EQ(1, *ids[2].version_ref());
   }
 
   // Check that the version cannot go backward.
   folly::test::CaptureFD stderr(2, printString);
-  sw.scheduler_->workerSetID_->version = 0;
+  *sw.scheduler_->workerSetID_->version_ref() = 0;
   waitForRegexOnFd(&stderr, ".*scheduler response with older WorkerSetID.*");
   SYNCHRONIZED(ids, sw.scheduler_->workerSetIDs_) {
     ASSERT_EQ(3, ids.size());
-    EXPECT_EQ(1, ids[2].version);
+    EXPECT_EQ(1, *ids[2].version_ref());
   }
 }

@@ -252,11 +252,12 @@ const TaskStatus& TaskStatus::update(
   // backoff value, rather than the extended one required for lost workers,
   // because that's the job's authentic configuration.
   auto prev_backoff_duration = hasSavedBackoff()
-    ? data_->at(kBistroSavedBackoff).getInt()
-    // "DoesNotAdvanceBackoff" needs to start with a nonzero backoff, so
-    // peek at the next duration if none is set.  For "backoff": ["fail"],
-    // it will default to a magic constant set in JobBackoffSettings.cpp.
-    : (backoffDuration_ ? backoffDuration_ : rt.nextBackoffDuration.seconds);
+      ? data_->at(kBistroSavedBackoff).getInt()
+      // "DoesNotAdvanceBackoff" needs to start with a nonzero backoff, so
+      // peek at the next duration if none is set.  For "backoff": ["fail"],
+      // it will default to a magic constant set in JobBackoffSettings.cpp.
+      : (backoffDuration_ ? backoffDuration_
+                          : rt.nextBackoffDuration_ref()->seconds);
 
   *this = std::move(new_status);
   if (usesBackoff()) {
@@ -270,8 +271,8 @@ const TaskStatus& TaskStatus::update(
       //   (2) the task is forgiven, promoting it to Error, which would
       //       let it run immediately
       // See forgive() and the lostRunningTasks() handler for the details.
-      backoffDuration_ = rt.nextBackoffDuration.seconds;
-      if (rt.nextBackoffDuration.noMoreBackoffs) {
+      backoffDuration_ = rt.nextBackoffDuration_ref()->seconds;
+      if (rt.nextBackoffDuration_ref()->noMoreBackoffs) {
         // We expired our last backoff. Switch to permanently failed.
         if (allSet(bits_, TaskStatusBits::Error)) {
           bits_ =

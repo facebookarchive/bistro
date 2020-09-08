@@ -215,12 +215,11 @@ private:
       int64_t cur_time,
       bool consensus_permits_becoming_healthy) const {
     return state_.computeState(
-      cur_time,
-      state_.maxHealthcheckGap(),
-      worker_.heartbeatPeriodSec + state_.heartbeatGracePeriod(),
-      state_.loseUnhealthyWorkerAfter(),
-      consensus_permits_becoming_healthy
-    );
+        cur_time,
+        state_.maxHealthcheckGap(),
+        *worker_.heartbeatPeriodSec_ref() + state_.heartbeatGracePeriod(),
+        state_.loseUnhealthyWorkerAfter(),
+        consensus_permits_becoming_healthy);
   }
 
   /**

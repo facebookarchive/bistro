@@ -43,8 +43,7 @@ bool RemoteWorkerSelector::jobCanRunOnWorker(
 
   CHECK(worker_level < job.filters().size());
   return job.filters()[worker_level].doesPass(
-    job.name(), worker.machineLock.hostname
-  );
+      job.name(), *worker.machineLock_ref()->hostname_ref());
 }
 
 }}  // namespace facebook::bistro

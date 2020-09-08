@@ -100,7 +100,7 @@ void ThriftMonitor::getJob(cpp2::BistroJobConfig& r, const string& job) {
   auto it = c->jobs.find(job);
   if (it == c->jobs.end()) {
     cpp2::BistroSchedulerUnknownJobException ex;
-    ex.message = "Unknown job: " + job;
+    *ex.message_ref() = "Unknown job: " + job;
     throw ex;
   }
   r = toThrift(job, it->second->toDynamic(*c));
@@ -111,13 +111,13 @@ void ThriftMonitor::deleteJob(const string& job_name) {
     configLoader_->deleteJob(job_name);
   } catch (const exception& e) {
     cpp2::BistroSchedulerUnknownJobException ex;
-    ex.message = e.what();
+    *ex.message_ref() = e.what();
     throw ex;
   }
 }
 
 void ThriftMonitor::saveJob(const cpp2::BistroJobConfig& job) {
-  configLoader_->saveJob(job.name, toDynamic(job));
+  configLoader_->saveJob(*job.name_ref(), toDynamic(job));
 }
 
 void ThriftMonitor::getLevels(vector<string>& levels) {
@@ -156,20 +156,19 @@ void ThriftMonitor::getJobHistograms(
     }
     histograms.emplace_back();
     auto& histogram = histograms.back();
-    histogram.job = job->name();
+    *histogram.job_ref() = job->name();
     for (const auto& pair : it->second) {
-      auto& s = histogram.statuses[pair.first];
+      auto& s = histogram.statuses_ref()[pair.first];
       for (const auto& values : pair.second) {
         const auto key = static_cast<cpp2::BistroTaskStatusBits>(values.first);
-        s[key].count = values.second.first;
+        *s[key].count_ref() = values.second.first;
         if (values.second.second.size() > samples) {
           copy(
-            values.second.second.begin(),
-            values.second.second.begin() + samples,
-            back_inserter(s[key].samples)
-          );
+              values.second.second.begin(),
+              values.second.second.begin() + samples,
+              back_inserter(*s[key].samples_ref()));
         } else {
-          s[key].samples = values.second.second;
+          *s[key].samples_ref() = values.second.second;
         }
       }
     }
@@ -220,16 +219,15 @@ void ThriftMonitor::getJobLogs(
     regex_filter
   );
   // TODO(#3885590): Get rid of these copies.
-  thrift_out.nextLineID = out.nextLineID;
+  *thrift_out.nextLineID_ref() = out.nextLineID;
   for (LogLine& l : out.lines) {
-    thrift_out.lines.emplace_back(
-      apache::thrift::FragileConstructor::FRAGILE,
-      std::move(l.jobID),
-      std::move(l.nodeID),
-      l.time,
-      std::move(l.line),
-      l.lineID
-    );
+    thrift_out.lines_ref()->emplace_back(
+        apache::thrift::FragileConstructor::FRAGILE,
+        std::move(l.jobID),
+        std::move(l.nodeID),
+        l.time,
+        std::move(l.line),
+        l.lineID);
   }
 }
 

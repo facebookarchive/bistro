@@ -61,10 +61,10 @@ std::vector<cpp2::GPUInfo> UsablePhysicalResourceFetcher::gpus(
   for (const auto& l : queryNvidiaSmi("query-gpu", query_fields, timeout_ms)) {
     auto parts = checkedSplitLine(", ", l, query_fields.size());
     gpus.emplace_back();
-    gpus.back().pciBusID = parts[0].str();
-    gpus.back().name = parts[2].str();
-    gpus.back().memoryMB = folly::to<double>(parts[1]);
-    gpus.back().compute = 1.0;
+    *gpus.back().pciBusID_ref() = parts[0].str();
+    *gpus.back().name_ref() = parts[2].str();
+    *gpus.back().memoryMB_ref() = folly::to<double>(parts[1]);
+    *gpus.back().compute_ref() = 1.0;
   }
   return gpus;
 }

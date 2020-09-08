@@ -38,7 +38,7 @@ struct MockRunner : public TaskRunner {
   void killTask(
     const cpp2::RunningTask& rt, const cpp2::KillRequest&
   ) override {
-    events_.emplace_back(EventType::KILL_TASK, rt.job, rt.node);
+    events_.emplace_back(EventType::KILL_TASK, *rt.job_ref(), *rt.node_ref());
   }
 
   TaskRunnerResponse runTaskImpl(

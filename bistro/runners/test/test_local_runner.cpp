@@ -239,7 +239,7 @@ TEST_F(TestLocalRunner, HandleKill) {
   for (size_t i = 0; i < kNumNodes; ++i) {
     cpp2::RunningTask rt;
     SYNCHRONIZED(last_rt, rts[i]) {
-      ASSERT_EQ("job", last_rt.job);  // Was it even set?
+      ASSERT_EQ("job", *last_rt.job_ref()); // Was it even set?
       rt = last_rt;
     }
     runner.killTask(rt, cpp2::KillRequest());

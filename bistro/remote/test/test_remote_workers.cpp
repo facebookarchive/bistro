@@ -36,16 +36,16 @@ void printString(folly::StringPiece s) {
 
 cpp2::BistroInstanceID randInstanceID() {
   cpp2::BistroInstanceID id;
-  id.startTime = folly::Random::rand64();
-  id.rand = folly::Random::rand64();
+  *id.startTime_ref() = folly::Random::rand64();
+  *id.rand_ref() = folly::Random::rand64();
   return id;
 }
 
 cpp2::BistroWorker makeWorker(std::string shard) {
   cpp2::BistroWorker worker;
-  worker.shard = shard;
-  worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
-  worker.id = randInstanceID();
+  *worker.shard_ref() = shard;
+  *worker.protocolVersion_ref() = cpp2::common_constants::kProtocolVersion();
+  *worker.id_ref() = randInstanceID();
   return worker;
 }
 
@@ -54,9 +54,9 @@ cpp2::WorkerSetID workerSetID(
     int64_t v,
     const cpp2::WorkerSetHash& h) {
   cpp2::WorkerSetID id;
-  id.hash = h;
-  id.version = v;
-  id.schedulerID = r.nonMustDieWorkerSetID().schedulerID;
+  *id.hash_ref() = h;
+  *id.version_ref() = v;
+  *id.schedulerID_ref() = *r.nonMustDieWorkerSetID().schedulerID_ref();
   return id;
 }
 
@@ -67,7 +67,7 @@ TEST(TestRemoteWorkers, ProtocolMismatch) {
   RemoteWorkers r(0, scheduler_id);
 
   // Mismatched version
-  worker.protocolVersion = -1;
+  *worker.protocolVersion_ref() = -1;
   EXPECT_THROW(
     r.processHeartbeat(&update, worker, cpp2::WorkerSetID()),
     std::runtime_error
@@ -75,15 +75,15 @@ TEST(TestRemoteWorkers, ProtocolMismatch) {
   EXPECT_TRUE(r.workerPool().begin() == r.workerPool().end());
 
   // Matched version
-  worker.protocolVersion = cpp2::common_constants::kProtocolVersion();
+  *worker.protocolVersion_ref() = cpp2::common_constants::kProtocolVersion();
   auto res = r.processHeartbeat(&update, worker, cpp2::WorkerSetID());
   EXPECT_TRUE(res.has_value());
   cpp2::WorkerSetHash wh;
-  addWorkerIDToHash(&wh, worker.id);
-  EXPECT_EQ(workerSetID(r, 1, wh), res->workerSetID);
+  addWorkerIDToHash(&wh, *worker.id_ref());
+  EXPECT_EQ(workerSetID(r, 1, wh), *res->workerSetID_ref());
   EXPECT_FALSE(r.workerPool().begin() == r.workerPool().end());
   EXPECT_TRUE(++r.workerPool().begin() == r.workerPool().end());
-  EXPECT_NE(nullptr, r.getWorker(worker.shard));
+  EXPECT_NE(nullptr, r.getWorker(*worker.shard_ref()));
 }
 
 IDSet dredgeHostPool(
@@ -93,7 +93,7 @@ IDSet dredgeHostPool(
 
   IDSet ids;
   for (size_t i = 0; i < max_pool_size + 1; ++i) {
-    ids.emplace(r.getNextWorkerByHost(host)->getBistroWorker().id);
+    ids.emplace(*r.getNextWorkerByHost(host)->getBistroWorker().id_ref());
   }
   return ids;
 }
@@ -106,16 +106,16 @@ TEST(TestRemoteWorkers, WorkerPools) {
 
   // 3 workers on 2 hosts
   auto w1 = makeWorker("w1");
-  w1.machineLock.hostname = "host1";
-  w1.machineLock.port = 123;
+  *w1.machineLock_ref()->hostname_ref() = "host1";
+  *w1.machineLock_ref()->port_ref() = 123;
 
   auto w2 = makeWorker("w2");
-  w2.machineLock.hostname = "host1";
-  w2.machineLock.port = 456;
+  *w2.machineLock_ref()->hostname_ref() = "host1";
+  *w2.machineLock_ref()->port_ref() = 456;
 
   auto w3 = makeWorker("w3");
-  w3.machineLock.hostname = "host2";
-  w3.machineLock.port = 123;
+  *w3.machineLock_ref()->hostname_ref() = "host2";
+  *w3.machineLock_ref()->port_ref() = 123;
 
   cpp2::WorkerSetHash wh;
 
@@ -123,28 +123,28 @@ TEST(TestRemoteWorkers, WorkerPools) {
   {
     auto res = r.processHeartbeat(&update, w1, cpp2::WorkerSetID());
     EXPECT_EQ(
-      static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
-    );
-    addWorkerIDToHash(&wh, w1.id);
-    EXPECT_EQ(workerSetID(r, 1, wh), res->workerSetID);
-    EXPECT_EQ(IDSet{w1.id}, dredgeHostPool(r, "host1"));
+        static_cast<int>(RemoteWorkerState::State::NEW),
+        *res->workerState_ref());
+    addWorkerIDToHash(&wh, *w1.id_ref());
+    EXPECT_EQ(workerSetID(r, 1, wh), *res->workerSetID_ref());
+    EXPECT_EQ(IDSet{*w1.id_ref()}, dredgeHostPool(r, "host1"));
 
     res = r.processHeartbeat(&update, w2, cpp2::WorkerSetID());
     EXPECT_EQ(
-      static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
-    );
-    addWorkerIDToHash(&wh, w2.id);
-    EXPECT_EQ(workerSetID(r, 2, wh), res->workerSetID);
-    EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
+        static_cast<int>(RemoteWorkerState::State::NEW),
+        *res->workerState_ref());
+    addWorkerIDToHash(&wh, *w2.id_ref());
+    EXPECT_EQ(workerSetID(r, 2, wh), *res->workerSetID_ref());
+    EXPECT_EQ(IDSet({*w1.id_ref(), *w2.id_ref()}), dredgeHostPool(r, "host1"));
 
     res = r.processHeartbeat(&update, w3, cpp2::WorkerSetID());
     EXPECT_EQ(
-      static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
-    );
-    addWorkerIDToHash(&wh, w3.id);
-    EXPECT_EQ(workerSetID(r, 3, wh), res->workerSetID);
-    EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
-    EXPECT_EQ(IDSet({w3.id}), dredgeHostPool(r, "host2"));
+        static_cast<int>(RemoteWorkerState::State::NEW),
+        *res->workerState_ref());
+    addWorkerIDToHash(&wh, *w3.id_ref());
+    EXPECT_EQ(workerSetID(r, 3, wh), *res->workerSetID_ref());
+    EXPECT_EQ(IDSet({*w1.id_ref(), *w2.id_ref()}), dredgeHostPool(r, "host1"));
+    EXPECT_EQ(IDSet({*w3.id_ref()}), dredgeHostPool(r, "host2"));
   }
 
   auto check_all_workers_fn = [&](std::vector<cpp2::BistroWorker> workers) {
@@ -152,21 +152,23 @@ TEST(TestRemoteWorkers, WorkerPools) {
 
     // getWorker
     for (const auto& w : workers) {
-      EXPECT_EQ(w.id, r.getWorker(w.shard)->getBistroWorker().id);
-      expected_ids.emplace(w.id);
+      EXPECT_EQ(
+          *w.id_ref(),
+          *r.getWorker(*w.shard_ref())->getBistroWorker().id_ref());
+      expected_ids.emplace(*w.id_ref());
     }
 
     // getNextWorker
     IDSet all_ids;
     for (size_t i = 0; i < 4; ++i) {
-      all_ids.emplace(r.getNextWorker()->getBistroWorker().id);
+      all_ids.emplace(*r.getNextWorker()->getBistroWorker().id_ref());
     }
     EXPECT_EQ(expected_ids, all_ids);
 
     // iterator
     IDSet iter_ids;
     for (const auto& rw : r.workerPool()) {
-      iter_ids.emplace(rw.second->getBistroWorker().id);
+      iter_ids.emplace(*rw.second->getBistroWorker().id_ref());
     }
     EXPECT_EQ(expected_ids, iter_ids);
   };
@@ -175,15 +177,16 @@ TEST(TestRemoteWorkers, WorkerPools) {
   // Try and fail to replace w1 with another worker before w1 is lost.
   {
     auto check_worker_pools_unchanged_fn = [&]() {
-      EXPECT_EQ(IDSet({w1.id, w2.id}), dredgeHostPool(r, "host1"));
-      EXPECT_EQ(IDSet({w3.id}), dredgeHostPool(r, "host2"));
+      EXPECT_EQ(
+          IDSet({*w1.id_ref(), *w2.id_ref()}), dredgeHostPool(r, "host1"));
+      EXPECT_EQ(IDSet({*w3.id_ref()}), dredgeHostPool(r, "host2"));
       check_all_workers_fn(std::vector<cpp2::BistroWorker>({w1, w2, w3}));
     };
 
     auto w1new = makeWorker("w1");
-    w1new.machineLock.hostname = "host2";
-    w1new.machineLock.port = 789;
-    ASSERT_NE(w1.id, w1new.id);
+    *w1new.machineLock_ref()->hostname_ref() = "host2";
+    *w1new.machineLock_ref()->port_ref() = 789;
+    ASSERT_NE(*w1.id_ref(), *w1new.id_ref());
 
     // w1new's heartbeat was rejected, and we ask it to commit suicide
     {
@@ -194,7 +197,8 @@ TEST(TestRemoteWorkers, WorkerPools) {
       EXPECT_FALSE(
           r.processHeartbeat(&update2, w1new, cpp2::WorkerSetID()).has_value());
       EXPECT_EQ(1, update2.suicideWorkers().size());
-      EXPECT_EQ(w1new.id, update2.suicideWorkers().begin()->second.id);
+      EXPECT_EQ(
+          *w1new.id_ref(), *update2.suicideWorkers().begin()->second.id_ref());
       EXPECT_EQ(0, update2.newWorkers().size());
       check_worker_pools_unchanged_fn();
     }
@@ -207,12 +211,12 @@ TEST(TestRemoteWorkers, WorkerPools) {
       );
       auto res = r.processHeartbeat(&update2, w1, cpp2::WorkerSetID());
       EXPECT_EQ(
-        static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
-      );
-      EXPECT_EQ(workerSetID(r, 3, wh), res->workerSetID);  // No change
+          static_cast<int>(RemoteWorkerState::State::NEW),
+          *res->workerState_ref());
+      EXPECT_EQ(workerSetID(r, 3, wh), *res->workerSetID_ref()); // No change
       EXPECT_EQ(0, update2.suicideWorkers().size());
       EXPECT_EQ(1, update2.newWorkers().size());
-      EXPECT_EQ(w1.id, update2.newWorkers().begin()->second.id);
+      EXPECT_EQ(*w1.id_ref(), *update2.newWorkers().begin()->second.id_ref());
       check_worker_pools_unchanged_fn();
     }
   }
@@ -220,9 +224,9 @@ TEST(TestRemoteWorkers, WorkerPools) {
   // Successfully move a worker from one host to another
   {
     auto w1new = makeWorker("w1");
-    w1new.machineLock.hostname = "host2";
-    w1new.machineLock.port = 789;
-    ASSERT_NE(w1.id, w1new.id);
+    *w1new.machineLock_ref()->hostname_ref() = "host2";
+    *w1new.machineLock_ref()->port_ref() = 789;
+    ASSERT_NE(*w1.id_ref(), *w1new.id_ref());
     {
       RemoteWorkerUpdate update2(
         RemoteWorkerUpdate::UNIT_TEST_TIME,
@@ -231,23 +235,27 @@ TEST(TestRemoteWorkers, WorkerPools) {
 
       auto res = r.processHeartbeat(&update2, w1new, cpp2::WorkerSetID());
       EXPECT_EQ(
-        static_cast<int>(RemoteWorkerState::State::NEW), res->workerState
-      );
-      removeWorkerIDFromHash(&wh, w1.id);
-      addWorkerIDToHash(&wh, w1new.id);
+          static_cast<int>(RemoteWorkerState::State::NEW),
+          *res->workerState_ref());
+      removeWorkerIDFromHash(&wh, *w1.id_ref());
+      addWorkerIDToHash(&wh, *w1new.id_ref());
       // 1 deletion, 1 addition == skip 2 versions
       auto wsid = workerSetID(r, 5, wh);
-      EXPECT_EQ(wsid, res->workerSetID)
-        << debugString(wsid) << " != " << debugString(res->workerSetID);
+      EXPECT_EQ(wsid, *res->workerSetID_ref())
+          << debugString(wsid)
+          << " != " << debugString(*res->workerSetID_ref());
 
       // Sanity check: w1new should have bumped w1
       EXPECT_EQ(1, update2.suicideWorkers().size());
-      EXPECT_EQ(w1.id, update2.suicideWorkers().begin()->second.id);
+      EXPECT_EQ(
+          *w1.id_ref(), *update2.suicideWorkers().begin()->second.id_ref());
       EXPECT_EQ(1, update2.newWorkers().size());
-      EXPECT_EQ(w1new.id, update2.newWorkers().begin()->second.id);
+      EXPECT_EQ(
+          *w1new.id_ref(), *update2.newWorkers().begin()->second.id_ref());
     }
-    EXPECT_EQ(IDSet({w2.id}), dredgeHostPool(r, "host1"));
-    EXPECT_EQ(IDSet({w1new.id, w3.id}), dredgeHostPool(r, "host2"));
+    EXPECT_EQ(IDSet({*w2.id_ref()}), dredgeHostPool(r, "host1"));
+    EXPECT_EQ(
+        IDSet({*w1new.id_ref(), *w3.id_ref()}), dredgeHostPool(r, "host2"));
     check_all_workers_fn(std::vector<cpp2::BistroWorker>({w1new, w2, w3}));
   }
 }
@@ -333,13 +341,12 @@ TEST_F(TestRemoteWorkersInitialWait, OneWorkerWithRunningTasks) {
 // Copy-pasta'd from test_remote_worker.cpp
 void successfulHealthcheck(int64_t t, RemoteWorkers& r, std::string shard) {
   cpp2::RunningTask rt;
-  rt.workerShard = shard;
-  rt.job = kHealthcheckTaskJob;
-  rt.invocationID.startTime = t;
+  *rt.workerShard_ref() = shard;
+  *rt.job_ref() = kHealthcheckTaskJob;
+  *rt.invocationID_ref()->startTime_ref() = t;
   auto w = r.mutableWorkerOrAbort(shard);
   EXPECT_FALSE(w->recordNonRunningTaskStatus(
-    rt, TaskStatus::done(), w->getBistroWorker().id
-  ));
+      rt, TaskStatus::done(), *w->getBistroWorker().id_ref()));
 }
 
 /**
@@ -354,20 +361,20 @@ void addWorker(
     const cpp2::WorkerSetID& initial_id,
     const std::multiset<cpp2::WorkerSetID>& expected_initial_ids,
     const cpp2::WorkerSetID& expected_non_mustdie_id) {
-
   auto no_consensus_re = folly::to<std::string>(
-    ".* ", w.shard, " can be healthy but lacks WorkerSetID consensus.*"
-  );
+      ".* ",
+      *w.shard_ref(),
+      " can be healthy but lacks WorkerSetID consensus.*");
 
   for (int i = 0; i < 2; ++i) {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
     // First pass: register the worker, and fake a successful healthcheck.
     if (i == 0) {
       auto res = r->processHeartbeat(&update, w, initial_id);
-      EXPECT_EQ(expected_non_mustdie_id, res->workerSetID);
-      successfulHealthcheck(1, *r, w.shard);
-    // Second pass: run an updateState so that we can check the initial wait
-    // message, and ensure nothing else changes.
+      EXPECT_EQ(expected_non_mustdie_id, *res->workerSetID_ref());
+      successfulHealthcheck(1, *r, *w.shard_ref());
+      // Second pass: run an updateState so that we can check the initial wait
+      // message, and ensure nothing else changes.
     } else {
       // We're not supposed to prune history when any workers are NEW.
       std::string not_pruning_re(".*Not pruning history until.*");
@@ -380,7 +387,7 @@ void addWorker(
       EXPECT_PCRE_MATCH(not_pruning_re, out);
       EXPECT_PCRE_MATCH(".*Waiting for all.*", update.initialWaitMessage());
     }
-    auto rw = r->getWorker(w.shard);
+    auto rw = r->getWorker(*w.shard_ref());
     EXPECT_EQ(RemoteWorkerState::State::NEW, rw->getState());
     EXPECT_EQ(initial_id, rw->initialWorkerSetID());
     EXPECT_FALSE(rw->workerSetID().has_value());
@@ -393,15 +400,16 @@ void addWorker(
   // Once the worker fetches running tasks, it's ready to become healthy.
   r->initializeRunningTasks(w, {});
   EXPECT_EQ(
-    RemoteWorkerState::State::UNHEALTHY, r->getWorker(w.shard)->getState()
-  );
+      RemoteWorkerState::State::UNHEALTHY,
+      r->getWorker(*w.shard_ref())->getState());
 
   EXPECT_NO_PCRE_MATCH(no_consensus_re, fd->readIncremental());
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
     // Coverage assertion: we're about to propagate with some workers
     // lacking an indirectWorkerSetID, and that works fine.
-    EXPECT_FALSE(r->getWorker(w.shard)->indirectWorkerSetID().has_value());
+    EXPECT_FALSE(
+        r->getWorker(*w.shard_ref())->indirectWorkerSetID().has_value());
     r->updateState(&update);
     EXPECT_PCRE_MATCH(".*Waiting for all.*", update.initialWaitMessage());
   }
@@ -419,29 +427,30 @@ TEST_F(TestRemoteWorkersInitialWait, AchieveAndMaintainWorkerSetConsensus) {
   auto w3 = makeWorker("w3");
 
   cpp2::WorkerSetID id2;  // 1) The first worker.
-  addWorkerIDToHash(&id2.hash, w2.id);
+  addWorkerIDToHash(&(*id2.hash_ref()), *w2.id_ref());
 
   cpp2::WorkerSetID id3;  // 2) This impostor joins before we reach consensus.
-  addWorkerIDToHash(&id3.hash, w3.id);
+  addWorkerIDToHash(&(*id3.hash_ref()), *w3.id_ref());
 
   cpp2::WorkerSetID id23 = id2;
-  addWorkerIDToHash(&id23.hash, w3.id);
+  addWorkerIDToHash(&(*id23.hash_ref()), *w3.id_ref());
 
   cpp2::WorkerSetID id12 = id2;  // 4) The consensus, once the impostor leaves.
-  addWorkerIDToHash(&id12.hash, w1.id);
+  addWorkerIDToHash(&(*id12.hash_ref()), *w1.id_ref());
 
   cpp2::WorkerSetID id123 = id12;  // 3) All three together.
-  addWorkerIDToHash(&id123.hash, w3.id);
+  addWorkerIDToHash(&(*id123.hash_ref()), *w3.id_ref());
 
+  addWorker(&stderr, &r, w2, id12, {id12}, workerSetID(r, 1, *id2.hash_ref()));
   addWorker(
-    &stderr, &r, w2, id12, {id12}, workerSetID(r, 1, id2.hash)
-  );
+      &stderr, &r, w3, id3, {id12, id3}, workerSetID(r, 2, *id23.hash_ref()));
   addWorker(
-    &stderr, &r, w3, id3, {id12, id3}, workerSetID(r, 2, id23.hash)
-  );
-  addWorker(
-    &stderr, &r, w1, id12, {id12, id12, id3}, workerSetID(r, 3, id123.hash)
-  );
+      &stderr,
+      &r,
+      w1,
+      id12,
+      {id12, id12, id3},
+      workerSetID(r, 3, *id123.hash_ref()));
   // These workers are unhealthy since they don't know about each other, but
   // for the purposes of this test, that does not matter.
 
@@ -471,15 +480,15 @@ TEST_F(TestRemoteWorkersInitialWait, AchieveAndMaintainWorkerSetConsensus) {
 
     auto maybe_id = r.getWorker("w3")->firstAssociatedWorkerSetID();
     if (p.first == RemoteWorkerState::State::UNHEALTHY) {
-      EXPECT_EQ(workerSetID(r, 3, id123.hash), res->workerSetID);
+      EXPECT_EQ(workerSetID(r, 3, *id123.hash_ref()), *res->workerSetID_ref());
       ASSERT_FALSE(maybe_id.has_value());
     } else {
-      EXPECT_EQ(workerSetID(r, 4, id12.hash), res->workerSetID);
-      EXPECT_EQ(workerSetID(r, 3, id123.hash), maybe_id);
+      EXPECT_EQ(workerSetID(r, 4, *id12.hash_ref()), *res->workerSetID_ref());
+      EXPECT_EQ(workerSetID(r, 3, *id123.hash_ref()), maybe_id);
     }
     EXPECT_EQ(p.first, r.getWorker("w3")->getState());
   }
-  EXPECT_EQ(workerSetID(r, 4, id12.hash), r.nonMustDieWorkerSetID());
+  EXPECT_EQ(workerSetID(r, 4, *id12.hash_ref()), r.nonMustDieWorkerSetID());
   EXPECT_EQ(
     (std::multiset<cpp2::WorkerSetID>{id12, id12}), r.initialWorkerSetIDs()
   );
@@ -501,7 +510,7 @@ TEST_F(TestRemoteWorkersInitialWait, NoConsensusWithEmptyWorkerSetID) {
   RemoteWorkers r(0, randInstanceID());
   auto w = makeWorker("w");
   cpp2::WorkerSetHash h;
-  addWorkerIDToHash(&h, w.id);
+  addWorkerIDToHash(&h, *w.id_ref());
   cpp2::WorkerSetID id;  // empty initial WorkerSetID
   addWorker(&stderr, &r, w, id, {id}, workerSetID(r, 1, h));
 
@@ -564,26 +573,29 @@ void addAndUpdateWorker(
   EXPECT_EQ(before_vss, r->indirectVersionsOfNonMustDieWorkers());
 
   EXPECT_EQ(num_workers - 1, r->indirectVersionsOfNonMustDieWorkers().size());
-  EXPECT_EQ(num_workers, r->nonMustDieWorkerSetID().hash.numWorkers);
+  EXPECT_EQ(
+      num_workers, *r->nonMustDieWorkerSetID().hash_ref()->numWorkers_ref());
   // All are blocked since the above two numbers don't match:
   for (const auto& p : shard_to_consensus_permits) {
     EXPECT_FALSE(r->consensusPermitsBecomingHealthyForUnitTest(p.first));
   }
 
   // Need one more heartbeat for w to get a workerSetID.
-  EXPECT_FALSE(r->getWorker(w.shard)->workerSetID().has_value());
-  EXPECT_FALSE(r->getWorker(w.shard)->indirectWorkerSetID().has_value());
-  EXPECT_FALSE(r->getWorker(w.shard)->firstAssociatedWorkerSetID().has_value());
+  EXPECT_FALSE(r->getWorker(*w.shard_ref())->workerSetID().has_value());
+  EXPECT_FALSE(r->getWorker(*w.shard_ref())->indirectWorkerSetID().has_value());
+  EXPECT_FALSE(
+      r->getWorker(*w.shard_ref())->firstAssociatedWorkerSetID().has_value());
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
-    EXPECT_EQ(wid, r->processHeartbeat(&update, w, wid)->workerSetID);
+    EXPECT_EQ(wid, *r->processHeartbeat(&update, w, wid)->workerSetID_ref());
   }
-  EXPECT_EQ(wid, r->getWorker(w.shard)->workerSetID());
-  EXPECT_EQ(wid, r->getWorker(w.shard)->indirectWorkerSetID());
-  EXPECT_EQ(wid, r->getWorker(w.shard)->firstAssociatedWorkerSetID());
+  EXPECT_EQ(wid, r->getWorker(*w.shard_ref())->workerSetID());
+  EXPECT_EQ(wid, r->getWorker(*w.shard_ref())->indirectWorkerSetID());
+  EXPECT_EQ(wid, r->getWorker(*w.shard_ref())->firstAssociatedWorkerSetID());
 
   EXPECT_EQ(num_workers, r->indirectVersionsOfNonMustDieWorkers().size());
-  EXPECT_EQ(num_workers, r->nonMustDieWorkerSetID().hash.numWorkers);
+  EXPECT_EQ(
+      num_workers, *r->nonMustDieWorkerSetID().hash_ref()->numWorkers_ref());
 
   // No updateState has happened since the worker acquired a WorkerSetID, so
   // test twice (before and after the update) -- nothing changes.
@@ -629,15 +641,15 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   auto w4 = makeWorker("w4");
 
   cpp2::WorkerSetHash hash1;
-  addWorkerIDToHash(&hash1, w1.id);
+  addWorkerIDToHash(&hash1, *w1.id_ref());
   auto hash12 = hash1;
-  addWorkerIDToHash(&hash12, w2.id);
+  addWorkerIDToHash(&hash12, *w2.id_ref());
   auto hash123 = hash12;
-  addWorkerIDToHash(&hash123, w3.id);
+  addWorkerIDToHash(&hash123, *w3.id_ref());
   auto hash1234 = hash123;
-  addWorkerIDToHash(&hash1234, w4.id);
+  addWorkerIDToHash(&hash1234, *w4.id_ref());
   auto hash234 = hash1234;
-  removeWorkerIDFromHash(&hash234, w1.id);
+  removeWorkerIDFromHash(&hash234, *w1.id_ref());
 
   RemoteWorkers::History history;
 
@@ -647,7 +659,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   ///
 
   auto wid1 = workerSetID(r, 1, hash1);
-  history.insert({1, {folly::none, {w1.shard}}});
+  history.insert({1, {folly::none, {*w1.shard_ref()}}});
   addAndUpdateWorker(
     &r,
     w1,
@@ -669,7 +681,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   ///
 
   auto wid12 = workerSetID(r, 2, hash12);
-  history.insert({2, {folly::none, {w2.shard}}});
+  history.insert({2, {folly::none, {*w2.shard_ref()}}});
   addAndUpdateWorker(
     &r,
     w2,
@@ -693,7 +705,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   ///
 
   auto wid123 = workerSetID(r, 3, hash123);
-  history.insert({3, {folly::none, {w3.shard}}});
+  history.insert({3, {folly::none, {*w3.shard_ref()}}});
   addAndUpdateWorker(
     &r,
     w3,
@@ -719,7 +731,8 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
 
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
-    EXPECT_EQ(wid123, r.processHeartbeat(&update, w2, wid123)->workerSetID);
+    EXPECT_EQ(
+        wid123, *r.processHeartbeat(&update, w2, wid123)->workerSetID_ref());
   }
   EXPECT_EQ(wid123, r.getWorker("w2")->workerSetID());
 
@@ -743,7 +756,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   ///
 
   auto wid1234 = workerSetID(r, 4, hash1234);
-  history.insert({4, {folly::none, {w4.shard}}});
+  history.insert({4, {folly::none, {*w4.shard_ref()}}});
   addAndUpdateWorker(
     &r,
     w4,
@@ -769,7 +782,8 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
 
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
-    EXPECT_EQ(wid1234, r.processHeartbeat(&update, w2, wid1234)->workerSetID);
+    EXPECT_EQ(
+        wid1234, *r.processHeartbeat(&update, w2, wid1234)->workerSetID_ref());
   }
   EXPECT_EQ(wid1234, r.getWorker("w2")->workerSetID());
 
@@ -820,9 +834,8 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, t);
     // Since w1 gets lost, should not matter that it now requires w2 as well.
     EXPECT_EQ(
-      p.first == RemoteWorkerState::State::UNHEALTHY ? wid1234 : wid234,
-      r.processHeartbeat(&update, w1, wid12)->workerSetID
-    );
+        p.first == RemoteWorkerState::State::UNHEALTHY ? wid1234 : wid234,
+        *r.processHeartbeat(&update, w1, wid12)->workerSetID_ref());
     EXPECT_EQ(wid12, r.getWorker("w1")->workerSetID());
     EXPECT_EQ(p.first, r.getWorker("w1")->getState());
   }
@@ -832,7 +845,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   );
 
   // updateState hasn't run yet, so the only change is the loss of w1.
-  history.insert({5, {w1.shard, std::unordered_set<std::string>{}}});
+  history.insert({5, {*w1.shard_ref(), std::unordered_set<std::string>{}}});
   updateWorkers(
     &r,
     {{4, "w2"}, {4, "w3"}, {4, "w4"}},
@@ -847,9 +860,8 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   history.erase(1);
   history.erase(2);
   history.erase(3);
-  history.insert(  // History got pruned: w3 is keeping version 3 alive.
-    {3, {folly::none, {w1.shard, w2.shard, w3.shard}}}
-  );
+  history.insert( // History got pruned: w3 is keeping version 3 alive.
+      {3, {folly::none, {*w1.shard_ref(), *w2.shard_ref(), *w3.shard_ref()}}});
   for (int i = 0; i < 2; ++i) {  // Ensure the second pass is a no-op
     updateWorkers(
       &r,
@@ -870,7 +882,8 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
 
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
-    EXPECT_EQ(wid234, r.processHeartbeat(&update, w3, wid234)->workerSetID);
+    EXPECT_EQ(
+        wid234, *r.processHeartbeat(&update, w3, wid234)->workerSetID_ref());
   }
   EXPECT_EQ(wid234, r.getWorker("w3")->workerSetID());
   // w3's state changes even before the propagation.
@@ -894,9 +907,10 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   );
   history.erase(3);
   history.erase(4);
-  history.insert(  // History got pruned: w2 and w4 are keeping v4 alive.
-    {4, {folly::none, {w1.shard, w2.shard, w3.shard, w4.shard}}}
-  );
+  history.insert( // History got pruned: w2 and w4 are keeping v4 alive.
+      {4,
+       {folly::none,
+        {*w1.shard_ref(), *w2.shard_ref(), *w3.shard_ref(), *w4.shard_ref()}}});
   updateWorkers(
     &r,
     {{5, "w2"}, {5, "w3"}, {5, "w4"}},  // w2 & w4 have now been propagated
@@ -911,12 +925,15 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   ///
 
   auto w1a = makeWorker("w1");
-  w1a.id.startTime = w1.id.startTime + 1;  // This is a **newer** worker.
-  CHECK_GT(w1a.id.startTime, w1.id.startTime);  // Fail loudly if we overflow.
+  *w1a.id_ref()->startTime_ref() =
+      *w1.id_ref()->startTime_ref() + 1; // This is a **newer** worker.
+  CHECK_GT(
+      *w1a.id_ref()->startTime_ref(),
+      *w1.id_ref()->startTime_ref()); // Fail loudly if we overflow.
   cpp2::WorkerSetHash hash1a234 = hash234;
-  addWorkerIDToHash(&hash1a234, w1a.id);
+  addWorkerIDToHash(&hash1a234, *w1a.id_ref());
   auto wid1a234 = workerSetID(r, 6, hash1a234);
-  history.insert({6, {folly::none, {w1a.shard}}});
+  history.insert({6, {folly::none, {*w1a.shard_ref()}}});
   addAndUpdateWorker(
     &r,
     w1a,
@@ -935,7 +952,7 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
   ///
 
   cpp2::WorkerSetHash hash1a23 = hash1a234;
-  removeWorkerIDFromHash(&hash1a23, w4.id);
+  removeWorkerIDFromHash(&hash1a23, *w4.id_ref());
   auto wid1a23 = workerSetID(r, 7, hash1a23);
   EXPECT_EQ(
     RemoteWorkerState::State::UNHEALTHY, r.getWorker("w4")->getState()
@@ -947,12 +964,13 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
     // Catch w4 up to the latest workerSetID, since we do propagate through
     // MUST_DIE workers, and this will have the effect of catching w2 & w3
     // to version 6 after a propagation.
-    EXPECT_EQ(wid1a23, r.processHeartbeat(&update, w4, wid1a234)->workerSetID);
+    EXPECT_EQ(
+        wid1a23, *r.processHeartbeat(&update, w4, wid1a234)->workerSetID_ref());
   }
   EXPECT_EQ(wid1a234, r.getWorker("w4")->workerSetID());
   EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, r.getWorker("w4")->getState());
 
-  history.insert({7, {w4.shard, std::unordered_set<std::string>{}}});
+  history.insert({7, {*w4.shard_ref(), std::unordered_set<std::string>{}}});
   updateWorkers(
     &r,
     {{5, "w2"}, {5, "w3"}, {6, "w1"}},
@@ -988,7 +1006,8 @@ TEST_F(TestRemoteWorkersInitialWait, HistoryAndWorkerSetIDPropagation) {
 
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, 1);
-    EXPECT_EQ(wid1a23, r.processHeartbeat(&update, w1a, wid1a23)->workerSetID);
+    EXPECT_EQ(
+        wid1a23, *r.processHeartbeat(&update, w1a, wid1a23)->workerSetID_ref());
   }
   EXPECT_EQ(wid1a23, r.getWorker("w1")->workerSetID());
   // Before propagation, nothing changed except w1a's indirect version.

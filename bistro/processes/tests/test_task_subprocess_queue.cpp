@@ -155,16 +155,16 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
   // Default RunningTask used by runTask, runAndKill, etc.
   static cpp2::RunningTask runningTask() {
     cpp2::RunningTask rt;
-    rt.job = "job";
-    rt.node = "node";
+    *rt.job_ref() = "job";
+    *rt.node_ref() = "node";
     // CGroup namind depends on this, but most other tests don't care.
-    rt.workerShard = "shard";
+    *rt.workerShard_ref() = "shard";
     return rt;
   }
 
   static cpp2::KillRequest requestSigkill() {
     cpp2::KillRequest req;
-    req.method = cpp2::KillMethod::KILL;
+    *req.method_ref() = cpp2::KillMethod::KILL;
     return req;
   }
 
@@ -203,17 +203,16 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
       cpp2::TaskSubprocessOptions opts,
       TaskSubprocessQueue::StatusCob status_cob) {
     tsq->runTask(
-      runningTask(),
-      std::vector<std::string>{"/bin/sh", "-c", cmd, "test_sh"},
-      "json_arg",
-      ".",
-      status_cob,
-      [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt.job);
-        EXPECT_EQ("node", rt.node);
-      },
-      std::move(opts)
-    );
+        runningTask(),
+        std::vector<std::string>{"/bin/sh", "-c", cmd, "test_sh"},
+        "json_arg",
+        ".",
+        status_cob,
+        [this](const cpp2::RunningTask& rt, cpp2::TaskPhysicalResources&&) {
+          EXPECT_EQ("job", *rt.job_ref());
+          EXPECT_EQ("node", *rt.node_ref());
+        },
+        std::move(opts));
   }
 
   // Run a task and ensure it can be killed immediately.
@@ -229,9 +228,9 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
     }
     // We should fail to kill tasks with the wrong invocation ID.
     auto rt = runningTask();
-    ++rt.invocationID.rand;
+    ++(*rt.invocationID_ref()->rand_ref());
     EXPECT_THROW(tsq.kill(rt, requestSigkill()), std::runtime_error);
-    --rt.invocationID.rand;
+    --(*rt.invocationID_ref()->rand_ref());
     tsq.kill(rt, requestSigkill());
     EXPECT_GT(1.0, timeSince(startTime_));  // Start & kill take < 1 sec
   }
@@ -243,36 +242,38 @@ struct TestTaskSubprocessQueue : public ::testing::Test {
       int post_kill_sleep,
       folly::Synchronized<TestLogWriter::TaskLogMap>* task_to_logs = nullptr) {
     cpp2::RunningTask rt;
-    rt.job = "job";
-    rt.node = "node";
+    *rt.job_ref() = "job";
+    *rt.node_ref() = "node";
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(task_to_logs));
     cpp2::TaskSubprocessOptions opts;
     // If we were a PG leader, the `sleep` would also get the SIGTERM.
-    opts.processGroupLeader = false;
+    *opts.processGroupLeader_ref() = false;
     tsq.runTask(
-      rt,
-      std::vector<std::string>{
-        // On SIGTERM, set the status to 'done'; exit after post_kill_sleep
-        // sec, or exit with no status after initial_sleep sec.
-        "/bin/sh", "-c", folly::to<std::string>(
-          "trap 'echo done > $2; sleep ", post_kill_sleep,
-          "; kill $SLEEP_PID;' TERM; /bin/sleep ", initial_sleep,
-          " & SLEEP_PID=$!; wait"
-        ), "test_sh"
-      },
-      "json_arg",
-      ".",
-      [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
-        EXPECT_EQ("job", rt2.job);
-        EXPECT_EQ("node", rt2.node);
-        EXPECT_TRUE(status.isDone());
-      },
-      [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt2.job);
-        EXPECT_EQ("node", rt2.node);
-      },
-      opts
-    );
+        rt,
+        std::vector<std::string>{
+            // On SIGTERM, set the status to 'done'; exit after post_kill_sleep
+            // sec, or exit with no status after initial_sleep sec.
+            "/bin/sh",
+            "-c",
+            folly::to<std::string>(
+                "trap 'echo done > $2; sleep ",
+                post_kill_sleep,
+                "; kill $SLEEP_PID;' TERM; /bin/sleep ",
+                initial_sleep,
+                " & SLEEP_PID=$!; wait"),
+            "test_sh"},
+        "json_arg",
+        ".",
+        [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+          EXPECT_EQ("job", *rt2.job_ref());
+          EXPECT_EQ("node", *rt2.node_ref());
+          EXPECT_TRUE(status.isDone());
+        },
+        [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+          EXPECT_EQ("job", *rt2.job_ref());
+          EXPECT_EQ("node", *rt2.node_ref());
+        },
+        opts);
     tsq.kill(rt, kill_req);
     EXPECT_GT(1.0, timeSince(startTime_));  // Start & kill take < 1 sec
   }
@@ -330,8 +331,8 @@ void checkNormalTaskLogs(
 
 TEST_F(TestTaskSubprocessQueue, NormalRun) {
   cpp2::RunningTask rt;
-  rt.job = "job";
-  rt.node = "node";
+  *rt.job_ref() = "job";
+  *rt.node_ref() = "node";
   std::vector<std::string> cmd{
     "/bin/sh", "-c",
     "sleep 1; echo stdout; echo stderr 1>&2; echo done > $2", "test_sh"
@@ -342,20 +343,20 @@ TEST_F(TestTaskSubprocessQueue, NormalRun) {
   {
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
     tsq.runTask(
-      rt,
-      cmd,
-      "json_arg",
-      ".",
-      [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
-        EXPECT_EQ("job", rt2.job);
-        EXPECT_EQ("node", rt2.node);
-        EXPECT_TRUE(status.isDone());
-      },
-      [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt2.job);
-        EXPECT_EQ("node", rt2.node);
-      },
-      cpp2::TaskSubprocessOptions()  // defaults should be ok
+        rt,
+        cmd,
+        "json_arg",
+        ".",
+        [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+          EXPECT_EQ("job", *rt2.job_ref());
+          EXPECT_EQ("node", *rt2.node_ref());
+          EXPECT_TRUE(status.isDone());
+        },
+        [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+          EXPECT_EQ("job", *rt2.job_ref());
+          EXPECT_EQ("node", *rt2.node_ref());
+        },
+        cpp2::TaskSubprocessOptions() // defaults should be ok
     );
     pipe_fd = tsq.statusPipeFdForTest();
     EXPECT_GT(1.0, timeSince(startTime_));  // fork + exec should take < 1 sec
@@ -377,7 +378,7 @@ TEST_F(TestTaskSubprocessQueue, NormalRun) {
 // A multi-task clone of NormalRun
 TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
   cpp2::RunningTask rt;
-  rt.job = "job";
+  *rt.job_ref() = "job";
   std::vector<std::string> cmd{
     "/bin/sh", "-c",
     "sleep 1; echo stdout; echo stderr 1>&2; echo done > $2", "test_sh"
@@ -392,24 +393,23 @@ TEST_F(TestTaskSubprocessQueue, MoreTasksThanThreads) {
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(&task_to_logs));
     for (int i = 0; i < kNumTasks; ++i) {
       auto node = folly::to<std::string>("node", i);  // ID tasks by the node
-      rt.node = node;
+      *rt.node_ref() = node;
       tsq.runTask(
-        rt,
-        cmd,
-        "json_arg",
-        ".",
-        [node](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
-          EXPECT_EQ("job", rt2.job);
-          EXPECT_EQ(node, rt2.node);
-          EXPECT_TRUE(status.isDone());
-        },
-        [node, this](
-          const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&
-        ) {
-          EXPECT_EQ("job", rt2.job);
-          EXPECT_EQ(node, rt2.node);
-        },
-        cpp2::TaskSubprocessOptions()  // defaults should be ok
+          rt,
+          cmd,
+          "json_arg",
+          ".",
+          [node](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+            EXPECT_EQ("job", *rt2.job_ref());
+            EXPECT_EQ(node, *rt2.node_ref());
+            EXPECT_TRUE(status.isDone());
+          },
+          [node, this](
+              const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+            EXPECT_EQ("job", *rt2.job_ref());
+            EXPECT_EQ(node, *rt2.node_ref());
+          },
+          cpp2::TaskSubprocessOptions() // defaults should be ok
       );
     }
     pipe_fd = tsq.statusPipeFdForTest();
@@ -437,30 +437,28 @@ TEST_F(TestTaskSubprocessQueue, NoStatus) {
   {
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
     cpp2::RunningTask rt;
-    rt.job = "job";
-    rt.node = "node";
+    *rt.job_ref() = "job";
+    *rt.node_ref() = "node";
     tsq.runTask(
-      rt,
-      std::vector<std::string>{"/bin/echo"},
-      "json_arg",
-      ".",
-      [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
-        EXPECT_EQ("job", rt2.job);
-        EXPECT_EQ("node", rt2.node);
-        EXPECT_EQ(
-          TaskStatusBits::Error | TaskStatusBits::UsesBackoff,
-          status.bits()
-        );
-        EXPECT_EQ(
-          "Failed to read a status",
-          (*status.dataThreadUnsafe()).at("exception").asString()
-        );
-      },
-      [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt2.job);
-        EXPECT_EQ("node", rt2.node);
-      },
-      cpp2::TaskSubprocessOptions()  // defaults should be ok
+        rt,
+        std::vector<std::string>{"/bin/echo"},
+        "json_arg",
+        ".",
+        [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+          EXPECT_EQ("job", *rt2.job_ref());
+          EXPECT_EQ("node", *rt2.node_ref());
+          EXPECT_EQ(
+              TaskStatusBits::Error | TaskStatusBits::UsesBackoff,
+              status.bits());
+          EXPECT_EQ(
+              "Failed to read a status",
+              (*status.dataThreadUnsafe()).at("exception").asString());
+        },
+        [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+          EXPECT_EQ("job", *rt2.job_ref());
+          EXPECT_EQ("node", *rt2.node_ref());
+        },
+        cpp2::TaskSubprocessOptions() // defaults should be ok
     );
   }
   EXPECT_GT(1.0, timeSince(startTime_));  // fork+exec+wait should take < 1 sec
@@ -469,7 +467,7 @@ TEST_F(TestTaskSubprocessQueue, NoStatus) {
 TEST_F(TestTaskSubprocessQueue, KillSingle) {
   // `sleep` replaces `sh`, gets the SIGKILL, and quits quickly.
   cpp2::TaskSubprocessOptions opts;
-  opts.processGroupLeader = false;
+  *opts.processGroupLeader_ref() = false;
   runAndKill("exec sleep 3600", opts);
   EXPECT_GT(1.0, timeSince(startTime_));  // Start, kill & wait take < 1 sec
 }
@@ -478,7 +476,7 @@ TEST_F(TestTaskSubprocessQueue, KillFailsToReachChild) {
   // Since we neither exec, nor make `sh` a process group leader, `sleep` is
   // never killed.  We must wait for it to close the status pipe FD.
   cpp2::TaskSubprocessOptions opts;
-  opts.processGroupLeader = false;
+  *opts.processGroupLeader_ref() = false;
   // A simple "sleep 1" gets `exec()`ed by some `sh`s
   runAndKill("sleep 1 ; sleep 3600", opts);
   EXPECT_LE(1.0, timeSince(startTime_));
@@ -487,7 +485,7 @@ TEST_F(TestTaskSubprocessQueue, KillFailsToReachChild) {
 TEST_F(TestTaskSubprocessQueue, ProcGroupKillsChild) {
   // Making a process group lets us kill both `sh` and `sleep` quickly.
   cpp2::TaskSubprocessOptions opts;
-  opts.processGroupLeader = true;
+  *opts.processGroupLeader_ref() = true;
   // A simple "sleep 1" gets `exec()`ed by some `sh`s
   runAndKill("sleep 3600 ; sleep 3600", opts);
   EXPECT_GT(1.0, timeSince(startTime_));
@@ -521,15 +519,15 @@ TEST_F(TestTaskSubprocessQueue, FailsToStart) {
 
 TEST_F(TestTaskSubprocessQueue, TermWaitKillWithStatusExited) {
   cpp2::KillRequest req;
-  req.method = cpp2::KillMethod::TERM_WAIT_KILL;
-  req.killWaitMs = 3600000;  // SIGKILL in 1 hour
+  *req.method_ref() = cpp2::KillMethod::TERM_WAIT_KILL;
+  *req.killWaitMs_ref() = 3600000; // SIGKILL in 1 hour
   runAndKillWithStatus(req, 3600, 1);  // Sleep 1 hour, or 1 second after TERM
   EXPECT_LE(1.0, timeSince(startTime_));  // Runs for min(3600, 1)
 }
 
 TEST_F(TestTaskSubprocessQueue, TermWithStatusExited) {
   cpp2::KillRequest req;
-  req.method = cpp2::KillMethod::TERM;
+  *req.method_ref() = cpp2::KillMethod::TERM;
   runAndKillWithStatus(req, 3600, 1);  // Sleep 1 hour, or 1 second after TERM
   EXPECT_LE(1.0, timeSince(startTime_));  // Runs for min(3600, 1)
 }
@@ -539,8 +537,8 @@ TEST_F(TestTaskSubprocessQueue, TermWaitKillWithStatusKilled) {
   // The SIGTERM 'trap' callback will be SIGKILLed while it sleeps.
   // Sleep 2 seconds, or 2 seconds after TERM
   cpp2::KillRequest req;
-  req.method = cpp2::KillMethod::TERM_WAIT_KILL;
-  req.killWaitMs = 1000;  // SIGKILL in 1 second
+  *req.method_ref() = cpp2::KillMethod::TERM_WAIT_KILL;
+  *req.killWaitMs_ref() = 1000; // SIGKILL in 1 second
   runAndKillWithStatus(req, 2, 2, &task_to_logs);
   EXPECT_LE(2.0, timeSince(startTime_));  // The original 2-second sleep runs.
 
@@ -602,8 +600,8 @@ TEST_F(TestTaskSubprocessQueue, TermWaitKillWithStatusKilled) {
 
 TEST_F(TestTaskSubprocessQueue, RateLimitLog) {
   cpp2::RunningTask rt;
-  rt.job = "job";
-  rt.node = "node";
+  *rt.job_ref() = "job";
+  *rt.node_ref() = "node";
   const int32_t kNumIters = 1000;
   std::vector<std::string> cmd{"/bin/bash", "-c", folly::to<std::string>(
     "for ((i=0;i<", kNumIters,  // plain `sh` lacks this kind of `for`
@@ -611,28 +609,27 @@ TEST_F(TestTaskSubprocessQueue, RateLimitLog) {
     "echo done > $2"
   ), "test_sh"};
   cpp2::TaskSubprocessOptions opts;
-  opts.maxLogLinesPerPollInterval = (3 /*lines*/ * kNumIters)
-    / (1000 /*ms per sec*/ / opts.pollMs);  // Finish in 1 second.
+  *opts.maxLogLinesPerPollInterval_ref() = (3 /*lines*/ * kNumIters) /
+      (1000 /*ms per sec*/ / *opts.pollMs_ref()); // Finish in 1 second.
   {
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>(
       /*task_to_logs=*/ nullptr, /*print_logs=*/ false
     ));
     tsq.runTask(
-      rt,
-      cmd,
-      "json_arg",
-      ".",
-      [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
-        EXPECT_EQ("job", rt2.job);
-        EXPECT_EQ("node", rt2.node);
-        EXPECT_TRUE(status.isDone());
-      },
-      [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
-        EXPECT_EQ("job", rt2.job);
-        EXPECT_EQ("node", rt2.node);
-      },
-      opts
-    );
+        rt,
+        cmd,
+        "json_arg",
+        ".",
+        [](const cpp2::RunningTask& rt2, TaskStatus&& status) noexcept {
+          EXPECT_EQ("job", *rt2.job_ref());
+          EXPECT_EQ("node", *rt2.node_ref());
+          EXPECT_TRUE(status.isDone());
+        },
+        [this](const cpp2::RunningTask& rt2, cpp2::TaskPhysicalResources&&) {
+          EXPECT_EQ("job", *rt2.job_ref());
+          EXPECT_EQ("node", *rt2.node_ref());
+        },
+        opts);
     EXPECT_GT(1.0, timeSince(startTime_));  // fork + exec should take < 1 sec
   }
   // The process must not exit before 1 second elapses.
@@ -654,9 +651,9 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
 
   // Nothing happens until we specify some subsystems.
   cpp2::TaskSubprocessOptions opts;
-  opts.cgroupOptions.unitTestCreateFiles = true;
-  opts.cgroupOptions.root = "root";
-  opts.cgroupOptions.slice = "slice";
+  *opts.cgroupOptions_ref()->unitTestCreateFiles_ref() = true;
+  *opts.cgroupOptions_ref()->root_ref() = "root";
+  *opts.cgroupOptions_ref()->slice_ref() = "slice";
   {
     // tsq's destructor is the easiest way to await task exit :)
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
@@ -666,7 +663,7 @@ TEST_F(TestTaskSubprocessQueue, AddToCGroups) {
   }
 
   // The slice directory must exist for this subsystem.
-  opts.cgroupOptions.subsystems = {"sys"};
+  *opts.cgroupOptions_ref()->subsystems_ref() = {"sys"};
   {
     TaskSubprocessQueue tsq(std::make_unique<TestLogWriter>());
     runTask(&tsq, "exec sleep 3600", opts, std::bind(
@@ -724,11 +721,12 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperNoFreezer) {
 
   // Without "freezer", we will just wait for the unkillable 'sleep'.
   cpp2::TaskSubprocessOptions opts;
-  opts.processGroupLeader = false;  // Or `sleep`'d be killed without cgroups
-  opts.cgroupOptions.unitTestCreateFiles = true;
-  opts.cgroupOptions.root = "root";
-  opts.cgroupOptions.slice = "slice";
-  opts.cgroupOptions.subsystems = {"cpu"};
+  *opts.processGroupLeader_ref() =
+      false; // Or `sleep`'d be killed without cgroups
+  *opts.cgroupOptions_ref()->unitTestCreateFiles_ref() = true;
+  *opts.cgroupOptions_ref()->root_ref() = "root";
+  *opts.cgroupOptions_ref()->slice_ref() = "slice";
+  *opts.cgroupOptions_ref()->subsystems_ref() = {"cpu"};
   EXPECT_TRUE(boost::filesystem::create_directories("root/cpu/slice"));
   {
     folly::test::CaptureFD stderr(2, printString);
@@ -804,11 +802,12 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperWithFreezer) {
   folly::test::ChangeToTempDir td;
 
   cpp2::TaskSubprocessOptions opts;
-  opts.processGroupLeader = false;  // Or `sleep`'d be killed without cgroups
-  opts.cgroupOptions.unitTestCreateFiles = true;
-  opts.cgroupOptions.root = "root";
-  opts.cgroupOptions.slice = "slice";
-  opts.cgroupOptions.subsystems = {"cpu", "freezer"};
+  *opts.processGroupLeader_ref() =
+      false; // Or `sleep`'d be killed without cgroups
+  *opts.cgroupOptions_ref()->unitTestCreateFiles_ref() = true;
+  *opts.cgroupOptions_ref()->root_ref() = "root";
+  *opts.cgroupOptions_ref()->slice_ref() = "slice";
+  *opts.cgroupOptions_ref()->subsystems_ref() = {"cpu", "freezer"};
   EXPECT_TRUE(boost::filesystem::create_directories("root/cpu/slice"));
   EXPECT_TRUE(boost::filesystem::create_directories("root/freezer/slice"));
   {
@@ -892,12 +891,13 @@ TEST_F(TestTaskSubprocessQueue, AsyncCGroupReaperKillWithoutFreezer) {
   folly::test::ChangeToTempDir td;
 
   cpp2::TaskSubprocessOptions opts;
-  opts.processGroupLeader = false;  // Or `sleep`'d be killed without cgroups
-  opts.cgroupOptions.unitTestCreateFiles = true;
-  opts.cgroupOptions.root = "root";
-  opts.cgroupOptions.slice = "slice";
-  opts.cgroupOptions.subsystems = {"cpu"};
-  opts.cgroupOptions.killWithoutFreezer = true;
+  *opts.processGroupLeader_ref() =
+      false; // Or `sleep`'d be killed without cgroups
+  *opts.cgroupOptions_ref()->unitTestCreateFiles_ref() = true;
+  *opts.cgroupOptions_ref()->root_ref() = "root";
+  *opts.cgroupOptions_ref()->slice_ref() = "slice";
+  *opts.cgroupOptions_ref()->subsystems_ref() = {"cpu"};
+  *opts.cgroupOptions_ref()->killWithoutFreezer_ref() = true;
   EXPECT_TRUE(boost::filesystem::create_directories("root/cpu/slice"));
   {
     // This scope uses `tsq`'s destructor to await task exit.

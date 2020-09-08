@@ -23,24 +23,24 @@ struct CGroupPaths {
    // root: /sys/fs/cgroup
    // slice: path/to/bistro.slice
    // task_cgroup: shard:start:rand:worker_pid, **MUST NOT** contain slashes
-  CGroupPaths(
-    cpp2::CGroupOptions cgopts,
-    // Optional since we want 'usable resources' in the absence of tasks.
-    folly::Optional<boost::filesystem::path> task,
-    // Let unit tests override this
-    boost::filesystem::path numa_path = "/sys/devices/system/node/"
-  ) : root_(std::move(cgopts.root)),
-      slice_(std::move(cgopts.slice)),
-      subsystems_(std::move(cgopts.subsystems)),
-      task_(std::move(task)),
-      numaPath_(std::move(numa_path)) {
-    if (task_.has_value() && ++task_->begin() != task_->end()) {
-      throw std::runtime_error(folly::to<std::string>(
-        "'task' component of cgroup path must be a single, non-nested ",
-        "directory, not: ", task_->native()
-      ));
-    }
-  }
+   CGroupPaths(
+       cpp2::CGroupOptions cgopts,
+       // Optional since we want 'usable resources' in the absence of tasks.
+       folly::Optional<boost::filesystem::path> task,
+       // Let unit tests override this
+       boost::filesystem::path numa_path = "/sys/devices/system/node/")
+       : root_(std::move(*cgopts.root_ref())),
+         slice_(std::move(*cgopts.slice_ref())),
+         subsystems_(std::move(*cgopts.subsystems_ref())),
+         task_(std::move(task)),
+         numaPath_(std::move(numa_path)) {
+     if (task_.has_value() && ++task_->begin() != task_->end()) {
+       throw std::runtime_error(folly::to<std::string>(
+           "'task' component of cgroup path must be a single, non-nested ",
+           "directory, not: ",
+           task_->native()));
+     }
+   }
 
   boost::filesystem::path taskDir(const std::string& subsys) const {
     return root_ / subsys / slice_ / *task_;

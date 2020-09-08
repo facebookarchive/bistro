@@ -138,8 +138,9 @@ void processRunningTasks(
     node_used_resources;
   for (const auto& id_and_task : running_tasks) {
     const auto& rt = id_and_task.second;
-    node_to_tasks[id_and_task.second.node].push_front(&id_and_task.second);
-    for (const auto& nr : rt.nodeResources) {
+    node_to_tasks[*id_and_task.second.node_ref()].push_front(
+        &id_and_task.second);
+    for (const auto& nr : *rt.nodeResources_ref()) {
       auto& resources = node_used_resources[nr.node];
       for (const auto& res : nr.resources) {
         resources.push_back(&res);
@@ -165,7 +166,7 @@ void processRunningTasks(
         auto tasks = node_to_tasks.find(node->name());
         if (tasks != node_to_tasks.end()) {  // Does node have running tasks?
           for (auto it = tasks->second.begin(); it != tasks->second.end();) {
-            auto jobs_it = config.jobs.find((*it)->job);
+            auto jobs_it = config.jobs.find(*(*it)->job_ref());
             if (jobs_it != config.jobs.end() && jobs_it->second->canRun()) {
               it = tasks->second.erase(it);  // Not a job or node orphan.
             } else {

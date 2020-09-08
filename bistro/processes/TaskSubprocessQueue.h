@@ -44,8 +44,10 @@ private:
 
   static InvocationID makeInvocationID(const cpp2::RunningTask& rt) {
     return InvocationID(
-      rt.invocationID.startTime, rt.invocationID.rand, rt.job, rt.node
-    );
+        *rt.invocationID_ref()->startTime_ref(),
+        *rt.invocationID_ref()->rand_ref(),
+        *rt.job_ref(),
+        *rt.node_ref());
   }
 
 public:
@@ -199,8 +201,9 @@ private:
     // This computes the number of asyncSubprocessCallback() invocations per
     // one resourceCallback_ invocation.
     // Convert resource callback invocation interval to milliseconds
-    const double resInterval = std::max(1, opts_.refreshResourcesSec) * 1000.;
-    const double pollInterval = std::max(1, opts_.pollMs);
+    const double resInterval =
+        std::max(1, *opts_.refreshResourcesSec_ref()) * 1000.;
+    const double pollInterval = std::max(1, *opts_.pollMs_ref());
     // Round up the ratio to make sure resource callback invocation happens
     // no more frequently than requested.
     return std::ceil(resInterval / pollInterval);

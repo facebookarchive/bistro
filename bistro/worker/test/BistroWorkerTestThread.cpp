@@ -38,15 +38,15 @@ BistroWorkerTestThread::BistroWorkerTestThread(
         if (!rt) {
           LOG(INFO) << "worker state change: " << m;
         } else {
-          LOG(INFO) << "worker task state change: " << m << " - " << rt->job
-                    << " / " << rt->node;
+          LOG(INFO) << "worker task state change: " << m << " - "
+                    << *rt->job_ref() << " / " << *rt->node_ref();
         }
         state_transition_cob(this, m);
       },
       std::move(scheduler_client_fn),
       "",
       socket_and_addr.second,
-      socket_and_addr.second.port);
+      *socket_and_addr.second.port_ref());
   ts->setInterface(workerPtr_);
   ts->useExistingSocket(std::move(socket_and_addr.first));
   sst_.start(std::move(ts));
@@ -71,18 +71,17 @@ cpp2::RunningTask BistroWorkerTestThread::runTask(
   cpp2::TaskSubprocessOptions subproc_opts
 ) {
   cpp2::RunningTask rt;
-  rt.job = job;
-  rt.node = node;
-  rt.workerShard = getWorker().shard;
+  *rt.job_ref() = job;
+  *rt.node_ref() = node;
+  *rt.workerShard_ref() = *getWorker().shard_ref();
   getClient()->sync_runTask(
-    rt,
-    "",
-    cmd,
-    getSchedulerID(),
-    getWorker().id,
-    0,
-    std::move(subproc_opts)
-  );
+      rt,
+      "",
+      cmd,
+      getSchedulerID(),
+      *getWorker().id_ref(),
+      0,
+      std::move(subproc_opts));
   return rt;
 }
 

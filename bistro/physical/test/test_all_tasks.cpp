@@ -59,20 +59,20 @@ TEST(AllTasksPhysicalResourceMonitor, FetchAllAndExtractTasks) {
 
   std::vector<cpp2::GPUInfo> all_gpus;
   all_gpus.emplace_back();
-  all_gpus.back().pciBusID = "0000:28:00.0";
-  all_gpus.back().name = "Tesla K40m";
-  all_gpus.back().memoryMB = 1234;
-  all_gpus.back().compute = 0.7;
+  *all_gpus.back().pciBusID_ref() = "0000:28:00.0";
+  *all_gpus.back().name_ref() = "Tesla K40m";
+  *all_gpus.back().memoryMB_ref() = 1234;
+  *all_gpus.back().compute_ref() = 0.7;
   all_gpus.emplace_back();
-  all_gpus.back().pciBusID = "0000:33:00.0";
-  all_gpus.back().name = "MX400";
-  all_gpus.back().memoryMB = 567;
-  all_gpus.back().compute = 0.3;
+  *all_gpus.back().pciBusID_ref() = "0000:33:00.0";
+  *all_gpus.back().name_ref() = "MX400";
+  *all_gpus.back().memoryMB_ref() = 567;
+  *all_gpus.back().compute_ref() = 0.3;
   all_gpus.emplace_back();
-  all_gpus.back().pciBusID = "0000:0E:00.0";
-  all_gpus.back().name = "Quadro M6000";
-  all_gpus.back().memoryMB = 890;
-  all_gpus.back().compute = 0.99;
+  *all_gpus.back().pciBusID_ref() = "0000:0E:00.0";
+  *all_gpus.back().name_ref() = "Quadro M6000";
+  *all_gpus.back().memoryMB_ref() = 890;
+  *all_gpus.back().compute_ref() = 0.99;
 
   auto expected_task_gpus = all_gpus;
   expected_task_gpus.erase(expected_task_gpus.begin());
@@ -83,11 +83,11 @@ TEST(AllTasksPhysicalResourceMonitor, FetchAllAndExtractTasks) {
     EXPECT_EQ(all_gpus, r->gpuInfos_);
     auto task_gpus = r->taskGpus(pids.begin(), pids.end());
     std::sort(
-      task_gpus.begin(), task_gpus.end(),
-      [](const cpp2::GPUInfo& a, const cpp2::GPUInfo& b) {
-        return a.pciBusID > b.pciBusID;
-      }
-    );
+        task_gpus.begin(),
+        task_gpus.end(),
+        [](const cpp2::GPUInfo& a, const cpp2::GPUInfo& b) {
+          return *a.pciBusID_ref() > *b.pciBusID_ref();
+        });
     EXPECT_EQ(expected_task_gpus, task_gpus);
   }
 }

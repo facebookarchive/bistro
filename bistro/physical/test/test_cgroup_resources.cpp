@@ -16,8 +16,8 @@ using namespace facebook::bistro::cgroups;
 
 struct TestCGroupResources : public ::testing::Test {
   TestCGroupResources() {
-    cgopts.root = ".";
-    cgopts.slice = "sl/ice";
+    *cgopts.root_ref() = ".";
+    *cgopts.slice_ref() = "sl/ice";
   }
 
   // Our NUMA node descriptions are rooted at ".".
@@ -43,7 +43,7 @@ TEST_F(TestCGroupResources, UsableNumaMemory) {
   // No subsystem, no result.
   EXPECT_FALSE(usableNumaMemoryMB(slicePaths()).has_value());
   // Confirm we read cpuset.mems & nodes correctly.
-  cgopts.subsystems = {"cpuset"};
+  *cgopts.subsystems_ref() = {"cpuset"};
   EXPECT_EQ(kNode0MB + kNode1MB, *usableNumaMemoryMB(slicePaths()));
 }
 
@@ -51,7 +51,7 @@ TEST_F(TestCGroupResources, UsableMemoryLimit) {
   // No subsystem, no limit.
   EXPECT_FALSE(usableMemoryLimitMB(slicePaths()).has_value());
 
-  cgopts.subsystems = {"memory"};
+  *cgopts.subsystems_ref() = {"memory"};
   writeFilesToHierarchy(
     "memory/sl/ice", "memory.limit_in_bytes", {strMB(7), strMB(6), strMB(5)}
   );
@@ -79,7 +79,7 @@ TEST_F(TestCGroupResources, UsableCpuCores) {
   EXPECT_FALSE(usableCpuCores(slicePaths()).has_value());
 
   // Confirm that we only search as high up as needed to find a value.
-  cgopts.subsystems = {"cpuset"};
+  *cgopts.subsystems_ref() = {"cpuset"};
   writeFilesToHierarchy("cpuset/sl/ice", "cpuset.cpus", {{"0,2-4"}});
   EXPECT_EQ(4, *usableCpuCores(slicePaths()));
   writeFilesToHierarchy("cpuset/sl/ice", "cpuset.cpus", {{""}, {"5,9"}});
@@ -92,7 +92,7 @@ TEST_F(TestCGroupResources, TaskMemory) {
   // No subsystem, no result.
   EXPECT_FALSE(taskMemoryMB(slicePaths()).has_value());
 
-  cgopts.subsystems = {"memory"};
+  *cgopts.subsystems_ref() = {"memory"};
   writeFilesToHierarchy(
     "memory/sl/ice/task", "memory.usage_in_bytes", {strMB(37)}
   );
@@ -103,7 +103,7 @@ TEST_F(TestCGroupResources, TaskCpuTime) {
   // No subsystem, no result.
   EXPECT_FALSE(taskCpuTimeMs(slicePaths()).has_value());
 
-  cgopts.subsystems = {"cpuacct"};
+  *cgopts.subsystems_ref() = {"cpuacct"};
   writeFilesToHierarchy("cpuacct/sl/ice/task", "cpuacct.usage", {{"7000000"}});
   EXPECT_EQ(7, *taskCpuTimeMs(taskPaths()));
 }
@@ -112,7 +112,7 @@ TEST_F(TestCGroupResources, TaskPids) {
   // No subsystem, no result.
   EXPECT_TRUE(taskPids(slicePaths()).empty());
 
-  cgopts.subsystems = {"bork"};  // Any subsystem is fine
+  *cgopts.subsystems_ref() = {"bork"}; // Any subsystem is fine
   writeFilesToHierarchy("bork/sl/ice/task", "cgroup.procs", {{"1\n2\n1\n3"}});
   EXPECT_EQ((std::unordered_set<pid_t>{1, 2, 3}), taskPids(taskPaths()));
 }

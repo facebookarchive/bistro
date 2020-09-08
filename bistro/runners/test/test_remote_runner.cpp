@@ -468,7 +468,7 @@ TEST_F(TestRemoteRunnerWithOneTask, DeathDueToTaskThatTookTooLongToKill) {
     // you are affected, one workaround is to increase the
     // --CAUTION_worker_suicide_backoff_safety_margin_sec value to the point
     // where the kernel definitely has enough time to kill such stale tasks.
-    ".* Check failed: it->second\\.invocationID == rt.invocationID Cannot "
+    ".* Check failed: .* Cannot "
     "updateStatus since the invocation IDs don't match, new task "
     "RunningTask \\{.*: workerShard \\(string\\) = \"test_worker_1\",.*"
     ": workerShard \\(string\\) = \"test_worker_2\",.*\\} with status "

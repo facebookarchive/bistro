@@ -130,14 +130,14 @@ TEST_F(TestWorker, HandleNormal) {
       ASSERT_EQ("my_" + logtype + "\n", *log.lines_ref()->back().line_ref());
     } else {
       ASSERT_EQ(4, log.lines_ref()->size());
-      ASSERT_LE(start_time, *log.lines[0].time_ref());
-      ASSERT_EQ("test_job", *log.lines[0].jobID_ref());
-      ASSERT_EQ("test_node", *log.lines[0].nodeID_ref());
+      ASSERT_LE(start_time, *log.lines_ref()[0].time_ref());
+      ASSERT_EQ("test_job", *log.lines_ref()[0].jobID_ref());
+      ASSERT_EQ("test_node", *log.lines_ref()[0].nodeID_ref());
       EXPECT_EQ(
-          "running", parseJson(*log.lines[0].line_ref())["event"].asString());
+          "running", parseJson(*log.lines_ref()[0].line_ref())["event"].asString());
       // Not bothering to verify 1 & 2 since test_task_subprocess_queue
       // and test_local_runner cover these well.
-      auto j = parseJson(*log.lines[3].line_ref());
+      auto j = parseJson(*log.lines_ref()[3].line_ref());
       ASSERT_EQ("got_status", j["event"].asString());
       ASSERT_EQ("done", j["raw_status"].asString());
     }
@@ -318,10 +318,10 @@ TEST_F(TestWorker, HandleKillTask) {
       } while (i == task_to_kill && log.lines_ref()->size() < 4);
       ASSERT_LE(1, log.lines_ref()->size());
       EXPECT_EQ(
-          "running", parseJson(*log.lines[0].line_ref())["event"].asString());
+          "running", parseJson(*log.lines_ref()[0].line_ref())["event"].asString());
       if (i <= task_to_kill) {
         ASSERT_EQ(4, log.lines_ref()->size());
-        auto j = folly::parseJson(*log.lines[3].line_ref());
+        auto j = folly::parseJson(*log.lines_ref()[3].line_ref());
         EXPECT_EQ("got_status", j["event"].asString());
         EXPECT_EQ(
           "Task killed, no status returned",

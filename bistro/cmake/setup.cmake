@@ -50,6 +50,7 @@ set(
   libprotocol.so
   libthrift-core.so
   libthriftcpp2.so
+  librpcmetadata.so
   libthriftmetadata.so
   libthriftprotocol.so
   libtransport.so

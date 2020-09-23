@@ -34,7 +34,6 @@ work with the community.
 
 Although Bistro has been in production at Facebook for over 3 years, the
 present public release is partial, including just the server components.
-The CLI tools and web UI will be shipping shortly.
 
 ## Install the dependencies and build
 
@@ -127,8 +126,8 @@ curl -d '{"a":{"handler":"jobs"},"b":{"handler":"running_tasks"}}' :::6790
 curl -d '{"my subquery":{"handler":"task_logs","log_type":"stdout"}}' :::6790
 ```
 
-**Pro-tip:** If you have `perl` installed, try piping the JSON output
-through `json_pp` --- it's much easier to read!
+**Pro-tip:** For ease of reading, pipe the output through either `jq` or
+`json_pp` (from a Perl package). For longer outputs, try `| jq -C . | less -R`.
 
 You should also take a look at the scheduler configuration to see how its
 jobs, nodes, and resources were specified.

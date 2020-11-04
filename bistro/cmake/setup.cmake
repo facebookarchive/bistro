@@ -47,7 +47,6 @@ set(
   # Thrift comes in a bajillion tiny pieces :'(
   libasync.so
   libconcurrency.so
-  libprotocol.so
   libthrift-core.so
   libthriftcpp2.so
   librpcmetadata.so

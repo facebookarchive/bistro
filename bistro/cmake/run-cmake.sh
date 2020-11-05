@@ -25,6 +25,8 @@ build_type=$1
 shift 1
 # The remaining arguments will be passed to CMake
 
+# Future: replace this with FBThriftCppLibrary in the common CMake/ dir.
+#
 # TODO: This neither deletes generated files nor auto-updates CMakeLists.txt
 update_thrift() {
   echo "Generating Thrift Files"

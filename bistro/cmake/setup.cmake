@@ -5,6 +5,14 @@
 
 # Do NOT use this -- run cmake/run-cmake.sh instead & read its docblock.
 
+set(CMAKE_MODULE_PATH
+  # Shared modules to find packages
+  "${PROJECT_SOURCE_DIR}/../build/fbcode_builder/CMake"
+  # Custom modules to find packages
+  "${PROJECT_SOURCE_DIR}/cmake/deps"
+  ${CMAKE_MODULE_PATH}
+)
+
 include_directories(
   # Our includes start with "bistro/bistro/"
   "${PROJECT_SOURCE_DIR}/../.."
@@ -13,48 +21,80 @@ include_directories(
   "${CMAKE_INSTALL_PREFIX}/include"
 )
 
-link_directories("${CMAKE_INSTALL_PREFIX}/lib")
+# Future: update the Buck -> CMake script to resolve deps to the below
+# instead of linking everything to everything?
+#
+# Keep the non-Boost dependencies alphabetical, and update `bistro_deps` below.
+#
+# IMPORTANT: It appears that as of 10/2020, finding Boost does not work well
+# with `find_dependency`.  Namely, the next line runs first, and all the
+# other components that are e.g. requested by `proxygen` are never found.
+# So we have to maintain our component list as a superset of everything that
+# our dependencies use.  Please annotate these with "<project> superset hack".
+find_package(Boost 1.58 REQUIRED
+  COMPONENTS
+    context
+    date_time
+    filesystem
+    iostreams  # `proxygen` superset hack, see above
+    regex
+    system
+    thread
+)
+find_package(FBThrift CONFIG REQUIRED)
+find_package(folly CONFIG REQUIRED)
+find_package(Gflags REQUIRED)  # From the common CMake/
+find_package(Glog REQUIRED)  # From the common CMake/
+find_package(proxygen CONFIG REQUIRED)
+find_package(Sqlite3 REQUIRED)  # From Eden
+find_package(Threads REQUIRED)  # Standard module
+find_package(wangle CONFIG REQUIRED)
+# Bistro does not directly depend on this, but Proxygen does.  Remove this
+# line, and the corresponding `FindZstd.cmake` once Proxygen & Folly use a
+# standard (and inheritable) method of discovering `zstd`.
+find_package(Zstd)
 
+# Do this after "find_package" calls to avoid shenanigans from triggering
+# third-party modules.
+#
 # We generally need to track folly here, or the build may break.  E.g.
-# having `c++14` here became incompatible with folly built with `gnu++1z`.
-add_definitions(-std=gnu++1z -Wno-deprecated)
+# having `gnu++14` here became incompatible with folly built with `gnu++1z`.
+#
+# An example failure due to having C++14 is like so:
+#   undefined reference to `folly::ThreadedRepeatingFunctionRunner::add(
+#     std::__cxx11::basic_string<char,
+#         std::char_traits<char>, std::allocator<char> >,
+#     folly::Function<std::chrono::duration<long, std::ratio<1l, 1000l> > ()>,
+#     std::chrono::duration<long, std::ratio<1l, 1000l> >)'
+# This is because the `Function` is declared as `noexcept` in `folly`, and
+# as of C++17, this annotation is part of the ABI.  But if we compile with
+# C++14, it looks for an unannotated overload.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(
-  BISTRO_LINK_DEPS
-  libfolly.so
-  libfmt.so
-  libglog.so
-  libgflags.so
-  libboost_context.so
-  libboost_date_time.so
-  libboost_regex.so
-  libboost_system.so
-  libboost_thread.so
-  libboost_filesystem.so
-  libdouble-conversion.so
-  libproxygenhttpserver.so
-  libproxygen.so
-  libcrypto.so
-  libfizz.so
-  libpthread.so
-  libsqlite3.so
-  libwangle.so
-  libssl.so
-  libsodium.so
-  libz.so
-  libzstd.so
-
-  # Thrift comes in a bajillion tiny pieces :'(
-  libasync.so
-  libconcurrency.so
-  libthrift-core.so
-  libthriftcpp2.so
-  librpcmetadata.so
-  libthriftmetadata.so
-  libthriftprotocol.so
-  libtransport.so
+add_library(bistro_deps INTERFACE)
+target_link_libraries(bistro_deps
+  # The dependencies should follow the `find_package` order
+  INTERFACE
+    Boost::context
+    Boost::date_time
+    Boost::filesystem
+    Boost::regex
+    Boost::system
+    Boost::thread
+    FBThrift::thriftcpp2
+    Folly::folly
+    ${LIBGFLAGS_LIBRARY}
+    ${GLOG_LIBRARIES}
+    proxygen::proxygen
+    proxygen::proxygenhttpserver
+    ${SQLITE3_LIBRARY}
+    Threads::Threads
+    wangle::wangle
 )
 
+# Future: kill this, just link `bistro_deps` directly.
+#
 # Use this instead of target_link_libraries() because pretty much everything
 # depends on these libraries.  If CMake does not know about the
 # dependencies, it is might use the wrong link order, and then you'll see
@@ -66,7 +106,7 @@ macro(bistro_link_libraries name)
   target_link_libraries(
     ${name}
     ${ARGN}
-    ${BISTRO_LINK_DEPS}
+    bistro_deps
   )
 endmacro(bistro_link_libraries)
 

@@ -243,7 +243,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
                        pollMs(state->opts()))
                 .thenTry(
                     [ this, rt, state ](folly::Try<folly::Unit> t) noexcept {
-                      t.throwIfFailed(); // The reaper never thows, crash if it
+                      t.throwUnlessValue(); // The reaper never thows, crash if it
                                          // does.
                       logEvent(google::INFO, rt, state.get(), "cgroups_reaped");
                     });
@@ -257,7 +257,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
             for (auto& try_pipe_closed : all_closed) {
               try {
                 // DO: Use folly::exception_wrapper once wangle supports it.
-                try_pipe_closed.throwIfFailed();
+                try_pipe_closed.throwUnlessValue();
               } catch (const std::exception& e) {
                 // Carry on, the pipe is known to be closed. Logging is
                 // noexcept.

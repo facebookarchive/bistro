@@ -100,7 +100,7 @@ folly::ProcessReturnCode subprocessOutputWithTimeout(
                 std::vector<folly::Try<folly::Unit>> && allClosed) noexcept {
               for (auto& pipeClosed : allClosed) {
                 try {
-                  pipeClosed.throwIfFailed();
+                  pipeClosed.throwUnlessValue();
                 } catch (const std::exception& e) {
                   LOG(ERROR) << "task_pipe_error, message: " << e.what();
                 }

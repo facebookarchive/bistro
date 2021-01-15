@@ -88,6 +88,7 @@ def parse_targets(dirpath, s):
                 {name}
                 {deps}
             )
+            install(TARGETS {name})
         ''').format(
             name=name, srcs=_one_per_line(srcs), deps=_one_per_line(deps)
         ))

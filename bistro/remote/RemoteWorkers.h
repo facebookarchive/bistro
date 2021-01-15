@@ -60,7 +60,7 @@ private:
   // Provide a correct "less than" ordering in VersionShardSet even when the
   // version overflows.
   struct VersionAndShardEarlierThan {
-    bool operator()(const VersionAndShard& a, const VersionAndShard& b) {
+    bool operator()(const VersionAndShard& a, const VersionAndShard& b) const {
       return WorkerSetIDEarlierThan()(a.first, b.first) || (
         (a.first == b.first) && (a.second < b.second)
       );

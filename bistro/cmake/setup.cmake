@@ -49,6 +49,7 @@ find_package(proxygen CONFIG REQUIRED)
 find_package(Sqlite3 REQUIRED)  # From Eden
 find_package(Threads REQUIRED)  # Standard module
 find_package(wangle CONFIG REQUIRED)
+find_package(GTest REQUIRED)
 # Bistro does not directly depend on this, but Proxygen does.  Remove this
 # line, and the corresponding `FindZstd.cmake` once Proxygen & Folly use a
 # standard (and inheritable) method of discovering `zstd`.
@@ -91,6 +92,7 @@ target_link_libraries(bistro_deps
     ${SQLITE3_LIBRARY}
     Threads::Threads
     wangle::wangle
+    ${GTEST_LIBRARIES}
 )
 
 # Future: kill this, just link `bistro_deps` directly.
@@ -108,15 +110,29 @@ macro(bistro_link_libraries name)
     ${ARGN}
     bistro_deps
   )
+  target_include_directories(
+    ${name}
+    PUBLIC
+      ${SQLITE3_INCLUDE_DIR}
+  )
 endmacro(bistro_link_libraries)
 
-add_subdirectory(cmake/deps/gtest-1.8.1)
 enable_testing()
-include_directories("${gtest_SOURCE_DIR}/include" "${gtest_SOURCE_DIR}")
+add_library(gtest INTERFACE)
+target_include_directories(gtest INTERFACE ${GTEST_INCLUDE_DIRS})
+target_link_libraries(gtest INTERFACE ${GTEST_LIBRARIES})
 
 add_library(
   folly_gtest_main STATIC
   folly_gtest_main.cpp
+)
+target_include_directories(
+  folly_gtest_main PUBLIC
+  ${GTEST_INCLUDE_DIR}
+)
+target_link_libraries(folly_gtest_main
+  PUBLIC
+    bistro_deps
 )
 
 macro(add_gtest name)

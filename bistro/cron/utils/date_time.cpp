@@ -75,17 +75,9 @@ UTCTimestampsForLocalTime _systemTimezoneLocalPTimeToUTCTimestamps(
 ) {
   UTCTimestampsForLocalTime res;
   struct tm tm = to_tm(local_pt);
-  auto save_timestamp_if_valid = [tm, &local_pt](int is_dst, time_t *out) {
-    // Try to make a UTC timestamp based on our DST guess and local time.
-    struct tm tmp_tm = tm;  // Make a copy since mktime changes the tm
-    tmp_tm.tm_isdst = is_dst;
-    time_t t = mktime(&tmp_tm);
-    if (t == -1) {  // Not sure of the error cause or how to handle it.
-      throw logic_error(folly::format(
-        "{}: mktime error {}", to_simple_string(local_pt), errno
-      ).str());
-    }
 
+  auto save_timestamp_if_valid = [tm, &local_pt](
+      time_t t, int is_dst, time_t *out) {
     // Convert the timestamp to a local time to see if the guess was right.
     struct tm new_tm;
     auto out_tm = localtime_r(&t, &new_tm);
@@ -136,24 +128,45 @@ UTCTimestampsForLocalTime _systemTimezoneLocalPTimeToUTCTimestamps(
     return new_tm.tm_isdst < 0;  // Used for a sanity-check below.
   };
 
-  bool neg_isdst1 = save_timestamp_if_valid(1, &res.dst_time);
-  bool neg_isdst2 = save_timestamp_if_valid(0, &res.non_dst_time);
-
+  int num_negative_isdst = 0;
+  int num_missing_timestamps = 0;
+  for (int is_dst = 0; is_dst <= 1; ++is_dst) {
+    // Try to make a UTC timestamp based on our DST guess and local time.
+    struct tm tmp_tm = tm;  // Make a copy since mktime changes the tm
+    tmp_tm.tm_isdst = is_dst;
+    time_t t = mktime(&tmp_tm);
+    if (t == -1) {  // Not sure of the error cause or how to handle it.
+      ++num_missing_timestamps;
+      continue;
+    }
+    num_negative_isdst += save_timestamp_if_valid(
+        t, is_dst, is_dst ? &res.dst_time : &res.non_dst_time);
+  }
   // The only legitimate way for localtime_r() to give back a negative
   // tm_isdst is if the input local time label is ambiguous due to DST.
-  if (neg_isdst1 || neg_isdst2) {
-    if (neg_isdst1 ^ neg_isdst2) {  // Can't be ambiguous half the time
+  //
+  // FWIW, we could also error on `isAmbiguous && !num_negative_isdst`,
+  // but it shouldn't affect our correctness.
+  if (num_negative_isdst && !res.isAmbiguous()) {
+    throw logic_error(folly::format(
+      "{}: negative tm_isdst but time label is unambiguous",
+      to_simple_string(local_pt)
+    ).str());
+  }
+  // On older glibc versions, `mktime` would succeed even when `is_dst` was
+  // invalid.
+  if (num_missing_timestamps == 0) {
+    if (num_negative_isdst == 1) {  // Can't be ambiguous half the time
       throw logic_error(folly::format(
         "{}: one tm_isdst negative but not both", to_simple_string(local_pt)
       ).str());
     }
-    if (!res.isAmbiguous()) {
-      throw logic_error(folly::format(
-        "{}: negative tm_isdst but time label is unambiguous",
-        to_simple_string(local_pt)
-      ).str());
-    }
+  } else if (num_missing_timestamps == 2) {
+    throw logic_error(folly::format(
+      "{}: mktime failed for both is_dst choices", to_simple_string(local_pt)
+    ).str());
   }
+
   return res;
 }
 

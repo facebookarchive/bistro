@@ -164,7 +164,7 @@ cpp2::BistroJobConfig toThrift(const std::string& name, const dynamic& d) {
     if (maybe_kill_ms.has_value()) {
       config.killOrphanTasksAfterSec_ref() = 0.001 * maybe_kill_ms->count();
     } else {
-      config.__isset.killOrphanTasksAfterSec = false;
+      apache::thrift::unset_unsafe(config.killOrphanTasksAfterSec_ref());
     }
   }
   parseTaskSubprocessOptions(&p, &(*config.taskSubprocessOptions_ref()));

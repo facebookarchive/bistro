@@ -120,7 +120,7 @@ folly::Optional<wangle::SSLContextConfig> createSslConfig() {
   config.sslVersion = SSLContext::SSLVersion::TLSv1_2;
   // Since we don't currently rely on TLS for auth, it's fine if the client
   // does not present a certificate.
-  config.clientVerification = SSLContext::SSLVerifyPeerEnum::VERIFY;
+  config.clientVerification = SSLContext::VerifyClientCertificate::IF_PRESENTED;
   config.setCertificate(certPath, keyPath, "");  // empty passwordPath
   config.clientCAFile = caPath;
   config.eccCurveName = "prime256v1";

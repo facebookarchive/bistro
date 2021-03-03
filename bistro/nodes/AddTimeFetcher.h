@@ -8,6 +8,7 @@
 #pragma once
 
 #include <boost/date_time/local_time/local_time_types.hpp>
+#include <fmt/core.h>
 #include <folly/json.h>
 #include <unordered_map>
 
@@ -168,13 +169,12 @@ public:
     // Use the "parent_level" pref to get my parents and my level ID.
     const auto my_level_and_parents =
       getMyLevelAndParents(config, node_config, all_nodes);
-    std::map<string, string> format_args;
     for (const auto& parent : my_level_and_parents.second) {
-      format_args["parent"] = parent->name();
       for (const auto& tags_and_enabled : time_to_tags_and_enabled) {
-        format_args["time"] = folly::to<string>(tags_and_enabled.first);
         all_nodes->add(
-          folly::vformat(format_str, format_args).str(),
+           fmt::format(format_str,
+            fmt::arg("parent",  parent->name()),
+            fmt::arg("time",  folly::to<string>(tags_and_enabled.first))),
           my_level_and_parents.first,
           tags_and_enabled.second.second,
           parent.get(),

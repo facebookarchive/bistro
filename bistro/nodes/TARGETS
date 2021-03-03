@@ -25,6 +25,7 @@ cpp_library(
         "utils.h",
     ],
     deps = [
+        "fbsource//third-party/fmt:fmt",
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/cron:cron_lib",
         "//bistro/bistro/utils:exception_lib",

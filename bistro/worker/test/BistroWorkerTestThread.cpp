@@ -12,7 +12,6 @@
 #include <folly/io/async/AsyncSocket.h>
 
 #include "bistro/bistro/utils/server_socket.h"
-#include "bistro/bistro/utils/service_clients.h"
 #include "bistro/bistro/if/gen-cpp2/BistroScheduler.h"
 
 namespace facebook { namespace bistro {
@@ -26,7 +25,7 @@ BistroWorkerTestThread::BistroWorkerTestThread(
     StateTransitionCob state_transition_cob) {
 
   auto ts = make_shared<ThriftServer>();
-  auto socket_and_addr = getServerSocketAndAddress();
+  auto socket_and_addr = getListeningServerSocketAndAddress();
   workerPtr_ = make_shared<BistroWorkerHandler>(
       ts,
       dataDir_.getPath().native(), // each worker runs in its own directory

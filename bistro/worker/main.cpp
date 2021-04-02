@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
   *scheduler_addr.ip_or_host_ref() = FLAGS_scheduler_host;
   *scheduler_addr.port_ref() = FLAGS_scheduler_port;
 
-  auto my_socket_and_addr = getServerSocketAndAddress();
+  auto my_socket_and_addr = getListeningServerSocketAndAddress();
   auto server = std::make_shared<apache::thrift::ThriftServer>();
   auto handler = std::make_shared<BistroWorkerHandler>(
       server, // The handler calls server->stop() on suicide.

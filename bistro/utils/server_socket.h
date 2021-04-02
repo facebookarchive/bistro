@@ -24,6 +24,6 @@ namespace facebook { namespace bistro {
  * This is a good place to add proxy support.
  */
 std::pair<folly::AsyncServerSocket::UniquePtr, cpp2::ServiceAddress>
-  getServerSocketAndAddress();
+  getListeningServerSocketAndAddress();
 
 }}

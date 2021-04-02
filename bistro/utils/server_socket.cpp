@@ -162,7 +162,7 @@ std::string guessPrimaryInterfaceAddress() {
 }  // anonymous namespace
 
 std::pair<folly::AsyncServerSocket::UniquePtr, cpp2::ServiceAddress>
-    getServerSocketAndAddress() {
+    getListeningServerSocketAndAddress() {
 
   // Pick the address to listen on
   cpp2::ServiceAddress addr;
@@ -188,6 +188,12 @@ std::pair<folly::AsyncServerSocket::UniquePtr, cpp2::ServiceAddress>
     socket->bind(
         folly::SocketAddress(*addr.ip_or_host_ref(), *addr.port_ref()));
   }
+
+  // Start listening on the socket right away because this guarantees that
+  // BistroWorkerHandler can immediately send out a heartbeat, without
+  // checking whether or not its ThriftServer is up.
+  socket->listen(1024);
+  socket->startAccepting();
 
   return std::make_pair(std::move(socket), std::move(addr));
 }

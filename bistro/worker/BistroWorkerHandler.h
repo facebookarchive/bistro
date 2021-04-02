@@ -50,6 +50,7 @@ public:
     SchedulerClientFn,
     const std::string& worker_command,
     // How can external clients connect to this worker?
+    // IMPORTANT: This socket must be listening already, see `heartbeat()`.
     const cpp2::ServiceAddress& addr,
     // What local port is this worker locking? (see MachinePortLock)
     int32_t locked_port
@@ -217,12 +218,6 @@ private:
   // When a new scheduler instance connects, send it our running tasks.
   bool gotNewSchedulerInstance_;  // Used only by the heartbeat() thread.
 
-  // Before we sent out any heartbeats, the worker makes sure that our
-  // "external" IP address actually works, at least locally.  This is also
-  // prevents us from sending the heartbeat before the worker's Thrift
-  // server is up.
-  bool canConnectToMyself_;  // Used only by the heartbeat() thread.
-
   // Flipped from true to false when the scheduler starts to commit suicide.
   // While the worker kill its tasks, this has the effect of blocking new
   // tasks from running.
@@ -239,6 +234,10 @@ private:
   };
   folly::Synchronized<UsablePhysicalResources> usablePhysicalResources_;
 
+  // It is REQUIRED that the socket that `server_` will use is already
+  // listening at the time that `BistroWorkerHandler` is constructed, see
+  // `heartbeat()`.
+  //
   // To suicide gracefully, the handler needs to be able to stop its server.
   // Must be a weak_ptr to avoid a circular server<->handler dependency.
   std::weak_ptr<apache::thrift::ThriftServer> server_;

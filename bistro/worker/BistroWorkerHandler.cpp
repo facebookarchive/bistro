@@ -26,7 +26,6 @@
 #include "bistro/bistro/utils/hostname.h"
 #include "bistro/bistro/utils/LogLines.h"
 #include "bistro/bistro/utils/LogWriter.h"
-#include "bistro/bistro/utils/service_clients.h"
 #include "bistro/bistro/if/gen-cpp2/worker_types.h"
 
 DEFINE_string(
@@ -125,7 +124,6 @@ BistroWorkerHandler::BistroWorkerHandler(
       worker_(makeWorker(addr, locked_port, logStateTransitionFn_)),
       state_(RemoteWorkerState(*worker_.id_ref()->startTime_ref())),
       gotNewSchedulerInstance_(true),
-      canConnectToMyself_(false),
       server_(std::move(server)) {
   // No scheduler associated yet, so use a dummy instance ID and timeouts
   *schedulerState_->id_ref()->startTime_ref() = 0;
@@ -667,25 +665,8 @@ std::chrono::seconds BistroWorkerHandler::heartbeat() noexcept {
   if (committingSuicide_.load()) {  // Stop sending heartbeats once dying.
     return std::chrono::seconds(1);
   }
-  if (!canConnectToMyself_) {
-    // Make a transient event base since we only use it for one sync call.
-    EventBase evb;
-    try {
-      // Make a dummy request to myself to see if the server is up and
-      // accessible via the external address to be used for heartbeats.
-      cpp2::LogLines ignored;
-      getAsyncClientForAddress<cpp2::BistroWorkerAsyncClient>(
-          &evb, *worker_.addr_ref())
-          ->sync_getJobLogsByID(ignored, "statuses", {}, {}, 0, false, 1, "");
-      canConnectToMyself_ = true;
-      // Fall through to sending a heartbeat
-    } catch (const apache::thrift::TException& e) {
-      LOG(WARNING) << "Waiting for this worker to start listening on "
-                   << debugString(*worker_.addr_ref()) << ": " << e.what();
-      return std::chrono::seconds(1);
-    }
-    logStateTransitionFn_("listening", worker_, nullptr);
-  }
+  // The handler's invariant is that that `server_`'s socket is already
+  // listening, so the scheduler will have no problem talking back to us.
   try {
     cpp2::SchedulerHeartbeatResponse res;
     // Create a copy of worker and update system resources

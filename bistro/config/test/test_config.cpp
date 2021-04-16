@@ -16,7 +16,6 @@
 #include "bistro/bistro/scheduler/SchedulerPolicyRegistry.h"
 #include "bistro/bistro/if/gen-cpp2/common_types_custom_protocol.h"
 
-using apache::thrift::debugString;
 using namespace facebook::bistro;
 using namespace folly;
 using namespace std;

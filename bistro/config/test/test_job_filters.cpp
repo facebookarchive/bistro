@@ -15,7 +15,6 @@
 using namespace facebook::bistro;
 using namespace folly;
 using namespace std;
-using boost::regex;
 
 #define DOES_PASS(filters, name) EXPECT_TRUE(filters.doesPass("", Node(name)))
 #define DOESNT_PASS(filters, name) \

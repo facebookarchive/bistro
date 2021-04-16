@@ -15,7 +15,6 @@
 
 namespace facebook { namespace bistro {
 
-using namespace folly;
 using namespace std;
 
 namespace {

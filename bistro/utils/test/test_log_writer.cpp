@@ -14,7 +14,6 @@
 #include "bistro/bistro/utils/LogWriter.h"
 #include "bistro/bistro/utils/TemporaryFile.h"
 
-using namespace facebook;
 using namespace facebook::bistro;
 
 DECLARE_int32(log_retention);

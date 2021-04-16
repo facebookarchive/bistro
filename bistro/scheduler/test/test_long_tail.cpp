@@ -10,7 +10,6 @@
 #include "bistro/bistro/scheduler/test/utils.h"
 #include "bistro/bistro/scheduler/LongTailSchedulerPolicy.h"
 
-using namespace folly;
 using namespace std;
 using namespace facebook::bistro;
 

@@ -14,7 +14,6 @@
 #include <folly/dynamic.h>
 #include <folly/json.h>
 
-using namespace facebook::bistro::detail_cron;
 using namespace facebook::bistro;
 using namespace folly;
 using namespace std;

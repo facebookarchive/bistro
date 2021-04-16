@@ -17,7 +17,6 @@ using namespace facebook::bistro::detail_cron;
 using namespace boost::local_time;
 using namespace boost::gregorian;
 using namespace boost::posix_time;
-using namespace std;
 
 enum class Ambiguity {
   Unique,

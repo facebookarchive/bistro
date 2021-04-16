@@ -11,7 +11,6 @@
 #include "bistro/bistro/config/Node.h"
 #include "bistro/bistro/nodes/Nodes.h"
 #include "bistro/bistro/nodes/NodesLoader.h"
-#include "bistro/bistro/utils/hostname.h"
 #include "bistro/bistro/nodes/test/utils.h"
 #include "bistro/bistro/utils/Exception.h"
 #include <folly/Conv.h>

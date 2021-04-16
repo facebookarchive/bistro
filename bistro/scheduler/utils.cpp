@@ -15,7 +15,6 @@
 
 namespace facebook { namespace bistro {
 
-using namespace std;
 
 /**
  * Try to schedule the given node and job, satisfying resource constraints. If

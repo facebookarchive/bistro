@@ -14,7 +14,6 @@
 
 using namespace facebook::bistro;
 using namespace folly;
-using namespace std;
 
 TEST(TestJob, HandleWorkerLocality) {
   Config c(dynamic::object

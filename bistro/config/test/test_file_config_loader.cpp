@@ -17,8 +17,6 @@
 #include "bistro/bistro/utils/TemporaryFile.h"
 
 using namespace facebook::bistro;
-using namespace folly;
-using namespace std;
 
 TEST(TestFileConfigLoader, HandleValidConfig) {
   registerSchedulerPolicy(kSchedulePolicyRankedPriority.str(), nullptr);

@@ -33,7 +33,6 @@ cpp_library(
         "//common/fb303/cpp:fb303",
         "//folly:conv",
         "//folly:dynamic",
-        "//folly:json",
         "//folly:mpmc_queue",
         "//folly:optional",
         "//folly:synchronized",

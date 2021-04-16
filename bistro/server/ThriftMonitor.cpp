@@ -29,9 +29,7 @@
 
 namespace facebook { namespace bistro {
 
-using namespace folly;
 using namespace std;
-using apache::thrift::debugString;
 
 ThriftMonitor::ThriftMonitor(
     shared_ptr<ConfigLoader> config_loader,

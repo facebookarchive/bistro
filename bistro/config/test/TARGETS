@@ -22,7 +22,7 @@ cpp_unittest(
     deps = [
         "//bistro/bistro/config:config_lib",
         "//folly:conv",
-        "//folly:json",
+        "//folly:dynamic",
         "//folly/experimental:test_util",
     ],
 )

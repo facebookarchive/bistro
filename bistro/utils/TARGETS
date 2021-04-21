@@ -74,7 +74,7 @@ cpp_library(
         "//folly/experimental:threaded_repeating_function_runner",
         "//folly/io/async:async_socket",
         "//folly/io/async:server_socket",
-        "//thrift/lib/cpp2:header_client_channel",
+        "//thrift/lib/cpp2/async:header_client_channel",
         "//thrift/lib/cpp2/protocol:protocol",
     ],
     external_deps = [

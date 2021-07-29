@@ -141,8 +141,8 @@ void processRunningTasks(
     node_to_tasks[*id_and_task.second.node_ref()].push_front(
         &id_and_task.second);
     for (const auto& nr : *rt.nodeResources_ref()) {
-      auto& resources = node_used_resources[nr.node];
-      for (const auto& res : nr.resources) {
+      auto& resources = node_used_resources[*nr.node_ref()];
+      for (const auto& res : *nr.resources_ref()) {
         resources.push_back(&res);
       }
     }
@@ -184,10 +184,10 @@ void processRunningTasks(
       auto resources_it = node_used_resources.find(node->name());
       if (resources_it != node_used_resources.end()) {
         for (const cpp2::Resource* r : resources_it->second) {
-          auto rsrc_it = lng.second.resourceToIndex_.find(r->name);
+          auto rsrc_it = lng.second.resourceToIndex_.find(*r->name_ref());
           if (rsrc_it == lng.second.resourceToIndex_.end()) {
             LOG(ERROR) << error.report(
-              "Resource ", r->name, " not found in the node-group of node ",
+              "Resource ", *r->name_ref(), " not found in the node-group of node ",
               node->name(), ": ", debugString(*r)
             );
             // We log, and ignore the bad resource as if it didn't exist.
@@ -196,10 +196,10 @@ void processRunningTasks(
             continue;
           }
           auto& amount = packed_resources.at(node->offset + rsrc_it->second);
-          amount -= r->amount;
+          amount -= *r->amount_ref();
           if (amount < 0) {
             LOG(ERROR) << error.report(
-              "Resource ", r->name, " is ", amount, " on node ", node->name(),
+              "Resource ", *r->name_ref(), " is ", amount, " on node ", node->name(),
               " for ", debugString(*r)
             );
           }
@@ -232,7 +232,7 @@ void processRunningTasks(
     std::string rs;
     size_t num_worker_resources = 0;
     for (const cpp2::Resource* r : p.second) {
-      num_worker_resources += worker_resource_names.count(r->name);
+      num_worker_resources += worker_resource_names.count(*r->name_ref());
       rs += debugString(*r) + "\n";
     }
     if (num_worker_resources != 0) {

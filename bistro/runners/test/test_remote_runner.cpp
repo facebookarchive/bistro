@@ -519,8 +519,8 @@ TEST_F(TestRemoteRunnerWithOneTask, LostTasksHaveAMinimumBackoff) {
         status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
       );
       // The next backoff value is computed on the basis of this struct.
-      EXPECT_FALSE(status.configuredBackoffDuration().noMoreBackoffs);
-      EXPECT_EQ(kDefaultBackoff, status.configuredBackoffDuration().seconds);
+      EXPECT_FALSE(*status.configuredBackoffDuration().noMoreBackoffs_ref());
+      EXPECT_EQ(kDefaultBackoff, *status.configuredBackoffDuration().seconds_ref());
       // But the effective backoff duration is longer.
       auto expiration_time = status.timestamp() + kExtendedBackoff;
       EXPECT_TRUE(status.isInBackoff(expiration_time - 1));
@@ -564,9 +564,9 @@ TEST_F(TestRemoteRunnerWithOneTask, LostTasksHaveAMinimumBackoff) {
         status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
       );
       // The next backoff value is computed on the basis of this struct.
-      EXPECT_TRUE(status.configuredBackoffDuration().noMoreBackoffs);
+      EXPECT_TRUE(*status.configuredBackoffDuration().noMoreBackoffs_ref());
       // No backoff, no duration (even though `60` was saved).
-      EXPECT_EQ(0, status.configuredBackoffDuration().seconds);
+      EXPECT_EQ(0, *status.configuredBackoffDuration().seconds_ref());
       {
         // The effective backoff duration is intact.
         auto expiration_time = status.timestamp() + kExtendedBackoff;
@@ -595,8 +595,8 @@ TEST_F(TestRemoteRunnerWithOneTask, LostTasksHaveAMinimumBackoff) {
         new_status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
       );
       // The next backoff value is computed on the basis of this struct.
-      EXPECT_FALSE(new_status.configuredBackoffDuration().noMoreBackoffs);
-      EXPECT_EQ(0, new_status.configuredBackoffDuration().seconds);
+      EXPECT_FALSE(*new_status.configuredBackoffDuration().noMoreBackoffs_ref());
+      EXPECT_EQ(0, *new_status.configuredBackoffDuration().seconds_ref());
       {
         // The effective backoff duration is intact.
         auto expiration_time = new_status.timestamp() + kExtendedBackoff;

@@ -81,8 +81,8 @@ TaskRunnerResponse TaskRunner::runTask(
   } else {
     // Make up something. Or, should I leave this unset, and check in Snapshot?
     cpp2::BackoffDuration bd;
-    bd.seconds = 0;
-    bd.noMoreBackoffs = false;
+    *bd.seconds_ref() = 0;
+    *bd.noMoreBackoffs_ref() = false;
     *rt.nextBackoffDuration_ref() = job->backoffSettings().getNext(bd);
   }
   *rt.workerSuicideTaskKillWaitMs_ref() =
@@ -107,15 +107,15 @@ cpp2::NodeResources* TaskRunner::addNodeResourcesToRunningTask(
 
   out_rt->nodeResources_ref()->emplace_back();
   auto& nr = out_rt->nodeResources_ref()->back();
-  nr.node = node_name;
+  *nr.node_ref() = node_name;
 
   auto& node_resources =
-    ((*out_resources_by_node)[nr.node] = folly::dynamic::object());
+    ((*out_resources_by_node)[*nr.node_ref()] = folly::dynamic::object());
 
   for (int resource_id : resource_ids) {
     const auto& rsrc_name = config.resourceNames.lookup(resource_id);
     const auto rsrc_val = job_resources[resource_id];
-    nr.resources.emplace_back(apache::thrift::FRAGILE, rsrc_name, rsrc_val);
+    nr.resources_ref()->emplace_back(apache::thrift::FRAGILE, rsrc_name, rsrc_val);
     node_resources[rsrc_name] = rsrc_val;
   }
 

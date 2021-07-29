@@ -93,7 +93,7 @@ TEST(TestTaskStatuses, HandleTaskStore) {
   EXPECT_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 
   auto rt = makeRT("job1", "db2");
-  rt.nextBackoffDuration_ref()->noMoreBackoffs = true;
+  *rt.nextBackoffDuration_ref()->noMoreBackoffs_ref() = true;
   task_statuses->updateStatus(rt, TaskStatus::errorBackoff(""));
 
   // job1:db3 is still running, let's delete the job, and make sure that

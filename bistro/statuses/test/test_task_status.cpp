@@ -140,8 +140,8 @@ TEST(TestTaskStatus, WorkerLostIntoBackoff) {
   for (int backoff_to_fail = 0; backoff_to_fail <= 1; ++backoff_to_fail) {
     auto s = TaskStatus::running();
     cpp2::RunningTask rt;
-    rt.nextBackoffDuration_ref()->noMoreBackoffs = backoff_to_fail;
-    rt.nextBackoffDuration_ref()->seconds = kEffectiveBackoff;
+    *rt.nextBackoffDuration_ref()->noMoreBackoffs_ref() = backoff_to_fail;
+    *rt.nextBackoffDuration_ref()->seconds_ref() = kEffectiveBackoff;
     // workerLost() is always used with update()
     s.update(rt, TaskStatus::workerLost("worker1", kConfiguredBackoff));
 
@@ -159,8 +159,8 @@ TEST(TestTaskStatus, WorkerLostIntoBackoff) {
 
       // Check that we stored the configured backoff correctly.
       auto bd = s.configuredBackoffDuration();
-      EXPECT_EQ(backoff_to_fail && !forgive, bd.noMoreBackoffs);
-      EXPECT_EQ(backoff_to_fail ? 0 : kSavedBackoff, bd.seconds);
+      EXPECT_EQ(backoff_to_fail && !forgive, *bd.noMoreBackoffs_ref());
+      EXPECT_EQ(backoff_to_fail ? 0 : kSavedBackoff, *bd.seconds_ref());
 
       // The effective backoff differs from the configured one, and
       // is NOT forgiven.

@@ -15,11 +15,11 @@ using folly::dynamic;
 cpp2::BackoffDuration bd(int i) {
   cpp2::BackoffDuration d;
   if (i == -1) {
-    d.noMoreBackoffs = true;
-    d.seconds = 60;  // Hardcoded in JobBackoffSettings.cpp
+    *d.noMoreBackoffs_ref() = true;
+    *d.seconds_ref() = 60;  // Hardcoded in JobBackoffSettings.cpp
   } else {
-    d.noMoreBackoffs = false;
-    d.seconds = i;
+    *d.noMoreBackoffs_ref() = false;
+    *d.seconds_ref() = i;
   }
   return d;
 }

@@ -116,7 +116,7 @@ void clampPhysical(T* phys, double unclamped, const cpp2::Resource& r) {
     *phys = unclamped;
     return;
   }
-  LOG(WARNING) << "Clamping physical value of " << r.name << " from "
+  LOG(WARNING) << "Clamping physical value of " << *r.name_ref() << " from "
     << unclamped << " to limit " << *phys;
 }
 
@@ -125,7 +125,7 @@ void logicalToIntPhysicalResource(
     T* phys,
     const cpp2::PhysicalResourceConfig& p,
     const cpp2::Resource& r) {
-  clampPhysical(phys, ::round(*p.multiplyLogicalBy_ref() * r.amount), r);
+  clampPhysical(phys, ::round(*p.multiplyLogicalBy_ref() * *r.amount_ref()), r);
 }
 
 folly::Optional<int> physicalToLogicalResource(
@@ -254,7 +254,7 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
     for (const auto& id_and_task : running_tasks) {
       const auto& rt = id_and_task.second;
       for (const auto& nr : *rt.nodeResources_ref()) {
-        if (nr.node != *rt.workerShard_ref()) {
+        if (*nr.node_ref() != *rt.workerShard_ref()) {
           continue;  // These are tracked in Scheduler
         }
         auto it = workerResources_.find(*rt.workerShard_ref());
@@ -267,12 +267,12 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
           break;  // cannot use this running task's resources
         }
         auto& resources = it->second;
-        for (const auto r : nr.resources) {
-          auto rid = config->resourceNames.lookup(r.name);
+        for (const auto r : *nr.resources_ref()) {
+          auto rid = config->resourceNames.lookup(*r.name_ref());
           if (rid == StringTable::NotFound || rid >= resources.size()) {
             LOG(ERROR) << error.report(
                 "Resource ",
-                r.name,
+                *r.name_ref(),
                 "/",
                 rid,
                 " not valid or known for worker ",
@@ -281,11 +281,11 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
                 debugString(rt));
             continue;
           }
-          resources[rid] -= r.amount;
+          resources[rid] -= *r.amount_ref();
           if (resources[rid] < 0) {
             LOG(ERROR) << error.report(
                 "Resource ",
-                r.name,
+                *r.name_ref(),
                 " is ",
                 resources[rid],
                 " on worker ",
@@ -641,8 +641,8 @@ TaskRunnerResponse RemoteWorkerRunner::runTaskImpl(
               *rt.workerShard_ref(),
               workerLevel_,
               job->resources())) {
-        for (const auto& r : nr->resources) {
-          auto phys_it = config->logicalToPhysical.find(r.name);
+        for (const auto& r : *nr->resources_ref()) {
+          auto phys_it = config->logicalToPhysical.find(*r.name_ref());
           if (phys_it != config->logicalToPhysical.end()) {
             const auto& p =  // at() is like CHECK, since this is `noexcept`
               config->physicalResourceConfigs.at(phys_it->second);
@@ -948,11 +948,11 @@ void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
                : *tweaked_rt.workerSuicideTaskKillWaitMs_ref()) /
               1000 +
           1; // a lazy way of rounding up, same as in my "initial wait" math
-      if (kSafeBackoffSec > original_rt.nextBackoffDuration_ref()->seconds) {
+      if (kSafeBackoffSec > *original_rt.nextBackoffDuration_ref()->seconds_ref()) {
         // This safe value will be used even if `noMoreBackoffs` is true,
         // and the task is forgiven -- `TaskStatus::forgive()` makes a
         // special provision for this.
-        tweaked_rt.nextBackoffDuration_ref()->seconds = kSafeBackoffSec;
+        *tweaked_rt.nextBackoffDuration_ref()->seconds_ref() = kSafeBackoffSec;
       }
       // IMPORTANT: Do not call recordFailedTask here because the lost tasks
       // are automatically recorded by RemoteWorker::loseRunningTasks.  See
@@ -967,7 +967,7 @@ void RemoteWorkerRunner::applyUpdate(RemoteWorkerUpdate* update) {
               // the job-configured backoff value the status would have had
               // **after** the update().  Storing it before the update() is
               // hacky, but who's watching?
-              original_rt.nextBackoffDuration_ref()->seconds));
+              *original_rt.nextBackoffDuration_ref()->seconds_ref()));
     }
   }
   // This may change the state of a worker from NEW to UNHEALTHY. For

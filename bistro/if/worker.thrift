@@ -16,11 +16,10 @@ namespace py facebook.bistro.worker
  ***************************************************************************/
 
 exception BistroWorkerException {
-  1: string message,
+  1: string message;
 } (message = 'message')
 
 service BistroWorker extends fb303.FacebookService {
-
   /**
    * Invoked whenever a worker connects to a scheduler for the first time.
    * This means the scheduler can be restarted without losing running tasks.
@@ -48,9 +47,7 @@ service BistroWorker extends fb303.FacebookService {
    *    move this worker from a NEW to a HEALTHY state, and try to runTask.
    *    Of course, its runTask()s would fail, so no real harm is done.
    */
-  list<common.RunningTask> getRunningTasks(
-    1: common.BistroInstanceID worker
-  );
+  list<common.RunningTask> getRunningTasks(1: common.BistroInstanceID worker);
 
   /**
    * Start the requested task on the worker if the worker considers itself
@@ -90,11 +87,11 @@ service BistroWorker extends fb303.FacebookService {
    *    which case the scheduler ID is not checked, see code).
    */
   void runTask(
-    1: common.RunningTask rt,  // replay protection: check task, invocation IDs
+    1: common.RunningTask rt, // replay protection: check task, invocation IDs
     // The config passed to the task, the 3rd JSON command-line argument.
     2: string config,
     // Binary to run. If empty, run the default worker command.
-    3: list<string> command,  // node, status, and config are the 3 arguments
+    3: list<string> command, // node, status, and config are the 3 arguments
     // Identify the originating scheduler, and the the worker, for which
     // this task was intended.  In the event of mistaken identity, the
     // worker must refuse to start the task.  One instance of mistaken
@@ -222,10 +219,10 @@ service BistroWorker extends fb303.FacebookService {
    *   this adds yet another way to mutate task status on the scheduler.
    */
   void notifyIfTasksNotRunning(
-    1: list<common.RunningTask> rts,  // checks task & invocation IDs
+    1: list<common.RunningTask> rts, // checks task & invocation IDs
     3: common.BistroInstanceID scheduler,
     4: common.BistroInstanceID worker,
-    5: i64 notify_if_tasks_not_running_sequence_num,  // See runTask comment
+    5: i64 notify_if_tasks_not_running_sequence_num, // See runTask comment
   );
 
   /**
@@ -324,13 +321,12 @@ service BistroWorker extends fb303.FacebookService {
    *    state, so there are no ordering issues with the other worker calls.
    */
   common.LogLines getJobLogsByID(
-    1: string logtype,  // "stdout" or "stderr" or "statuses"
+    1: string logtype, // "stdout" or "stderr" or "statuses"
     2: list<string> job_ids,
     3: list<string> node_ids,
-    4: i64 line_id,  // Get >= lines if is_ascending, =< otherwise
-    5: bool is_ascending,  // Order in which to look through the logs
+    4: i64 line_id, // Get >= lines if is_ascending, =< otherwise
+    5: bool is_ascending, // Order in which to look through the logs
     6: i32 limit,
     7: string regex_filter,
   ) throws (1: BistroWorkerException ex);
-
 }

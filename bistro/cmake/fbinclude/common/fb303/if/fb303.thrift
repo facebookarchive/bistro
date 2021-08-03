@@ -20,5 +20,5 @@ enum fb_status {
 }
 
 service FacebookService {
-  fb_status getStatus()
+  fb_status getStatus();
 }

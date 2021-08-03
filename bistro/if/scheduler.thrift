@@ -19,66 +19,67 @@ typedef map<string, i32> (cpp.template = "std::unordered_map") stringToIntMap
 typedef set<string> (cpp.template = "std::unordered_set") stringSet
 
 struct BistroJobConfigFilters {
-  1: stringSet whitelist,
-  2: string whitelistRegex,
-  3: stringSet blacklist,
-  4: string blacklistRegex,
-  5: double fractionOfNodes = 1.0,
-  6: stringSet tagWhitelist,
+  1: stringSet whitelist;
+  2: string whitelistRegex;
+  3: stringSet blacklist;
+  4: string blacklistRegex;
+  5: double fractionOfNodes = 1.0;
+  6: stringSet tagWhitelist;
 }
 
-typedef map<string, BistroJobConfigFilters>
-  (cpp.template = "std::unordered_map")
-    stringToFiltersMap
+typedef map<string, BistroJobConfigFilters> (
+  cpp.template = "std::unordered_map",
+) stringToFiltersMap
 
 struct BistroJobConfig {
-  1: string name,
-  2: bool enabled = 0,
-  3: string owner,
+  1: string name;
+  2: bool enabled = 0;
+  3: string owner;
   // Map of resource name => resources required
-  4: stringToIntMap resources,
-  5: string config,
-  6: double priority = 1.0,
-  7: stringToFiltersMap filters,
-  8: string error,
-  9: list<i32> backoffValues,
-  10: bool backoffRepeat,
+  4: stringToIntMap resources;
+  5: string config;
+  6: double priority = 1.0;
+  7: stringToFiltersMap filters;
+  8: string error;
+  9: list<i32> backoffValues;
+  10: bool backoffRepeat;
   // createTime & modifyTime may not be set -- only valid if they're positive.
-  11: i64 createTime = 0,
-  12: i64 modifyTime = 0,
-  13: string levelForTasks,
-  14: string levelForHostPlacement,
-  15: list<string> dependsOn,
-  16: string hostPlacement,
-  17: optional double killOrphanTasksAfterSec,
-  19: common.TaskSubprocessOptions taskSubprocessOptions,
-  20: common.KillRequest killRequest,
+  11: i64 createTime = 0;
+  12: i64 modifyTime = 0;
+  13: string levelForTasks;
+  14: string levelForHostPlacement;
+  15: list<string> dependsOn;
+  16: string hostPlacement;
+  17: optional double killOrphanTasksAfterSec;
+  19: common.TaskSubprocessOptions taskSubprocessOptions;
+  20: common.KillRequest killRequest;
   // ConfigLoaders can use this to implement compare-and-swap for saveJob(),
   // preventing two concurrent calls from silently clobbering one another.
   //
   // Default to -1 because we need the "no version ID specified" behavior to
   // be equivalent to "add new job" (rather than "update existing job") and
   // -1 is the sentinel for this.
-  18: i64 versionID = -1,
+  18: i64 versionID = -1;
 }
 
 struct BistroCountWithSamples {
-  1: i32 count,
-  2: list<string> samples,
+  1: i32 count;
+  2: list<string> samples;
 }
 
 struct BistroJobHistogram {
-  1: string job,
-  2: map<string, map<bits.BistroTaskStatusBits, BistroCountWithSamples>>
-    statuses,
+  1: string job;
+  2: map<
+    string,
+    map<bits.BistroTaskStatusBits, BistroCountWithSamples>
+  > statuses;
 }
 
 exception BistroSchedulerUnknownJobException {
-  1: string message,
+  1: string message;
 } (message = 'message')
 
 service BistroScheduler extends fb303.FacebookService {
-
   ////
   //// The following calls comprise the scheduler's external API.
   ////
@@ -89,8 +90,9 @@ service BistroScheduler extends fb303.FacebookService {
   // Add a new job to bistro.
   void saveJob(1: BistroJobConfig job);
 
-  void deleteJob(1: string job_name)
-    throws (1: BistroSchedulerUnknownJobException ex);
+  void deleteJob(1: string job_name) throws (
+    1: BistroSchedulerUnknownJobException ex,
+  );
 
   list<string> getLevels();
 
@@ -127,20 +129,20 @@ service BistroScheduler extends fb303.FacebookService {
    */
 
   common.LogLines getJobLogsByTime(
-    1: string logtype,  // "stdout" or "stderr" or "statuses"
+    1: string logtype, // "stdout" or "stderr" or "statuses"
     2: string job_id,
     3: string node_id,
-    4: i32 time,  // min if is_ascending, max otherwise
-    5: bool is_ascending,  // Order in which to look through the logs
-    6: string regex_filter = "",  // Match all lines by default
+    4: i32 time, // min if is_ascending, max otherwise
+    5: bool is_ascending, // Order in which to look through the logs
+    6: string regex_filter = "", // Match all lines by default
   );
 
   common.LogLines getJobLogsByID(
-    1: string logtype,  // "stdout" or "stderr" or "statuses"
+    1: string logtype, // "stdout" or "stderr" or "statuses"
     2: string job_id,
     3: string node_id,
-    4: i64 line_id,  // min if is_ascending, max otherwise
-    5: bool is_ascending,  // Order in which to look through the logs
+    4: i64 line_id, // min if is_ascending, max otherwise
+    5: bool is_ascending, // Order in which to look through the logs
     6: string regex_filter,
   );
 
@@ -251,5 +253,4 @@ service BistroScheduler extends fb303.FacebookService {
     // connected workers -- then the scheduler exits its "initial wait".
     2: common.WorkerSetID workerSetID,
   );
-
 }

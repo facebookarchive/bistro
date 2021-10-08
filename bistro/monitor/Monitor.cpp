@@ -24,7 +24,6 @@ DEFINE_int32(monitor_update_ms, 5000, "How often to update job histograms");
 namespace facebook { namespace bistro {
 
 using namespace std;
-using namespace folly;
 
 Monitor::Monitor(
     shared_ptr<ConfigLoader> config_loader,

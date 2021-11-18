@@ -24,6 +24,7 @@ cpp_library(
         "ScriptFetcher.h",
         "utils.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "fbsource//third-party/fmt:fmt",
         "//bistro/bistro/config:config_lib",

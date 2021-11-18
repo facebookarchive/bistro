@@ -18,6 +18,7 @@ cpp_library(
         "TaskStatuses.h",
         "TaskStore.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/if:bits-cpp2-types",

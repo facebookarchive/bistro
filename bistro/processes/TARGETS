@@ -19,6 +19,7 @@ cpp_library(
         "SubprocessOutputWithTimeout.h",
         "TaskSubprocessQueue.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/physical:physical_lib",
@@ -57,6 +58,7 @@ cpp_library(
         "AsyncSubprocess.h",
         "SubprocessOutputWithTimeout.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "//folly:exception",
         "//folly:file",

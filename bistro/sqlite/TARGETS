@@ -13,6 +13,7 @@ cpp_library(
         "Database.h",
         "Statement.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "//folly:conv",
         "//folly:range",

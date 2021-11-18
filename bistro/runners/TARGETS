@@ -16,6 +16,7 @@ cpp_library(
         "RemoteWorkerRunner.h",
         "TaskRunner.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/if:if-cpp2",

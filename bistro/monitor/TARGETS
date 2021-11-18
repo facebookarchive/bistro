@@ -6,6 +6,7 @@ cpp_library(
     name = "monitor_lib",
     srcs = ["Monitor.cpp"],
     headers = ["Monitor.h"],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/flags:flags_lib",

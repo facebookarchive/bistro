@@ -8,6 +8,7 @@ cpp_library(
         "Bistro.cpp",
     ],
     headers = [],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/monitor:monitor_lib",

@@ -16,6 +16,7 @@ cpp_library(
         "EpochCrontabItem.h",
         "StandardCrontabItem.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/cron/utils:cron_utils_lib",
         "//folly:conv",

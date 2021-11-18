@@ -27,6 +27,7 @@ cpp_library(
         "RemoteWorkerSelectorType.h",
         "parsing_common.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro:headers",
         "//bistro/bistro/if:common-cpp2",

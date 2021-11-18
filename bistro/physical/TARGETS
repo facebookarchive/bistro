@@ -21,6 +21,7 @@ cpp_library(
         "UsablePhysicalResourceMonitor.h",
         "utils.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/processes:subprocess_with_timeout",

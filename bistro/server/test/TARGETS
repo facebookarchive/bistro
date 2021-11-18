@@ -5,6 +5,7 @@ cpp_library(
     name = "thrift_monitor_test_thread_lib",
     srcs = ["ThriftMonitorTestThread.cpp"],
     headers = ["ThriftMonitorTestThread.h"],
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/monitor:monitor_lib",
         "//bistro/bistro/runners:runners_lib",

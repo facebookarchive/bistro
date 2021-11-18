@@ -18,6 +18,7 @@ cpp_library(
         "ThriftMonitor.h",
     ],
     undefined_symbols = True,  # TODO(T23121628): fix deps and remove
+    unexported_deps_by_default = False,
     deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/if:common-cpp2-types",

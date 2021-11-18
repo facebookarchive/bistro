@@ -4,6 +4,7 @@ cpp_library(
     name = "scheduler_policy_registry_lib",
     srcs = ["SchedulerPolicyRegistry.cpp"],
     headers = ["SchedulerPolicyRegistry.h"],
+    unexported_deps_by_default = False,
     deps = ["//bistro/bistro/utils:exception_lib"],
     external_deps = ["glog"],
 )
@@ -34,6 +35,7 @@ cpp_library(
         "UnitTestSchedulerPolicy.h",
         "utils.h",
     ],
+    unexported_deps_by_default = False,
     deps = [
         ":scheduler_policy_registry_lib",
         "//bistro/bistro/config:config_lib",

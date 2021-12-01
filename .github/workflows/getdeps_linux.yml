@@ -5,10 +5,10 @@ name: linux
 on:
   push:
     branches:
-    - master
+    - main
   pull_request:
     branches:
-    - master
+    - main
 
 jobs:
   build:
@@ -135,7 +135,7 @@ jobs:
       run: python3 build/fbcode_builder/getdeps.py build --src-dir=. bistro  --project-install-prefix bistro:/usr/local
     - name: Copy artifacts
       run: python3 build/fbcode_builder/getdeps.py fixup-dyn-deps --strip --src-dir=. bistro _artifacts/linux  --project-install-prefix bistro:/usr/local --final-install-prefix /usr/local
-    - uses: actions/upload-artifact@master
+    - uses: actions/upload-artifact@main
       with:
         name: bistro
         path: _artifacts

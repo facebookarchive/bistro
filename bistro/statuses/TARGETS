@@ -18,8 +18,7 @@ cpp_library(
         "TaskStatuses.h",
         "TaskStore.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/if:bits-cpp2-types",
         "//bistro/bistro/if:common-cpp2-types",
@@ -35,7 +34,7 @@ cpp_library(
         "//folly/experimental:auto_timer",
         "//thrift/lib/cpp2/protocol:protocol",
     ],
-    external_deps = [
+    exported_external_deps = [
         ("boost", None, "boost_filesystem"),
     ],
 )

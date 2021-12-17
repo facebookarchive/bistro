@@ -6,9 +6,8 @@ cpp_library(
     name = "exception_lib",
     srcs = ["Exception.cpp"],
     headers = ["Exception.h"],
-    unexported_deps_by_default = False,
-    deps = ["//folly:conv"],
-    external_deps = [
+    exported_deps = ["//folly:conv"],
+    exported_external_deps = [
         "glog",
     ],
 )
@@ -17,8 +16,7 @@ cpp_library(
     name = "hostname_lib",
     srcs = ["hostname.cpp"],
     headers = ["hostname.h"],
-    unexported_deps_by_default = False,
-    external_deps = [
+    exported_external_deps = [
         "glog",  # Future: Move startsWithAny elsewhere.
         ("boost", None, "boost_algorithm"),
     ],
@@ -28,9 +26,8 @@ cpp_library(
     name = "shell_lib",
     srcs = ["shell.cpp"],
     headers = ["shell.h"],
-    unexported_deps_by_default = False,
-    deps = ["//folly:string"],
-    external_deps = [
+    exported_deps = ["//folly:string"],
+    exported_external_deps = [
         ("boost", None, "boost_algorithm"),
     ],
 )
@@ -62,8 +59,7 @@ cpp_library(
         "signal.h",
         "Exception.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/sqlite:sqlite_lib",
         "//folly:conv",
@@ -81,7 +77,7 @@ cpp_library(
         "//thrift/lib/cpp2/async:header_client_channel",
         "//thrift/lib/cpp2/protocol:protocol",
     ],
-    external_deps = [
+    exported_external_deps = [
         ("boost", None, "boost_regex"),
         ("boost", None, "boost_filesystem"),
         "boost",

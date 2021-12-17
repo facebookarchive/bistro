@@ -16,8 +16,7 @@ cpp_library(
         "RemoteWorkerRunner.h",
         "TaskRunner.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/if:if-cpp2",
         "//bistro/bistro/if:worker_if-cpp2",
@@ -35,7 +34,7 @@ cpp_library(
         "//folly/gen:base",
         "//folly/io/async:async_base",
     ],
-    external_deps = [
+    exported_external_deps = [
         ("boost", None, "boost_filesystem"),
         "boost",
     ],

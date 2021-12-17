@@ -5,8 +5,7 @@ cpp_library(
     name = "bistro_worker_lib",
     srcs = ["BistroWorkerHandler.cpp"],
     headers = ["BistroWorkerHandler.h"],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/if:if-cpp2",
         "//bistro/bistro/if:worker_if-cpp2",
         "//bistro/bistro/processes:processes",
@@ -24,7 +23,7 @@ cpp_library(
         "//folly:synchronized",
         "//thrift/lib/cpp2:server",
     ],
-    external_deps = [
+    exported_external_deps = [
         ("boost", None, "boost_filesystem"),
     ],
 )

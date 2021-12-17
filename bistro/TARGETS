@@ -8,8 +8,7 @@ cpp_library(
         "Bistro.cpp",
     ],
     headers = [],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/monitor:monitor_lib",
         "//bistro/bistro/nodes:nodes_lib",
@@ -19,5 +18,5 @@ cpp_library(
         "//folly/experimental:auto_timer",
         "//thrift/lib/cpp2/protocol:protocol",
     ],
-    external_deps = ["boost"],
+    exported_external_deps = ["boost"],
 )

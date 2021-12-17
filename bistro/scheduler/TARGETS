@@ -4,9 +4,8 @@ cpp_library(
     name = "scheduler_policy_registry_lib",
     srcs = ["SchedulerPolicyRegistry.cpp"],
     headers = ["SchedulerPolicyRegistry.h"],
-    unexported_deps_by_default = False,
-    deps = ["//bistro/bistro/utils:exception_lib"],
-    external_deps = ["glog"],
+    exported_deps = ["//bistro/bistro/utils:exception_lib"],
+    exported_external_deps = ["glog"],
 )
 
 cpp_library(
@@ -35,8 +34,7 @@ cpp_library(
         "UnitTestSchedulerPolicy.h",
         "utils.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         ":scheduler_policy_registry_lib",
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/flags:flags_lib",
@@ -48,5 +46,5 @@ cpp_library(
         "//folly:small_vector",
         "//folly/experimental:auto_timer",
     ],
-    external_deps = ["boost"],
+    exported_external_deps = ["boost"],
 )

@@ -21,8 +21,7 @@ cpp_library(
         "UsablePhysicalResourceMonitor.h",
         "utils.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/processes:subprocess_with_timeout",
         "//bistro/bistro/utils:exception_lib",
@@ -37,7 +36,7 @@ cpp_library(
         "//folly:synchronized",
         "//folly/gen:file",
     ],
-    external_deps = [
+    exported_external_deps = [
         ("boost", None, "boost_filesystem"),
     ],
 )

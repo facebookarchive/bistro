@@ -24,8 +24,7 @@ cpp_library(
         "ScriptFetcher.h",
         "utils.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "fbsource//third-party/fmt:fmt",
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/cron:cron_lib",
@@ -38,7 +37,7 @@ cpp_library(
         "//folly/experimental:auto_timer",
         "//folly/gen:file",
     ],
-    external_deps = [
+    exported_external_deps = [
         "boost",
         "glog",
         ("boost", None, "boost_date_time"),

@@ -27,8 +27,7 @@ cpp_library(
         "RemoteWorkerSelectorType.h",
         "parsing_common.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro:headers",
         "//bistro/bistro/if:common-cpp2",
         "//bistro/bistro/scheduler:scheduler_policy_registry_lib",
@@ -44,7 +43,7 @@ cpp_library(
         "//folly/experimental:dynamic_parser",
         "//folly/hash:hash",
     ],
-    external_deps = [
+    exported_external_deps = [
         "boost",
         ("boost", None, "boost_algorithm"),
         ("boost", None, "boost_filesystem"),

@@ -6,9 +6,8 @@ cpp_library(
     name = "test_lib",
     srcs = ["utils.cpp"],
     headers = ["utils.h"],
-    unexported_deps_by_default = False,
-    deps = ["//folly/experimental:test_util"],
-    external_deps = [
+    exported_deps = ["//folly/experimental:test_util"],
+    exported_external_deps = [
         ("boost", None, "boost_regex"),
     ],
 )

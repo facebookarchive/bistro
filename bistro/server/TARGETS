@@ -18,8 +18,7 @@ cpp_library(
         "ThriftMonitor.h",
     ],
     undefined_symbols = True,  # TODO(T23121628): fix deps and remove
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/if:common-cpp2-types",
         "//bistro/bistro/if:if-cpp2-services",
@@ -43,7 +42,7 @@ cpp_library(
         "//thrift/lib/cpp2/protocol:protocol",
         "//wangle/ssl:ssl_context_config",
     ],
-    external_deps = [
+    exported_external_deps = [
         "boost",
         "glog",
         ("boost", None, "boost_algorithm"),

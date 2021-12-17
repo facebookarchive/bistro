@@ -11,8 +11,7 @@ cpp_library(
         "BistroWorkerTestThread.h",
         "FakeBistroWorkerThread.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/test:test_lib",
         "//bistro/bistro/worker:bistro_worker_lib",
         "//thrift/lib/cpp2:server",

@@ -6,6 +6,5 @@ cpp_library(
     name = "flags_lib",
     srcs = ["Flags.cpp"],
     headers = ["Flags.h"],
-    unexported_deps_by_default = False,
-    external_deps = ["gflags"],
+    exported_external_deps = ["gflags"],
 )

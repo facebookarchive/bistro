@@ -16,8 +16,7 @@ cpp_library(
         "EpochCrontabItem.h",
         "StandardCrontabItem.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/cron/utils:cron_utils_lib",
         "//folly:conv",
         "//folly:dynamic",
@@ -25,7 +24,7 @@ cpp_library(
         "//folly:json",
         "//folly:optional",
     ],
-    external_deps = [
+    exported_external_deps = [
         ("boost", None, "boost_date_time"),
         "boost",
     ],

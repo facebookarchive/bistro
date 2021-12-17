@@ -20,8 +20,7 @@ cpp_library(
         "RoundRobinRemoteWorkerSelector.h",
         "WorkerSetID.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//bistro/bistro/flags:flags_lib",
         "//bistro/bistro/if:if-cpp2",
         "//bistro/bistro/statuses:statuses_lib",

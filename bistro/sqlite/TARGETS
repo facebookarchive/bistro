@@ -13,12 +13,11 @@ cpp_library(
         "Database.h",
         "Statement.h",
     ],
-    unexported_deps_by_default = False,
-    deps = [
+    exported_deps = [
         "//folly:conv",
         "//folly:range",
     ],
-    external_deps = [
+    exported_external_deps = [
         "boost",
         "glog",
         "sqlite",

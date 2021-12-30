@@ -267,7 +267,7 @@ void RemoteWorkerRunner::updateConfig(std::shared_ptr<const Config> config) {
           break;  // cannot use this running task's resources
         }
         auto& resources = it->second;
-        for (const auto r : *nr.resources_ref()) {
+        for (const auto& r : *nr.resources_ref()) {
           auto rid = config->resourceNames.lookup(*r.name_ref());
           if (rid == StringTable::NotFound || rid >= resources.size()) {
             LOG(ERROR) << error.report(

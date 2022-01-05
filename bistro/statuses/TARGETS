@@ -27,7 +27,6 @@ cpp_library(
         "//folly:conv",
         "//folly:dynamic",
         "//folly:glog",
-        "//folly:json",
         "//folly:memory",
         "//folly:optional",
         "//folly:synchronized",

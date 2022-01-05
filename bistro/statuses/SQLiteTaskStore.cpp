@@ -59,12 +59,12 @@ void SQLiteTaskStore::fetchJobTasks(
       table_,
       " WHERE job_id = ?"
     ));
-    for (const tuple<string, string, int, int64_t>& row : st->query(job_id)) {
+    for (const auto& row : st->query(job_id)) {
       cb(
-        get<0>(row),
-        get<1>(row),
-        static_cast<TaskResult>(get<2>(row)),
-        get<3>(row));
+         row.getText(0),
+         row.getText(1),
+         static_cast<TaskResult>(row.getInt(2)),
+         row.getInt64(3));
     }
   }
 }

@@ -13,6 +13,7 @@
 #include <folly/json.h>
 #include <folly/Memory.h>
 #include <fstream>
+#include <sstream>
 
 #include "bistro/bistro/config/Job.h"
 #include "bistro/bistro/utils/Exception.h"

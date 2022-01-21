@@ -21,7 +21,6 @@ cpp_library(
         "//folly:conv",
         "//folly:dynamic",
         "//folly:format",
-        "//folly:json",
         "//folly:optional",
     ],
     exported_external_deps = [

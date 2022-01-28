@@ -11,7 +11,6 @@ cpp_library(
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/if:if-cpp2-types",
         "//folly:dynamic",
-        "//folly:json",
         "//folly/experimental:dynamic_parser",
     ],
 )
@@ -23,7 +22,7 @@ cpp_unittest(
         ":conversion_lib",
         "//bistro/bistro/config:config_lib",
         "//bistro/bistro/if:if-cpp2-types",
-        "//folly:json",
+        "//folly:dynamic",
         "//thrift/lib/cpp2/protocol:protocol",
     ],
 )

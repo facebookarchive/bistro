@@ -1,5 +1,3 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 
 cpp_library(
@@ -20,15 +18,20 @@ cpp_library(
     ],
     exported_deps = [
         "//bistro/bistro/config:config_lib",
-        "//bistro/bistro/if:if-cpp2",
-        "//bistro/bistro/if:worker_if-cpp2",
+        "//bistro/bistro/flags:flags_lib",
+        "//bistro/bistro/if:common-cpp2-types",
+        "//bistro/bistro/if:worker_if-cpp2-services",
+        "//bistro/bistro/monitor:monitor_lib",
         "//bistro/bistro/nodes:nodes_lib",
         "//bistro/bistro/processes:processes",
         "//bistro/bistro/remote:remote_lib",
+        "//bistro/bistro/scheduler:scheduler_lib",
         "//bistro/bistro/statuses:statuses_lib",
+        "//bistro/bistro/utils:exception_lib",
+        "//bistro/bistro/utils:hostname_lib",
         "//bistro/bistro/utils:utils_lib",
         "//folly:conv",
-        "//folly:json",
+        "//folly:dynamic",
         "//folly:random",
         "//folly:synchronized",
         "//folly/experimental:auto_timer",

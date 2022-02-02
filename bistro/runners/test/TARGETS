@@ -1,12 +1,14 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 
 cpp_unittest(
     name = "test_local_runner",
     srcs = ["test_local_runner.cpp"],
     deps = [
+        "//bistro/bistro/config:config_lib",
         "//bistro/bistro/runners:runners_lib",
+        "//bistro/bistro/statuses:statuses_lib",
+        "//bistro/bistro/utils:hostname_lib",
+        "//bistro/bistro/utils:utils_lib",
         "//folly:synchronized",
     ],
 )
@@ -15,7 +17,9 @@ cpp_unittest(
     name = "test_benchmark_runner",
     srcs = ["test_benchmark_runner.cpp"],
     deps = [
+        "//bistro/bistro/config:config_lib",
         "//bistro/bistro/runners:runners_lib",
+        "//bistro/bistro/statuses:statuses_lib",
         "//folly:synchronized",
     ],
 )
@@ -24,13 +28,20 @@ cpp_unittest(
     name = "test_remote_runner",
     srcs = ["test_remote_runner.cpp"],
     deps = [
+        "//bistro/bistro/config:config_lib",
+        "//bistro/bistro/if:common-cpp2-types",
+        "//bistro/bistro/remote:remote_lib",
         "//bistro/bistro/runners:runners_lib",
+        "//bistro/bistro/server:http_server_lib",
+        "//bistro/bistro/statuses:statuses_lib",
+        "//bistro/bistro/test:test_lib",
         "//bistro/bistro/worker/test:bistro_worker_test_lib",
         "//folly:random",
     ],
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_kill_orphans",
     srcs = ["test_kill_orphans.cpp"],
     deps = ["//bistro/bistro:bistro_lib"],

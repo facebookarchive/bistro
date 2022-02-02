@@ -1,5 +1,3 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 
 cpp_library(
@@ -11,6 +9,7 @@ cpp_library(
 )
 
 cpp_library(
+    # @autodeps-skip
     name = "scheduler_lib",
     srcs = [
         "LongTailSchedulerPolicy.cpp",

@@ -1,8 +1,7 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_scheduler",
     srcs = ["test_scheduler.cpp"],
     deps = [
@@ -14,36 +13,42 @@ cpp_unittest(
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_job_dependency",
     srcs = ["test_job_dependency.cpp"],
     deps = ["//bistro/bistro/scheduler:scheduler_lib"],
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_long_tail",
     srcs = ["test_long_tail.cpp"],
     deps = ["//bistro/bistro/scheduler:scheduler_lib"],
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_level_for_tasks",
     srcs = ["test_level_for_tasks.cpp"],
     deps = ["//bistro/bistro/scheduler:scheduler_lib"],
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_round_robin",
     srcs = ["test_round_robin.cpp"],
     deps = ["//bistro/bistro/scheduler:scheduler_lib"],
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_ranked_priority",
     srcs = ["test_ranked_priority.cpp"],
     deps = ["//bistro/bistro/scheduler:scheduler_lib"],
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_randomized_priority",
     srcs = ["test_randomized_priority.cpp"],
     deps = ["//bistro/bistro/scheduler:scheduler_lib"],

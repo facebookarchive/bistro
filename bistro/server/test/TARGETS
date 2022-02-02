@@ -1,5 +1,3 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 
@@ -8,11 +6,15 @@ cpp_library(
     srcs = ["ThriftMonitorTestThread.cpp"],
     headers = ["ThriftMonitorTestThread.h"],
     exported_deps = [
+        "//bistro/bistro/config:config_lib",
         "//bistro/bistro/monitor:monitor_lib",
+        "//bistro/bistro/nodes:nodes_lib",
         "//bistro/bistro/runners:runners_lib",
         "//bistro/bistro/server:http_server_lib",
         "//bistro/bistro/statuses:statuses_lib",
+        "//folly/io/async:async_socket",
         "//thrift/lib/cpp2:server",
+        "//thrift/lib/cpp2/async:header_client_channel",
         "//thrift/lib/cpp2/util:scoped_server_thread",
     ],
 )
@@ -22,11 +24,13 @@ cpp_unittest(
     srcs = ["test_thrift_monitor.cpp"],
     deps = [
         ":thrift_monitor_test_thread_lib",
+        "//bistro/bistro/if:if-cpp2-services",
         "//folly/io/async:event_base_manager",
     ],
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_node_getter",
     srcs = ["test_node_getter.cpp"],
     deps = [

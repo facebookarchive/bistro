@@ -1,8 +1,7 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_async_read_pipe",
     srcs = ["test_async_read_pipe.cpp"],
     deps = [
@@ -15,6 +14,7 @@ cpp_unittest(
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_async_read_pipe_rate_limiter",
     srcs = ["test_async_read_pipe_rate_limiter.cpp"],
     deps = [
@@ -27,7 +27,7 @@ cpp_unittest(
     name = "test_async_subprocess",
     srcs = ["test_async_subprocess.cpp"],
     deps = [
-        "//bistro/bistro/processes:processes",
+        "//bistro/bistro/processes:subprocess_with_timeout",
         "//folly:mpmc_queue",
         "//folly/experimental:auto_timer",
         "//folly/io/async:async_base",
@@ -41,6 +41,7 @@ cpp_unittest(
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_task_subprocess_queue",
     srcs = ["test_task_subprocess_queue.cpp"],
     deps = [

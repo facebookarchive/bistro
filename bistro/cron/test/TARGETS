@@ -1,5 +1,3 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 
 cpp_unittest(
@@ -7,6 +5,7 @@ cpp_unittest(
     srcs = ["test_crontab_selector.cpp"],
     deps = [
         "//bistro/bistro/cron:cron_lib",
+        "//folly:dynamic",
     ],
 )
 
@@ -15,6 +14,7 @@ cpp_unittest(
     srcs = ["test_epoch_crontab_item.cpp"],
     deps = [
         "//bistro/bistro/cron:cron_lib",
+        "//folly:dynamic",
     ],
 )
 
@@ -23,6 +23,7 @@ cpp_unittest(
     srcs = ["test_standard_crontab_item.cpp"],
     deps = [
         "//bistro/bistro/cron:cron_lib",
+        "//folly:dynamic",
     ],
     external_deps = [
         ("boost", None, "boost_date_time"),

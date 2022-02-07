@@ -30,3 +30,18 @@ cpp_library(
         "//folly:optional",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "BusiestRemoteWorkerSelector.h",
+        "RemoteWorker.h",
+        "RemoteWorkerSelector.h",
+        "RemoteWorkerState.h",
+        "RemoteWorkerUpdate.h",
+        "RemoteWorkers.h",
+        "RoundRobinRemoteWorkerSelector.h",
+        "WorkerSetID.h",
+    ],
+    tags = ["noautodeps"],
+)

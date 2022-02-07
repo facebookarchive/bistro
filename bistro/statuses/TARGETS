@@ -35,3 +35,16 @@ cpp_library(
         ("boost", None, "boost_filesystem"),
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "SQLiteTaskStore.h",
+        "TaskStatus.h",
+        "TaskStatusObserver.h",
+        "TaskStatusSnapshot.h",
+        "TaskStatuses.h",
+        "TaskStore.h",
+    ],
+    tags = ["noautodeps"],
+)

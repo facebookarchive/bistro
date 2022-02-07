@@ -49,3 +49,24 @@ cpp_library(
     ],
     exported_external_deps = ["boost"],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "LongTailSchedulerPolicy.h",
+        "RandomizedPrioritySchedulerPolicy.h",
+        "RankedPrioritySchedulerPolicy.h",
+        "ResourceVector.h",
+        "RoundRobinSchedulerPolicy.h",
+        "Scheduler.h",
+        "SchedulerPolicies.h",
+        "SchedulerPolicy.h",
+        "SchedulerPolicyRegistry.h",
+        "UnitTestSchedulerPolicy.h",
+        "utils.h",
+    ],
+    tags = ["noautodeps"],
+    exported_deps = [
+        "//bistro/bistro/scheduler/test:recursive_glob_headers",  # @manual
+    ],
+)

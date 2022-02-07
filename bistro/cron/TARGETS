@@ -26,3 +26,17 @@ cpp_library(
         "boost",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "CrontabItem.h",
+        "CrontabSelector.h",
+        "EpochCrontabItem.h",
+        "StandardCrontabItem.h",
+    ],
+    tags = ["noautodeps"],
+    exported_deps = [
+        "//bistro/bistro/cron/utils:recursive_glob_headers",  # @manual
+    ],
+)

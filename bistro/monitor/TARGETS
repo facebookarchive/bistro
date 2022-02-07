@@ -15,3 +15,9 @@ cpp_library(
         "//folly/experimental:threaded_repeating_function_runner",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = ["Monitor.h"],
+    tags = ["noautodeps"],
+)

@@ -24,3 +24,9 @@ cpp_unittest(
         "//thrift/lib/cpp2/protocol:protocol",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = ["ThriftConversion.h"],
+    tags = ["noautodeps"],
+)

@@ -9,3 +9,12 @@ cpp_library(
         ("boost", None, "boost_regex"),
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "MockBistro.h",
+        "utils.h",
+    ],
+    tags = ["noautodeps"],
+)

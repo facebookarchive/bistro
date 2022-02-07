@@ -1,3 +1,4 @@
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 
 cpp_unittest(
@@ -61,4 +62,10 @@ cpp_unittest(
         "//folly:file_util",
         "//folly/experimental:test_util",
     ],
+)
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = ["utils.h"],
+    tags = ["noautodeps"],
 )

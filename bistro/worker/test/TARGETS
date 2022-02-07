@@ -33,3 +33,12 @@ cpp_unittest(
         "//folly/experimental:test_util",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "BistroWorkerTestThread.h",
+        "FakeBistroWorkerThread.h",
+    ],
+    tags = ["noautodeps"],
+)

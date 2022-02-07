@@ -18,3 +18,38 @@ cpp_library(
     ],
     exported_external_deps = ["boost"],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "Bistro.h",
+        "cmake/fbinclude/common/fb303/cpp/FacebookBase2.h",
+    ],
+    tags = ["noautodeps"],
+    exported_deps = [
+        "//bistro/bistro/config:recursive_glob_headers",  # @manual
+        "//bistro/bistro/cron:recursive_glob_headers",  # @manual
+        "//bistro/bistro/cron/utils:recursive_glob_headers",  # @manual
+        "//bistro/bistro/flags:recursive_glob_headers",  # @manual
+        "//bistro/bistro/monitor:recursive_glob_headers",  # @manual
+        "//bistro/bistro/nodes:recursive_glob_headers",  # @manual
+        "//bistro/bistro/nodes/test:recursive_glob_headers",  # @manual
+        "//bistro/bistro/physical:recursive_glob_headers",  # @manual
+        "//bistro/bistro/physical/test:recursive_glob_headers",  # @manual
+        "//bistro/bistro/processes:recursive_glob_headers",  # @manual
+        "//bistro/bistro/processes/tests:recursive_glob_headers",  # @manual
+        "//bistro/bistro/remote:recursive_glob_headers",  # @manual
+        "//bistro/bistro/runners:recursive_glob_headers",  # @manual
+        "//bistro/bistro/scheduler:recursive_glob_headers",  # @manual
+        "//bistro/bistro/scheduler/test:recursive_glob_headers",  # @manual
+        "//bistro/bistro/server:recursive_glob_headers",  # @manual
+        "//bistro/bistro/server/test:recursive_glob_headers",  # @manual
+        "//bistro/bistro/sqlite:recursive_glob_headers",  # @manual
+        "//bistro/bistro/statuses:recursive_glob_headers",  # @manual
+        "//bistro/bistro/test:recursive_glob_headers",  # @manual
+        "//bistro/bistro/thrift:recursive_glob_headers",  # @manual
+        "//bistro/bistro/utils:recursive_glob_headers",  # @manual
+        "//bistro/bistro/worker:recursive_glob_headers",  # @manual
+        "//bistro/bistro/worker/test:recursive_glob_headers",  # @manual
+    ],
+)

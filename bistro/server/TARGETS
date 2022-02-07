@@ -67,3 +67,17 @@ cpp_binary(
     ],
     external_deps = ["glog"],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "Connection.h",
+        "HTTPMonitor.h",
+        "HTTPMonitorServer.h",
+        "ThriftMonitor.h",
+    ],
+    tags = ["noautodeps"],
+    exported_deps = [
+        "//bistro/bistro/server/test:recursive_glob_headers",  # @manual
+    ],
+)

@@ -38,3 +38,20 @@ cpp_library(
         ("boost", None, "boost_filesystem"),
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "AllTasksPhysicalResourceMonitor.h",
+        "CGroupPaths.h",
+        "CGroupResources.h",
+        "TaskPhysicalResourceFetcher.h",
+        "UsablePhysicalResourceFetcher.h",
+        "UsablePhysicalResourceMonitor.h",
+        "utils.h",
+    ],
+    tags = ["noautodeps"],
+    exported_deps = [
+        "//bistro/bistro/physical/test:recursive_glob_headers",  # @manual
+    ],
+)

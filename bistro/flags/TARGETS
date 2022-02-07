@@ -6,3 +6,9 @@ cpp_library(
     headers = ["Flags.h"],
     exported_external_deps = ["gflags"],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = ["Flags.h"],
+    tags = ["noautodeps"],
+)

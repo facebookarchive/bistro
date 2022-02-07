@@ -83,3 +83,24 @@ cpp_library(
         "glog",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "EnumHash.h",
+        "Exception.h",
+        "LogLines.h",
+        "LogWriter.h",
+        "PeriodicPoller.h",
+        "SettingsMap.h",
+        "ShuffledRange.h",
+        "SymbolTable.h",
+        "TemporaryFile.h",
+        "hostname.h",
+        "server_socket.h",
+        "service_clients.h",
+        "shell.h",
+        "signal.h",
+    ],
+    tags = ["noautodeps"],
+)

@@ -29,7 +29,7 @@ cpp_library(
         "//bistro/bistro/utils:exception_lib",
         "//bistro/bistro/utils:hostname_lib",
         "//bistro/bistro/utils:utils_lib",
-        "//folly:json",
+        "//folly:dynamic",
         "//folly:string",
         "//folly:subprocess",  # for ScriptFetcher
         "//folly/experimental:auto_timer",
@@ -40,5 +40,24 @@ cpp_library(
         "glog",
         ("boost", None, "boost_date_time"),
         ("boost", None, "boost_range"),
+    ],
+)
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "AddTimeFetcher.h",
+        "EmptyFetcher.h",
+        "ManualFetcher.h",
+        "NodeFetcher.h",
+        "Nodes.h",
+        "NodesLoader.h",
+        "RangeLabelFetcher.h",
+        "ScriptFetcher.h",
+        "utils.h",
+    ],
+    tags = ["noautodeps"],
+    exported_deps = [
+        "//bistro/bistro/nodes/test:recursive_glob_headers",  # @manual
     ],
 )

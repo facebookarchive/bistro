@@ -13,3 +13,9 @@ cpp_library(
         ("boost", None, "boost_date_time"),
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = ["date_time.h"],
+    tags = ["noautodeps"],
+)

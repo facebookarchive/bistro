@@ -29,3 +29,12 @@ cpp_unittest(
     srcs = ["test_sqlite.cpp"],
     deps = [":sqlite_lib"],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "Database.h",
+        "Statement.h",
+    ],
+    tags = ["noautodeps"],
+)

@@ -54,3 +54,21 @@ cpp_library(
         ("boost", None, "boost_serialization"),
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "Config.h",
+        "ConfigLoader.h",
+        "FileConfigLoader.h",
+        "InMemoryConfigLoader.h",
+        "Job.h",
+        "JobBackoffSettings.h",
+        "JobFilters.h",
+        "Node.h",
+        "NodeOrderType.h",
+        "RemoteWorkerSelectorType.h",
+        "parsing_common.h",
+    ],
+    tags = ["noautodeps"],
+)

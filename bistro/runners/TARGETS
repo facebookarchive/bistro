@@ -44,3 +44,15 @@ cpp_library(
         "boost",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "BenchmarkRunner.h",
+        "LocalRunner.h",
+        "NoOpRunner.h",
+        "RemoteWorkerRunner.h",
+        "TaskRunner.h",
+    ],
+    tags = ["noautodeps"],
+)

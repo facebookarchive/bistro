@@ -40,3 +40,9 @@ cpp_unittest(
         "//bistro/bistro/test:test_lib",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = ["ThriftMonitorTestThread.h"],
+    tags = ["noautodeps"],
+)

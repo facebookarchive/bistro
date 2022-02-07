@@ -66,3 +66,20 @@ cpp_library(
         "//folly/io/async:event_base_manager",
     ],
 )
+
+cpp_library(
+    name = "recursive_glob_headers",
+    headers = [
+        "AsyncCGroupReaper.h",
+        "AsyncReadPipe.h",
+        "AsyncReadPipeRateLimiter.h",
+        "AsyncSubprocess.h",
+        "CGroupSetup.h",
+        "SubprocessOutputWithTimeout.h",
+        "TaskSubprocessQueue.h",
+    ],
+    tags = ["noautodeps"],
+    exported_deps = [
+        "//bistro/bistro/processes/tests:recursive_glob_headers",  # @manual
+    ],
+)

@@ -1,9 +1,8 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 
 cpp_library(
+    # @autodeps-skip
     name = "bistro_worker_test_lib",
     srcs = [
         "BistroWorkerTestThread.cpp",
@@ -23,6 +22,7 @@ cpp_library(
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_worker",
     srcs = ["test_worker.cpp"],
     deps = [

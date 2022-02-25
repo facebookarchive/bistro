@@ -5,6 +5,15 @@ id: home
 hero: true
 ---
 
+<div align="center">
+  <h3>Watch Introductory Video</h3>
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/IXlZYBft_rY" 
+    title="Explain Like I'm 5: Bistro" frameBorder="0" 
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+    allowFullScreen ></iframe>
+</div>
+<br/>
+
 {% include content/gridblocks.html data_source=site.data.features grid_type="threeByGridBlockLeft" %}
 
 ## Why Use Bistro?

@@ -1,5 +1,3 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
 load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 
@@ -8,21 +6,27 @@ cpp_library(
     srcs = ["BistroWorkerHandler.cpp"],
     headers = ["BistroWorkerHandler.h"],
     exported_deps = [
-        "//bistro/bistro/if:if-cpp2",
-        "//bistro/bistro/if:worker_if-cpp2",
+        "//bistro/bistro/if:common-cpp2-types",
+        "//bistro/bistro/if:if-cpp2-services",
+        "//bistro/bistro/if:if-cpp2-types",
+        "//bistro/bistro/if:worker_if-cpp2-services",
+        "//bistro/bistro/if:worker_if-cpp2-types",
+        "//bistro/bistro/physical:physical_lib",
         "//bistro/bistro/processes:processes",
         # for enforceWorkerSchedulerProtocolVersion()
         "//bistro/bistro/remote:remote_lib",
         "//bistro/bistro/statuses:statuses_lib",
+        "//bistro/bistro/utils:hostname_lib",
         "//bistro/bistro/utils:utils_lib",
         "//common/fb303/cpp:fb303",
         "//folly/experimental:auto_timer",
         "//folly/experimental:threaded_repeating_function_runner",
+        "//folly:dynamic",
         "//folly:file",
-        "//folly:json",
         "//folly:mpmc_queue",
         "//folly:random",
         "//folly:synchronized",
+        "//thrift/lib/cpp2/protocol:protocol",
         "//thrift/lib/cpp2:server",
     ],
     exported_external_deps = [
@@ -31,6 +35,7 @@ cpp_library(
 )
 
 cpp_binary(
+    # @autodeps-skip
     name = "bistro_worker",
     srcs = ["main.cpp"],
     deps = [

@@ -1,5 +1,3 @@
-# @noautodeps
-
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 
 cpp_unittest(
@@ -7,7 +5,7 @@ cpp_unittest(
     srcs = ["test_task_status.cpp"],
     deps = [
         "//bistro/bistro/statuses:statuses_lib",
-        "//folly:json",
+        "//folly:dynamic",
         "//folly:memory",
         "//folly:optional",
         "//folly/experimental:test_util",
@@ -17,10 +15,14 @@ cpp_unittest(
 cpp_unittest(
     name = "test_sqlite_task_store",
     srcs = ["test_sqlite_task_store.cpp"],
-    deps = ["//bistro/bistro/statuses:statuses_lib"],
+    deps = [
+        "//bistro/bistro/statuses:statuses_lib",
+        "//bistro/bistro/utils:utils_lib",
+    ],
 )
 
 cpp_unittest(
+    # @autodeps-skip
     name = "test_task_statuses",
     srcs = ["test_task_statuses.cpp"],
     deps = [

@@ -8,4 +8,7 @@ python_library(
         "*.py",
         "facebook/*.py",
     ]),
+    deps = [
+        "fbsource//third-party/pypi/pycurl:pycurl",
+    ],
 )

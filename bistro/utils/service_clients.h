@@ -46,8 +46,8 @@ std::shared_ptr<ThriftClient> getAsyncClientForAddress(
   using namespace apache::thrift;
   auto socket = folly::AsyncSocket::newSocket(
       event_base,
-      *addr.ip_or_host_ref(),
-      *addr.port_ref(),
+      *addr.ip_or_host(),
+      *addr.port(),
       connect_timeout_ms);
   auto socketPtr = socket.get();
   auto channel = HeaderClientChannel::newChannel(std::move(socket));

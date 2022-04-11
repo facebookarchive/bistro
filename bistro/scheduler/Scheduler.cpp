@@ -138,11 +138,11 @@ void processRunningTasks(
     node_used_resources;
   for (const auto& id_and_task : running_tasks) {
     const auto& rt = id_and_task.second;
-    node_to_tasks[*id_and_task.second.node_ref()].push_front(
+    node_to_tasks[*id_and_task.second.node()].push_front(
         &id_and_task.second);
-    for (const auto& nr : *rt.nodeResources_ref()) {
-      auto& resources = node_used_resources[*nr.node_ref()];
-      for (const auto& res : *nr.resources_ref()) {
+    for (const auto& nr : *rt.nodeResources()) {
+      auto& resources = node_used_resources[*nr.node()];
+      for (const auto& res : *nr.resources()) {
         resources.push_back(&res);
       }
     }
@@ -166,7 +166,7 @@ void processRunningTasks(
         auto tasks = node_to_tasks.find(node->name());
         if (tasks != node_to_tasks.end()) {  // Does node have running tasks?
           for (auto it = tasks->second.begin(); it != tasks->second.end();) {
-            auto jobs_it = config.jobs.find(*(*it)->job_ref());
+            auto jobs_it = config.jobs.find(*(*it)->job());
             if (jobs_it != config.jobs.end() && jobs_it->second->canRun()) {
               it = tasks->second.erase(it);  // Not a job or node orphan.
             } else {
@@ -184,10 +184,10 @@ void processRunningTasks(
       auto resources_it = node_used_resources.find(node->name());
       if (resources_it != node_used_resources.end()) {
         for (const cpp2::Resource* r : resources_it->second) {
-          auto rsrc_it = lng.second.resourceToIndex_.find(*r->name_ref());
+          auto rsrc_it = lng.second.resourceToIndex_.find(*r->name());
           if (rsrc_it == lng.second.resourceToIndex_.end()) {
             LOG(ERROR) << error.report(
-              "Resource ", *r->name_ref(), " not found in the node-group of node ",
+              "Resource ", *r->name(), " not found in the node-group of node ",
               node->name(), ": ", debugString(*r)
             );
             // We log, and ignore the bad resource as if it didn't exist.
@@ -196,10 +196,10 @@ void processRunningTasks(
             continue;
           }
           auto& amount = packed_resources.at(node->offset + rsrc_it->second);
-          amount -= *r->amount_ref();
+          amount -= *r->amount();
           if (amount < 0) {
             LOG(ERROR) << error.report(
-              "Resource ", *r->name_ref(), " is ", amount, " on node ", node->name(),
+              "Resource ", *r->name(), " is ", amount, " on node ", node->name(),
               " for ", debugString(*r)
             );
           }
@@ -232,7 +232,7 @@ void processRunningTasks(
     std::string rs;
     size_t num_worker_resources = 0;
     for (const cpp2::Resource* r : p.second) {
-      num_worker_resources += worker_resource_names.count(*r->name_ref());
+      num_worker_resources += worker_resource_names.count(*r->name());
       rs += debugString(*r) + "\n";
     }
     if (num_worker_resources != 0) {

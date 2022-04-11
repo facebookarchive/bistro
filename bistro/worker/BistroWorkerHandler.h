@@ -130,7 +130,7 @@ public:
     return worker_;
   }
   cpp2::BistroInstanceID getSchedulerID() const {
-    return *schedulerState_->id_ref();
+    return *schedulerState_->id();
   }
 
 private:

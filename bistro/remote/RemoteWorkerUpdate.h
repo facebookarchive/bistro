@@ -60,9 +60,9 @@ public:
   // Worker actions
 
   bool healthcheckWorker(const cpp2::BistroWorker& w) {
-    if (!workersToHealthcheck_.emplace(*w.shard_ref(), w).second) {
+    if (!workersToHealthcheck_.emplace(*w.shard(), w).second) {
       LOG(ERROR) << "Worker healthcheck requested more than once: "
-                 << *w.shard_ref();
+                 << *w.shard();
       return false;
     }
     return true;
@@ -71,17 +71,17 @@ public:
   bool requestSuicide(const cpp2::BistroWorker& w, const std::string& reason) {
     LOG(INFO) << "Telling " << apache::thrift::debugString(w)
       << " to commit suicide: " << reason;
-    if (!suicideWorkers_.emplace(*w.shard_ref(), w).second) {
+    if (!suicideWorkers_.emplace(*w.shard(), w).second) {
       LOG(ERROR) << "Worker suicide requested more than once: "
-                 << *w.shard_ref();
+                 << *w.shard();
       return false;
     }
     return true;
   }
 
   bool addNewWorker(const cpp2::BistroWorker& w) {
-    if (!newWorkers_.emplace(*w.shard_ref(), w).second) {
-      LOG(ERROR) << "New worker added more than once: " << *w.shard_ref();
+    if (!newWorkers_.emplace(*w.shard(), w).second) {
+      LOG(ERROR) << "New worker added more than once: " << *w.shard();
       return false;
     }
     return true;
@@ -91,8 +91,8 @@ public:
 
   bool loseRunningTask(const TaskID& task_id, const cpp2::RunningTask& rt) {
     if (!lostRunningTasks_.emplace(task_id, rt).second) {
-      LOG(ERROR) << "Task was lost more than once: " << *rt.job_ref() << ", "
-                 << *rt.node_ref() << " on " << *rt.workerShard_ref();
+      LOG(ERROR) << "Task was lost more than once: " << *rt.job() << ", "
+                 << *rt.node() << " on " << *rt.workerShard();
       return false;
     }
     return true;
@@ -109,10 +109,10 @@ public:
     }
     if (!unsureIfRunningTasks_
              .emplace(
-                 *worker.shard_ref(), std::make_pair(worker, std::move(tasks)))
+                 *worker.shard(), std::make_pair(worker, std::move(tasks)))
              .second) {
       LOG(ERROR) << "Unsure-if-running tasks check requested more than once "
-                 << "for " << *worker.shard_ref();
+                 << "for " << *worker.shard();
     }
   }
 

@@ -33,59 +33,59 @@ void parseKillOrphanTasksAfter(
 
 namespace {
 folly::dynamic cgroupOptionsToDynamic(const cpp2::CGroupOptions& cgopts) {
-  return folly::dynamic::object(kRoot, *cgopts.root_ref())(
-      kSlice, *cgopts.slice_ref())(
+  return folly::dynamic::object(kRoot, *cgopts.root())(
+      kSlice, *cgopts.slice())(
       kSubsystems,
       folly::dynamic(
-          cgopts.subsystems_ref()->begin(), cgopts.subsystems_ref()->end()))(
-      kKillWithoutFreezer, *cgopts.killWithoutFreezer_ref());
+          cgopts.subsystems()->begin(), cgopts.subsystems()->end()))(
+      kKillWithoutFreezer, *cgopts.killWithoutFreezer());
 }
 }  // anonymous namespace
 
 folly::dynamic taskSubprocessOptionsToDynamic(
     const cpp2::TaskSubprocessOptions& opts) {
-  return folly::dynamic::object(kPollMs, *opts.pollMs_ref())(
-      kMaxLogLinesPerPollInterval, *opts.maxLogLinesPerPollInterval_ref())(
-      kParentDeathSignal, *opts.parentDeathSignal_ref())(
-      kProcessGroupLeader, *opts.processGroupLeader_ref())(
-      kUseCanaryPipe, *opts.useCanaryPipe_ref())(
-      kCGroups, cgroupOptionsToDynamic(*opts.cgroupOptions_ref()));
+  return folly::dynamic::object(kPollMs, *opts.pollMs())(
+      kMaxLogLinesPerPollInterval, *opts.maxLogLinesPerPollInterval())(
+      kParentDeathSignal, *opts.parentDeathSignal())(
+      kProcessGroupLeader, *opts.processGroupLeader())(
+      kUseCanaryPipe, *opts.useCanaryPipe())(
+      kCGroups, cgroupOptionsToDynamic(*opts.cgroupOptions()));
 }
 
 void parseTaskSubprocessOptions(
     folly::DynamicParser* p,
     cpp2::TaskSubprocessOptions* opts) {
   p->optional(kTaskSubprocess, [&]() {
-    p->optional(kPollMs, [&](int64_t n) { *opts->pollMs_ref() = n; });
+    p->optional(kPollMs, [&](int64_t n) { *opts->pollMs() = n; });
     p->optional(kMaxLogLinesPerPollInterval, [&](int64_t n) {
-      *opts->maxLogLinesPerPollInterval_ref() = n;
+      *opts->maxLogLinesPerPollInterval() = n;
     });
     p->optional(kParentDeathSignal, [&](int64_t n) {
-      *opts->parentDeathSignal_ref() = n;
+      *opts->parentDeathSignal() = n;
     });
     p->optional(kProcessGroupLeader, [&](bool b) {
-      *opts->processGroupLeader_ref() = b;
+      *opts->processGroupLeader() = b;
     });
     p->optional(
-        kUseCanaryPipe, [&](bool b) { *opts->useCanaryPipe_ref() = b; });
+        kUseCanaryPipe, [&](bool b) { *opts->useCanaryPipe() = b; });
     p->optional(kCGroups, [&]() {
-      auto& cgopts = *opts->cgroupOptions_ref();
+      auto& cgopts = *opts->cgroupOptions();
       p->optional(
-          kRoot, [&](std::string&& s) { *cgopts.root_ref() = std::move(s); });
+          kRoot, [&](std::string&& s) { *cgopts.root() = std::move(s); });
       p->optional(
-          kSlice, [&](std::string&& s) { *cgopts.slice_ref() = std::move(s); });
+          kSlice, [&](std::string&& s) { *cgopts.slice() = std::move(s); });
       p->optional(kSubsystems, [&]() {
         // This is required since Job will just parse **on top** of whatever
         // it inherits from Config.  With multiple save-load cycles, the
         // Config's list of subsystems would get copied to the job, then and
         // grow by one extra copy with each cycle.
-        cgopts.subsystems_ref()->clear();
+        cgopts.subsystems()->clear();
         p->arrayItems([&](std::string&& s) {
-          cgopts.subsystems_ref()->emplace_back(std::move(s));
+          cgopts.subsystems()->emplace_back(std::move(s));
         });
       });
       p->optional(kKillWithoutFreezer, [&](bool b) {
-        *cgopts.killWithoutFreezer_ref() = b;
+        *cgopts.killWithoutFreezer() = b;
       });
       // cpuShares and memoryLimitInBytes will be populated on a
       // per-task basis, based on their worker resources using
@@ -96,7 +96,7 @@ void parseTaskSubprocessOptions(
 
 folly::dynamic killRequestToDynamic(const cpp2::KillRequest& req) {
   return folly::dynamic::object(kMethod, [&]() {
-    switch (*req.method_ref()) {
+    switch (*req.method()) {
       case cpp2::KillMethod::TERM_WAIT_KILL:
         return kTermWaitKill;
       case cpp2::KillMethod::TERM:
@@ -105,25 +105,25 @@ folly::dynamic killRequestToDynamic(const cpp2::KillRequest& req) {
         return kKill;
       default:
         throw std::runtime_error(folly::to<std::string>(
-            "Unknown KillMethod ", static_cast<int>(*req.method_ref())));
+            "Unknown KillMethod ", static_cast<int>(*req.method())));
     }
-  }())(kKillWaitMs, *req.killWaitMs_ref());
+  }())(kKillWaitMs, *req.killWaitMs());
 }
 
 void parseKillRequest(folly::DynamicParser* p, cpp2::KillRequest* req) {
   p->optional(kKillSubprocess, [&]() {
     p->optional(kMethod, [&](const std::string& s) {
       if (s == kTermWaitKill) {
-        *req->method_ref() = cpp2::KillMethod::TERM_WAIT_KILL;
+        *req->method() = cpp2::KillMethod::TERM_WAIT_KILL;
       } else if (s == kTerm) {
-        *req->method_ref() = cpp2::KillMethod::TERM;
+        *req->method() = cpp2::KillMethod::TERM;
       } else if (s == kKill) {
-        *req->method_ref() = cpp2::KillMethod::KILL;
+        *req->method() = cpp2::KillMethod::KILL;
       } else {
         throw std::runtime_error("Unknown KillMethod");
       }
     });
-    p->optional(kKillWaitMs, [&](int64_t n) { *req->killWaitMs_ref() = n; });
+    p->optional(kKillWaitMs, [&](int64_t n) { *req->killWaitMs() = n; });
   });
 }
 

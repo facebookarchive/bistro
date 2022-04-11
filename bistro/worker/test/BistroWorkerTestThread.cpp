@@ -38,14 +38,14 @@ BistroWorkerTestThread::BistroWorkerTestThread(
           LOG(INFO) << "worker state change: " << m;
         } else {
           LOG(INFO) << "worker task state change: " << m << " - "
-                    << *rt->job_ref() << " / " << *rt->node_ref();
+                    << *rt->job() << " / " << *rt->node();
         }
         state_transition_cob(this, m);
       },
       std::move(scheduler_client_fn),
       "",
       socket_and_addr.second,
-      *socket_and_addr.second.port_ref());
+      *socket_and_addr.second.port());
   ts->setInterface(workerPtr_);
   ts->useExistingSocket(std::move(socket_and_addr.first));
   sst_.start(std::move(ts));
@@ -70,15 +70,15 @@ cpp2::RunningTask BistroWorkerTestThread::runTask(
   cpp2::TaskSubprocessOptions subproc_opts
 ) {
   cpp2::RunningTask rt;
-  *rt.job_ref() = job;
-  *rt.node_ref() = node;
-  *rt.workerShard_ref() = *getWorker().shard_ref();
+  *rt.job() = job;
+  *rt.node() = node;
+  *rt.workerShard() = *getWorker().shard();
   getClient()->sync_runTask(
       rt,
       "",
       cmd,
       getSchedulerID(),
-      *getWorker().id_ref(),
+      *getWorker().id(),
       0,
       std::move(subproc_opts));
   return rt;

@@ -24,8 +24,8 @@ using namespace folly::test;
 
 cpp2::RunningTask makeRT(const string& job, const string& node) {
   cpp2::RunningTask rt;
-  *rt.job_ref() = job;
-  *rt.node_ref() = node;
+  *rt.job() = job;
+  *rt.node() = node;
   return rt;
 }
 
@@ -93,7 +93,7 @@ TEST(TestTaskStatuses, HandleTaskStore) {
   EXPECT_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 
   auto rt = makeRT("job1", "db2");
-  *rt.nextBackoffDuration_ref()->noMoreBackoffs_ref() = true;
+  *rt.nextBackoffDuration()->noMoreBackoffs() = true;
   task_statuses->updateStatus(rt, TaskStatus::errorBackoff(""));
 
   // job1:db3 is still running, let's delete the job, and make sure that

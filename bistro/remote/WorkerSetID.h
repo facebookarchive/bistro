@@ -15,32 +15,32 @@ namespace facebook { namespace bistro {
 
 namespace detail {
 inline void addValueToHash(cpp2::SetHash* h, int64_t v) {
-  *h->xorAll_ref() = *h->xorAll_ref() ^ v;
-  *h->addAll_ref() = static_cast<int64_t>(
-      static_cast<uint64_t>(*h->addAll_ref()) + static_cast<uint64_t>(v));
+  *h->xorAll() = *h->xorAll() ^ v;
+  *h->addAll() = static_cast<int64_t>(
+      static_cast<uint64_t>(*h->addAll()) + static_cast<uint64_t>(v));
 }
 inline void removeValueFromHash(cpp2::SetHash* h, int64_t v) {
-  *h->xorAll_ref() = *h->xorAll_ref() ^ v;
-  *h->addAll_ref() = static_cast<int64_t>(
-      static_cast<uint64_t>(*h->addAll_ref()) - static_cast<uint64_t>(v));
+  *h->xorAll() = *h->xorAll() ^ v;
+  *h->addAll() = static_cast<int64_t>(
+      static_cast<uint64_t>(*h->addAll()) - static_cast<uint64_t>(v));
 }
 }
 
 inline void addWorkerIDToHash(
     cpp2::WorkerSetHash* s,
     cpp2::BistroInstanceID id) {
-  ++(*s->numWorkers_ref());
-  detail::addValueToHash(&(*s->startTime_ref()), *id.startTime_ref());
-  detail::addValueToHash(&(*s->rand_ref()), *id.rand_ref());
+  ++(*s->numWorkers());
+  detail::addValueToHash(&(*s->startTime()), *id.startTime());
+  detail::addValueToHash(&(*s->rand()), *id.rand());
 }
 
 inline void removeWorkerIDFromHash(
     cpp2::WorkerSetHash* s,
     cpp2::BistroInstanceID id) {
-  CHECK_LT(0, *s->numWorkers_ref());
-  --(*s->numWorkers_ref());
-  detail::removeValueFromHash(&(*s->startTime_ref()), *id.startTime_ref());
-  detail::removeValueFromHash(&(*s->rand_ref()), *id.rand_ref());
+  CHECK_LT(0, *s->numWorkers());
+  --(*s->numWorkers());
+  detail::removeValueFromHash(&(*s->startTime()), *id.startTime());
+  detail::removeValueFromHash(&(*s->rand()), *id.rand());
 }
 
 /**

@@ -23,11 +23,11 @@ std::vector<cpp2::GPUInfo> fetchGpuUtilization(uint32_t timeout_ms) {
   for (const auto& l : queryNvidiaSmi("query-gpu", query_fields, timeout_ms)) {
     auto parts = checkedSplitLine(", ", l, query_fields.size());
     gpus.emplace_back();
-    *gpus.back().pciBusID_ref() = parts[0].str();
-    *gpus.back().memoryMB_ref() = folly::to<double>(parts[1]);
-    *gpus.back().compute_ref() =
+    *gpus.back().pciBusID() = parts[0].str();
+    *gpus.back().memoryMB() = folly::to<double>(parts[1]);
+    *gpus.back().compute() =
         folly::to<double>(parts[2]) / 100; // was in percent
-    *gpus.back().name_ref() = parts[3].str();
+    *gpus.back().name() = parts[3].str();
   }
   return gpus;
 }
@@ -64,7 +64,7 @@ struct Fetcher {
     // Make a map from bus ID to a pointer into gpuInfos_.
     std::unordered_map<std::string, const cpp2::GPUInfo*> bus_id_to_gpu_info;
     for (const auto& gpu_info : res->gpuInfos_) {
-      bus_id_to_gpu_info[*gpu_info.pciBusID_ref()] = &gpu_info;
+      bus_id_to_gpu_info[*gpu_info.pciBusID()] = &gpu_info;
     }
     // Fetch the pid => bus ID list, and translate it into gpuInfos_ pointers.
     for (const auto& p : fetchGpuPidsWithBusID(subprocessTimeoutMs_)) {

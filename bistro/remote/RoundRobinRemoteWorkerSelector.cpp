@@ -27,11 +27,11 @@ bool tryToRun(
   }
 
   const auto& job_resources = job.resources();
-  const auto& rv_it = worker_resources->find(*worker.shard_ref());
+  const auto& rv_it = worker_resources->find(*worker.shard());
   // I'm not sure, but I think this can happen if a new worker was just
   // added, but updateConfig had not yet run for it.
   if (rv_it == worker_resources->end()) {
-    LOG(WARNING) << "Not using worker " << *worker.shard_ref()
+    LOG(WARNING) << "Not using worker " << *worker.shard()
                  << " since it does "
                  << "not yet have resources";
     return false;

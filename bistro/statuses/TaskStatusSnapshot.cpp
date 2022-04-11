@@ -44,8 +44,8 @@ void TaskStatusSnapshot::updateForConfig(const Config& config) {
   // rows.  This happens, e.g. when a job gets removed and re-added.
   for (const auto& id_and_task : runningTasks_) {
     const auto& rt = id_and_task.second;
-    const int job_id = as_const(Job::JobNameTable)->lookup(*rt.job_ref());
-    const int node_id = as_const(Node::NodeNameTable)->lookup(*rt.node_ref());
+    const int job_id = as_const(Job::JobNameTable)->lookup(*rt.job());
+    const int node_id = as_const(Node::NodeNameTable)->lookup(*rt.node());
     auto& status_ref = access(job_id, node_id);
     if (!status_ref.isRunning()) {
       LOG(WARNING) << "Task in runningTasks_ was not marked as running: "
@@ -175,7 +175,7 @@ TaskStatus TaskStatusSnapshot::updateStatus(
     //  - Have notifyFinished() tag "after suicide" task exit statuses with
     //    a special bit, so that they can be ERRORs, while still CHECKing
     //    for other, buggier instances of two simultaneous task instances.
-    CHECK(*it->second.invocationID_ref() == *rt.invocationID_ref())
+    CHECK(*it->second.invocationID() == *rt.invocationID())
         << "Cannot updateStatus since the invocation IDs don't match, new task "
         << debugString(rt) << " vs current task " << debugString(it->second)
         << " with status " << status.toJson();

@@ -95,8 +95,8 @@ void TaskSubprocessQueue::logEvent(
     obj["raw_status"] = state->rawStatus_;
   }
   // Distinguish different invocations of the same task.
-  obj["invocation_start_time"] = *rt.invocationID_ref()->startTime_ref();
-  obj["invocation_rand"] = *rt.invocationID_ref()->rand_ref();
+  obj["invocation_start_time"] = *rt.invocationID()->startTime();
+  obj["invocation_rand"] = *rt.invocationID()->rand();
   // The worker host need not be the same as the scheduler host, so
   // it's important to log it.
   obj["worker_host"] = getLocalHostName();
@@ -108,12 +108,12 @@ void TaskSubprocessQueue::logEvent(
 
   try {
     // Suppress INFO messages about healthchecks to keep the logs cleaner
-    if (glog_level != google::INFO || *rt.job_ref() != kHealthcheckTaskJob) {
+    if (glog_level != google::INFO || *rt.job() != kHealthcheckTaskJob) {
       google::LogMessage(__FILE__, __LINE__, glog_level).stream()
-          << "Task " << *rt.job_ref() << ", " << *rt.node_ref()
+          << "Task " << *rt.job() << ", " << *rt.node()
           << " message: " << msg;
     }
-    logWriter_->write(LogTable::EVENTS, *rt.job_ref(), *rt.node_ref(), msg);
+    logWriter_->write(LogTable::EVENTS, *rt.job(), *rt.node(), msg);
   } catch (const std::exception& e) {  // Not much to do with this...
     LOG(ERROR) << "Error logging task subprocess message '" << msg
       << "' for task " << apache::thrift::debugString(rt) << ": " << e.what();
@@ -122,7 +122,7 @@ void TaskSubprocessQueue::logEvent(
 
 namespace {
 uint32_t pollMs(const cpp2::TaskSubprocessOptions& opts) {
-  return std::max(1, *opts.pollMs_ref());
+  return std::max(1, *opts.pollMs());
 }
 }  // anonymous namespace
 
@@ -152,8 +152,8 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
   std::vector<std::shared_ptr<AsyncReadPipe>> pipes;  // For the rate-limiter
   for (auto&& p : proc.takeOwnershipOfPipes()) {
     int child_fd = p.childFd;
-    auto job = *rt.job_ref();
-    auto node = *rt.node_ref();
+    auto job = *rt.job();
+    auto node = *rt.node();
     pipes.emplace_back(asyncReadPipe(
       evb,
       std::move(p.pipe),
@@ -199,7 +199,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
   state->pipeRateLimiter_.reset(new AsyncReadPipeRateLimiter(
       evb,
       pollMs(state->opts()), // Poll at the Subprocess's rate
-      *state->opts().maxLogLinesPerPollInterval_ref(),
+      *state->opts().maxLogLinesPerPollInterval(),
       std::move(pipes)));
 
   // Add callbacks to wait for the subprocess and pipes on the same EventBase.
@@ -223,7 +223,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
                 folly::dynamic::object("message", rc.str())); // noexcept
             // Now that the child has exited, optionally use cgroups to kill,
             // and/or wait for, its left-over descendant processes.
-            if (state->opts().cgroupOptions_ref()->subsystems_ref()->empty()) {
+            if (state->opts().cgroupOptions()->subsystems()->empty()) {
               // No cgroups exist: shortcut early to avoid logging
               // "cgroups_reaped".
               return folly::Future<folly::Unit>();
@@ -238,7 +238,7 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
             // tasks.
             return asyncCGroupReaper(
                        evb,
-                       *state->opts().cgroupOptions_ref(),
+                       *state->opts().cgroupOptions(),
                        state->cgroupName(),
                        pollMs(state->opts()))
                 .thenTry(
@@ -302,9 +302,9 @@ void TaskSubprocessQueue::waitForSubprocessAndPipes(
             folly::dynamic::object("status", status.toDynamicNoTime()));
         status_cob(rt, std::move(status)); // noexcept
         // logEvent ignores healthcheck messages; print a short note instead.
-        if (*rt.job_ref() == kHealthcheckTaskJob) {
+        if (*rt.job() == kHealthcheckTaskJob) {
           LOG(INFO) << "Healthcheck started at "
-                    << *rt.invocationID_ref()->startTime_ref()
+                    << *rt.invocationID()->startTime()
                     << " quit with status '" << status.toJson() << "'";
         }
         SYNCHRONIZED(
@@ -381,7 +381,7 @@ void TaskSubprocessQueue::runTask(
       // required for nice exception logging.
       auto pipe_filename =  // Unlike /proc, /dev/fd works on Linux and OS X
         folly::to<std::string>("/dev/fd/", childStatusPipePlaceholder_.fd());
-      std::vector<std::string> args{*rt.node_ref(), pipe_filename, job_arg};
+      std::vector<std::string> args{*rt.node(), pipe_filename, job_arg};
       debug_cmd = folly::to<std::string>(
         '[', escapeShellArgsInsecure(cmd), "] + [",
         escapeShellArgsInsecure(args), ']'
@@ -406,15 +406,15 @@ void TaskSubprocessQueue::runTask(
       auto opts = folly::Subprocess::Options().pipeStdout().pipeStderr()
         .chdir(working_dir.native())
         .fd(childStatusPipePlaceholder_.fd(), folly::Subprocess::PIPE_OUT);
-      if (*state->opts().useCanaryPipe_ref()) {
+      if (*state->opts().useCanaryPipe()) {
         // It's much easier for us to get the read end of the pipe, since we
         // can just use AsyncReadPipe to track its closing.
         opts.fd(childCanaryPipePlaceholder_.fd(), folly::Subprocess::PIPE_OUT);
       }
-      if (*state->opts().parentDeathSignal_ref() != 0) {
-        opts.parentDeathSignal(*state->opts().parentDeathSignal_ref());
+      if (*state->opts().parentDeathSignal() != 0) {
+        opts.parentDeathSignal(*state->opts().parentDeathSignal());
       }
-      if (*state->opts().processGroupLeader_ref()) {
+      if (*state->opts().processGroupLeader()) {
         opts.processGroupLeader();
       }
       // folly::Subprocess() can throw, and that's ok. Do not make `proc`
@@ -431,7 +431,7 @@ void TaskSubprocessQueue::runTask(
         LOG(INFO) << "Making task cgroups named " << state->cgroupName();
         // This must live only until folly::Subprocess's constructor exits.
         AddChildToCGroups add_to_cgroups(cgroupSetup(
-            state->cgroupName(), *state->opts().cgroupOptions_ref()));
+            state->cgroupName(), *state->opts().cgroupOptions()));
         options.dangerousPostForkPreExecCallback(&add_to_cgroups);
         return folly::Subprocess(full_cmd, options);
       }(std::move(opts));
@@ -484,13 +484,13 @@ void TaskSubprocessQueue::kill(
       // Bistro's scheduler (see the "kill orphan tasks" code).
       throw BistroException(
           "Cannot kill task with ID ",
-          *rt.job_ref(),
+          *rt.job(),
           " / ",
-          *rt.node_ref(),
+          *rt.node(),
           " / ",
-          *rt.invocationID_ref()->startTime_ref(),
+          *rt.invocationID()->startTime(),
           " / ",
-          *rt.invocationID_ref()->rand_ref(),
+          *rt.invocationID()->rand(),
           " since no such task is running.");
     }
     it->second->kill(std::move(req));  // Throws if the queue is full.
@@ -503,14 +503,14 @@ namespace {
 std::string makeCGroupName(
     const cpp2::CGroupOptions& cgopts,
     const cpp2::RunningTask& rt) {
-  if (cgopts.subsystems_ref()->empty()) {
+  if (cgopts.subsystems()->empty()) {
     return std::string();
   }
   // Create a unique ID based on the RunningTask and the supervisor's pid.
   constexpr size_t kDateMax = 32; // 4+2+2+2+2+2+1 + 17 for sheer paranoia.
   struct ::tm start_tm;
   // Using localtime would cause DST headaches, and confusion in unit tests.
-  CHECK(gmtime_r(&(*rt.invocationID_ref()->startTime_ref()), &start_tm));
+  CHECK(gmtime_r(&(*rt.invocationID()->startTime()), &start_tm));
   char start_time[kDateMax];
   CHECK_LT(0, strftime(start_time, kDateMax, "%Y%m%d%H%M%S", &start_tm));
   return folly::format(
@@ -527,9 +527,9 @@ std::string makeCGroupName(
              // and aspirational (we could use it to have a worker re-adopt
              // previously running tasks on startup).
              "{}:{}:{:x}:{}",
-             *rt.workerShard_ref(),
+             *rt.workerShard(),
              start_time,
-             *rt.invocationID_ref()->rand_ref(),
+             *rt.invocationID()->rand(),
              getpid())
       .str();
 }
@@ -544,10 +544,10 @@ TaskSubprocessState::TaskSubprocessState(
     : opts_(std::move(opts)),
       queue_(10),
       resourceCallback_(std::move(resource_cb)),
-      cgroupName_(makeCGroupName(*opts_.cgroupOptions_ref(), rt)),
+      cgroupName_(makeCGroupName(*opts_.cgroupOptions(), rt)),
       physicalResourceFetcher_(
           CGroupPaths(
-              *opts_.cgroupOptions_ref(),
+              *opts_.cgroupOptions(),
               boost::filesystem::path(cgroupName_)),
           all_tasks_mon) {}
 
@@ -564,7 +564,7 @@ void TaskSubprocessState::asyncSubprocessCallback(
   }
   cpp2::KillRequest kill_req;
   while (queue_.read(kill_req)) {
-    switch (*kill_req.method_ref()) {
+    switch (*kill_req.method()) {
       case cpp2::KillMethod::KILL:
         signal = SIGKILL;  // KILL takes precedence over an outstanding TERM
         killAfterTicks_ = 0;  // No point in sending already-scheduled kills
@@ -576,7 +576,7 @@ void TaskSubprocessState::asyncSubprocessCallback(
         // Pick the earlier kill time of the two -- only one SIGKILL will fire.
         {
           uint32_t ticks =
-              std::max(*kill_req.killWaitMs_ref(), 0) / pollMs(opts_);
+              std::max(*kill_req.killWaitMs(), 0) / pollMs(opts_);
           killAfterTicks_ =
             (killAfterTicks_ == 0) ? ticks : std::min(ticks, killAfterTicks_);
         }
@@ -588,7 +588,7 @@ void TaskSubprocessState::asyncSubprocessCallback(
         break;
       default:  // Not reached, checked in TaskSubprocessState::kill()
         LOG(FATAL) << "Unknown kill method: "
-                   << static_cast<int>(*kill_req.method_ref());
+                   << static_cast<int>(*kill_req.method());
     }
   }
   // AsyncSubprocess guarantees that the process had not yet been wait()ed
@@ -603,7 +603,7 @@ void TaskSubprocessState::asyncSubprocessCallback(
     CHECK(proc.returnCode().running());
     auto pid = proc.pid();
     CHECK(pid > 1);
-    if (*opts_.processGroupLeader_ref()) {
+    if (*opts_.processGroupLeader()) {
       pid = -pid;
       CHECK(pid < -1);
     }
@@ -624,7 +624,7 @@ void TaskSubprocessState::asyncSubprocessCallback(
 }
 
 void TaskSubprocessState::kill(cpp2::KillRequest req) {
-  switch (*req.method_ref()) {
+  switch (*req.method()) {
     case cpp2::KillMethod::TERM_WAIT_KILL:
     case cpp2::KillMethod::KILL:
     case cpp2::KillMethod::TERM:
@@ -634,7 +634,7 @@ void TaskSubprocessState::kill(cpp2::KillRequest req) {
       break;
     default:
       throw BistroException(
-          "Unknown kill method: ", static_cast<int>(*req.method_ref()));
+          "Unknown kill method: ", static_cast<int>(*req.method()));
   }
 }
 

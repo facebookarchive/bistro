@@ -129,19 +129,19 @@ TEST(TestJob, HandleAll) {
     (kParentDeathSignal, 333)
     (kProcessGroupLeader, true)
     (kUseCanaryPipe, false);
-  *task_opts.pollMs_ref() = 111;
-  *task_opts.maxLogLinesPerPollInterval_ref() = 222;
-  *task_opts.parentDeathSignal_ref() = 333;
-  *task_opts.processGroupLeader_ref() = true;
-  *task_opts.useCanaryPipe_ref() = false;
+  *task_opts.pollMs() = 111;
+  *task_opts.maxLogLinesPerPollInterval() = 222;
+  *task_opts.parentDeathSignal() = 333;
+  *task_opts.processGroupLeader() = true;
+  *task_opts.useCanaryPipe() = false;
   EXPECT_EQ(task_opts, Job(Config(cd1), "j", jd).taskSubprocessOptions());
 
   // Further override task options via Job
   jd[kTaskSubprocess] = dynamic::object
     (kMaxLogLinesPerPollInterval, 444)
     (kUseCanaryPipe, true);
-  *task_opts.maxLogLinesPerPollInterval_ref() = 444;
-  *task_opts.useCanaryPipe_ref() = true;
+  *task_opts.maxLogLinesPerPollInterval() = 444;
+  *task_opts.useCanaryPipe() = true;
   EXPECT_EQ(task_opts, Job(Config(cd1), "j", jd).taskSubprocessOptions());
 
   // Check task options' toDynamic
@@ -167,13 +167,13 @@ TEST(TestJob, HandleAll) {
 
   // Non-default kill request via Config
   cd1[kKillSubprocess] = dynamic::object(kMethod, kKill)(kKillWaitMs, 987);
-  *kill_req.method_ref() = cpp2::KillMethod::KILL;
-  *kill_req.killWaitMs_ref() = 987;
+  *kill_req.method() = cpp2::KillMethod::KILL;
+  *kill_req.killWaitMs() = 987;
   EXPECT_EQ(kill_req, Job(Config(cd1), "j", jd).killRequest());
 
   // Further override kill request via Job
   jd[kKillSubprocess] = dynamic::object(kMethod, kTermWaitKill);
-  *kill_req.method_ref() = cpp2::KillMethod::TERM_WAIT_KILL;
+  *kill_req.method() = cpp2::KillMethod::TERM_WAIT_KILL;
   EXPECT_EQ(kill_req, Job(Config(cd1), "j", jd).killRequest());
 
   // Check kill request's toDynamic

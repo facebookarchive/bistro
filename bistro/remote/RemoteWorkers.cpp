@@ -68,7 +68,7 @@ namespace {
 template <typename... Args>
 bool consensusFail(const RemoteWorker& w, Args&&... args) {
   if (!w.hasBeenHealthy()) {
-    LOG(WARNING) << "Worker " << *w.getBistroWorker().shard_ref()
+    LOG(WARNING) << "Worker " << *w.getBistroWorker().shard()
                  << " is not yet able to achieve consensus: "
                  << folly::to<std::string>(std::forward<Args>(args)...);
   }
@@ -80,7 +80,7 @@ bool consensusFail(const RemoteWorker& w, Args&&... args) {
 bool RemoteWorkers::consensusPermitsBecomingHealthy(const RemoteWorker& w)
     const {
   CHECK_EQ(
-      *nonMustDieWorkerSetID_.hash_ref()->numWorkers_ref(),
+      *nonMustDieWorkerSetID_.hash()->numWorkers(),
       initialWorkerSetIDs_.size());
   CHECK_GE(
     initialWorkerSetIDs_.size(), indirectVersionsOfNonMustDieWorkers_.size()
@@ -103,13 +103,13 @@ bool RemoteWorkers::consensusPermitsBecomingHealthy(const RemoteWorker& w)
   // this scheduler's WorkerSetID.  If any worker lacks it, we don't have
   // a safe consensus -- that worker might declare consensus with itself.
   if (indirectVersionsOfNonMustDieWorkers_.size() !=
-      *nonMustDieWorkerSetID_.hash_ref()->numWorkers_ref()) {
+      *nonMustDieWorkerSetID_.hash()->numWorkers()) {
     return consensusFail(
         w,
         "Scheduler has ",
         indirectVersionsOfNonMustDieWorkers_.size(),
         " non-MUST_DIE workers with indirect versions versus ",
-        *nonMustDieWorkerSetID_.hash_ref()->numWorkers_ref(),
+        *nonMustDieWorkerSetID_.hash()->numWorkers(),
         " non-MUST_DIE workers");
   }
 
@@ -123,18 +123,18 @@ bool RemoteWorkers::consensusPermitsBecomingHealthy(const RemoteWorker& w)
   }
   if (WorkerSetIDEarlierThan()(
           indirectVersionsOfNonMustDieWorkers_.begin()->first,
-          *w.firstAssociatedWorkerSetID()->version_ref())) {
+          *w.firstAssociatedWorkerSetID()->version())) {
     return consensusFail(
         w,
         "It first appeared in the following WorkerSetID: ",
-        *w.firstAssociatedWorkerSetID()->version_ref(),
+        *w.firstAssociatedWorkerSetID()->version(),
         " but an earlier one "
         "is indirectly required by all non-MUST_DIE workers: ",
         indirectVersionsOfNonMustDieWorkers_.begin()->first);
   }
 
   if (!w.hasBeenHealthy()) {
-    LOG(INFO) << "Worker " << *w.getBistroWorker().shard_ref()
+    LOG(INFO) << "Worker " << *w.getBistroWorker().shard()
               << " has not been "
               << "healthy, but WorkerSetID consensus allows it.";
   }
@@ -146,16 +146,16 @@ void addToVersionShardSet(
     RemoteWorkers::VersionShardSet* vss,
     const cpp2::WorkerSetID& id,
     const std::string& shard) {
-  CHECK(vss->emplace(*id.version_ref(), shard).second)
-      << "Duplicate: v" << *id.version_ref() << " in shard " << shard;
+  CHECK(vss->emplace(*id.version(), shard).second)
+      << "Duplicate: v" << *id.version() << " in shard " << shard;
 }
 
 void removeFromVersionShardSet(
     RemoteWorkers::VersionShardSet* vss,
     const cpp2::WorkerSetID& id,
     const std::string& shard) {
-  CHECK_NE(0, vss->erase({*id.version_ref(), shard}))
-      << "Not found: v" << *id.version_ref() << " in shard " << shard;
+  CHECK_NE(0, vss->erase({*id.version(), shard}))
+      << "Not found: v" << *id.version() << " in shard " << shard;
 }
 }  // anonymous namespace
 
@@ -164,10 +164,10 @@ void RemoteWorkers::updateIndirectWorkerSetVersion(
     const cpp2::WorkerSetID& new_id) {
 
   auto& maybe_id = w->indirectWorkerSetID();
-  CHECK(!maybe_id.has_value() || *maybe_id->schedulerID_ref() == schedulerID_);
+  CHECK(!maybe_id.has_value() || *maybe_id->schedulerID() == schedulerID_);
   if (maybe_id.has_value() &&
       !WorkerSetIDEarlierThan()(
-          *maybe_id->version_ref(), *new_id.version_ref())) {
+          *maybe_id->version(), *new_id.version())) {
     return;  // Nothing to update
   }
 
@@ -175,12 +175,12 @@ void RemoteWorkers::updateIndirectWorkerSetVersion(
   if (maybe_id.has_value()) {
     // Remove the current denormalized entry, since the version has changed.
     removeFromVersionShardSet(
-        &indirectVersionsOfNonMustDieWorkers_, *maybe_id, *bw.shard_ref());
+        &indirectVersionsOfNonMustDieWorkers_, *maybe_id, *bw.shard());
   }
 
   // Denormalize w's indirect version for quickly finding the smallest one.
   addToVersionShardSet(
-      &indirectVersionsOfNonMustDieWorkers_, new_id, *bw.shard_ref());
+      &indirectVersionsOfNonMustDieWorkers_, new_id, *bw.shard());
 
   // Update the RemoteWorker.
   maybe_id = new_id;
@@ -196,9 +196,9 @@ RemoteWorkers::processHeartbeat(
   // RemoteWorker.  At present, we do not tell that worker to commit
   // suicide, so version mismatches will cause lots of logspam.
   enforceWorkerSchedulerProtocolVersion(
-      *worker.protocolVersion_ref(),
+      *worker.protocolVersion(),
       cpp2::common_constants::kProtocolVersion());
-  const auto& shard = *worker.shard_ref();
+  const auto& shard = *worker.shard();
   auto worker_it = workerPool_.find(shard);
   if (worker_it == workerPool_.end()) {
 
@@ -227,15 +227,15 @@ RemoteWorkers::processHeartbeat(
         // that's not a problem because updateInitialWait() explicitly
         // prohibits leaving initial wait while any workers are NEW.
         const auto& bw = w.getBistroWorker();
-        addWorkerIDToHash(&(*nonMustDieWorkerSetID_.hash_ref()), *bw.id_ref());
-        ++(*nonMustDieWorkerSetID_.version_ref());
+        addWorkerIDToHash(&(*nonMustDieWorkerSetID_.hash()), *bw.id());
+        ++(*nonMustDieWorkerSetID_.version());
         // Update history_ with this new set.
         HistoryStep hist_step;
-        hist_step.added.emplace(*bw.shard_ref());
+        hist_step.added.emplace(*bw.shard());
         CHECK(
             history_
                 .emplace(
-                    *nonMustDieWorkerSetID_.version_ref(), std::move(hist_step))
+                    *nonMustDieWorkerSetID_.version(), std::move(hist_step))
                 .second);
       },
       // Dead worker: either became MUST_DIE or got bumped by another worker.
@@ -248,29 +248,29 @@ RemoteWorkers::processHeartbeat(
 
         // If `w` had an indirect version, delete its denormalization.
         if (auto id_ptr = w.indirectWorkerSetID().get_pointer()) {
-          CHECK(*id_ptr->schedulerID_ref() == schedulerID_);
+          CHECK(*id_ptr->schedulerID() == schedulerID_);
           removeFromVersionShardSet(
-              &indirectVersionsOfNonMustDieWorkers_, *id_ptr, *bw.shard_ref());
+              &indirectVersionsOfNonMustDieWorkers_, *id_ptr, *bw.shard());
         }
 
         // Remove the dead worker from the non-MUST_DIE set, update history_.
         removeWorkerIDFromHash(
-            &(*nonMustDieWorkerSetID_.hash_ref()), *bw.id_ref());
-        ++(*nonMustDieWorkerSetID_.version_ref());
+            &(*nonMustDieWorkerSetID_.hash()), *bw.id());
+        ++(*nonMustDieWorkerSetID_.version());
         HistoryStep hist_step;
-        hist_step.removed = *bw.shard_ref();
+        hist_step.removed = *bw.shard();
         CHECK(
             history_
                 .emplace(
-                    *nonMustDieWorkerSetID_.version_ref(), std::move(hist_step))
+                    *nonMustDieWorkerSetID_.version(), std::move(hist_step))
                 .second);
       },
       // A worker's WorkerSetID is getting a new version (a new echo arrived).
       [this](RemoteWorker& w, const cpp2::WorkerSetID& w_set_id) {
         // Guaranteed by RemoteWorker
-        CHECK(schedulerID_ == *w_set_id.schedulerID_ref())
+        CHECK(schedulerID_ == *w_set_id.schedulerID())
             << debugString(schedulerID_)
-            << " != " << debugString(*w_set_id.schedulerID_ref());
+            << " != " << debugString(*w_set_id.schedulerID());
 
         // Update indirectVersionsOfNonMustDieWorkers_ and
         // w.indirectWorkerSetID_, if this update changes this worker's
@@ -282,18 +282,18 @@ RemoteWorkers::processHeartbeat(
       }
     ));
     // Add the same pointer to the right host worker pool
-    CHECK(mutableHostWorkerPool(*worker.machineLock_ref()->hostname_ref())
+    CHECK(mutableHostWorkerPool(*worker.machineLock()->hostname())
               .emplace(shard, res.first->second)
               .second)
         << "Worker pool for hostname "
-        << *worker.machineLock_ref()->hostname_ref() << " already had "
+        << *worker.machineLock()->hostname() << " already had "
         << " shard " << shard;
     worker_it = res.first;
   }
 
   // If the hostname changes, we will move the worker to the new host pool
   const auto old_hostname =
-      *worker_it->second->getBistroWorker().machineLock_ref()->hostname_ref();
+      *worker_it->second->getBistroWorker().machineLock()->hostname();
 
   // Update the worker's state (also update the hostname if needed)
   auto response = worker_it->second->processHeartbeat(
@@ -307,7 +307,7 @@ RemoteWorkers::processHeartbeat(
   // heartbeat could have been rejected.  NB: I could also have ensured
   // res.hasValue() here, but it seems fine to just test the symptom.
   const auto& new_hostname =
-      *worker_it->second->getBistroWorker().machineLock_ref()->hostname_ref();
+      *worker_it->second->getBistroWorker().machineLock()->hostname();
   if (new_hostname != old_hostname) {
     // This might "invalidate" the nextShard_ iterator, but it's okay
     // since the getNextWorker() implementation is robust.
@@ -329,7 +329,7 @@ RemoteWorkers::processHeartbeat(
     // always be part of the WorkerSetID in our reply -- this ensures that
     // RemoteWorker::firstAssociatedWorkerSetID_ is always the first
     // WorkerSetID that contains this worker.
-    *response->workerSetID_ref() = nonMustDieWorkerSetID_;
+    *response->workerSetID() = nonMustDieWorkerSetID_;
   }
   return response;
 }
@@ -389,8 +389,8 @@ void RemoteWorkers::pruneUnusedHistoryVersions() {
       CHECK(wsid_ptr);
       if (!first_referenced_version.has_value() ||
           WorkerSetIDEarlierThan()(
-              *wsid_ptr->version_ref(), *first_referenced_version)) {
-        first_referenced_version = *wsid_ptr->version_ref();
+              *wsid_ptr->version(), *first_referenced_version)) {
+        first_referenced_version = *wsid_ptr->version();
       }
     }
   }
@@ -500,7 +500,7 @@ void RemoteWorkers::propagateIndirectWorkerSets() {
       // version in `vss`.  Secondly, once the worker gets a version, the
       // next iteration will propagate it properly, fixing the omission.
       if (w.indirectWorkerSetID().has_value()) {
-        CHECK(*w.indirectWorkerSetID()->schedulerID_ref() == schedulerID_);
+        CHECK(*w.indirectWorkerSetID()->schedulerID() == schedulerID_);
         removeFromVersionShardSet(&vss, *w.indirectWorkerSetID(), *shard_p);
       }
     }
@@ -509,7 +509,7 @@ void RemoteWorkers::propagateIndirectWorkerSets() {
       if (!w.indirectWorkerSetID().has_value()) {
         continue;  // See comment above
       }
-      CHECK(*w.indirectWorkerSetID()->schedulerID_ref() == schedulerID_);
+      CHECK(*w.indirectWorkerSetID()->schedulerID() == schedulerID_);
       addToVersionShardSet(&vss, *w.indirectWorkerSetID(), shard);
     }
     // For all workers having the current version (from `hp`) as their
@@ -537,15 +537,15 @@ void RemoteWorkers::propagateIndirectWorkerSets() {
         mutableWorkerOrAbort(vss.rbegin()->second)->indirectWorkerSetID();
       // Can't end up in `vss` without having an indirectWorkerSetID version.
       CHECK(new_id.has_value());
-      CHECK_EQ(vss.rbegin()->first, *new_id->version_ref());
-      CHECK(*new_id->schedulerID_ref() == schedulerID_);
+      CHECK_EQ(vss.rbegin()->first, *new_id->version());
+      CHECK(*new_id->schedulerID() == schedulerID_);
 
       // Find the worker to update.
       auto& w = *mutableWorkerOrAbort(it->second);
       // Can't end up in indirectVersionsOfNonMustDieWorkers_ without having
       // an indirectWorkerSetID version.
-      CHECK_EQ(it->first, *w.indirectWorkerSetID()->version_ref());
-      CHECK_EQ(it->second, *w.getBistroWorker().shard_ref());
+      CHECK_EQ(it->first, *w.indirectWorkerSetID()->version());
+      CHECK_EQ(it->second, *w.getBistroWorker().shard());
       // Since we're about to update `w`, we must also do `vss` -- the `vss`
       // update step above searches for the latest `indirectWorkerSetID`.
       auto vss_it = vss.find({it->first, it->second});
@@ -561,9 +561,9 @@ void RemoteWorkers::propagateIndirectWorkerSets() {
       //
       // CAUTION: This invalidates `it`.
       updateIndirectWorkerSetVersion(&w, *new_id);
-      CHECK(*new_id->version_ref() == *w.indirectWorkerSetID()->version_ref())
-          << debugString(*new_id->version_ref())
-          << " != " << debugString(*w.indirectWorkerSetID()->version_ref());
+      CHECK(*new_id->version() == *w.indirectWorkerSetID()->version())
+          << debugString(*new_id->version())
+          << " != " << debugString(*w.indirectWorkerSetID()->version());
     }
   }
   CHECK(indir_it == indirectVersionsOfNonMustDieWorkers_.end())
@@ -623,8 +623,8 @@ void RemoteWorkers::updateInitialWait(RemoteWorkerUpdate* update) {
       // ... and it matches our non-MUST_DIE worker set, meaning that exactly
       // the same workers are connected now as the scheduler had before its
       // restart.
-      && *nonMustDieWorkerSetID_.hash_ref() ==
-          *initialWorkerSetIDs_.begin()->hash_ref();
+      && *nonMustDieWorkerSetID_.hash() ==
+          *initialWorkerSetIDs_.begin()->hash();
   if (!initial_worker_set_id_consensus) {
     msg += "No initial worker set ID consensus. ";
   }
@@ -681,10 +681,10 @@ void RemoteWorkers::updateState(RemoteWorkerUpdate* update) {
 void RemoteWorkers::initializeRunningTasks(
     const cpp2::BistroWorker& w,
     const std::vector<cpp2::RunningTask>& running_tasks) {
-  auto worker = mutableWorkerOrAbort(*w.shard_ref());
+  auto worker = mutableWorkerOrAbort(*w.shard());
   // applyUpdate in another thread could have won (#5176536)
   if (worker->getState() != RemoteWorkerState::State::NEW) {
-    LOG(WARNING) << "Ignoring running tasks for non-new " << *w.shard_ref();
+    LOG(WARNING) << "Ignoring running tasks for non-new " << *w.shard();
     return;
   }
   worker->initializeRunningTasks(running_tasks);

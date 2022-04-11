@@ -44,10 +44,10 @@ private:
 
   static InvocationID makeInvocationID(const cpp2::RunningTask& rt) {
     return InvocationID(
-        *rt.invocationID_ref()->startTime_ref(),
-        *rt.invocationID_ref()->rand_ref(),
-        *rt.job_ref(),
-        *rt.node_ref());
+        *rt.invocationID()->startTime(),
+        *rt.invocationID()->rand(),
+        *rt.job(),
+        *rt.node());
   }
 
 public:
@@ -202,8 +202,8 @@ private:
     // one resourceCallback_ invocation.
     // Convert resource callback invocation interval to milliseconds
     const double resInterval =
-        std::max(1, *opts_.refreshResourcesSec_ref()) * 1000.;
-    const double pollInterval = std::max(1, *opts_.pollMs_ref());
+        std::max(1, *opts_.refreshResourcesSec()) * 1000.;
+    const double pollInterval = std::max(1, *opts_.pollMs());
     // Round up the ratio to make sure resource callback invocation happens
     // no more frequently than requested.
     return std::ceil(resInterval / pollInterval);

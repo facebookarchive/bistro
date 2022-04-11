@@ -17,8 +17,8 @@ using namespace facebook::bistro;
 
 struct TestUsablePhysicalResourceFetcher : public ::testing::Test {
   TestUsablePhysicalResourceFetcher() {
-    *cgopts.root_ref() = ".";
-    *cgopts.slice_ref() = "sl/ice";
+    *cgopts.root() = ".";
+    *cgopts.slice() = "sl/ice";
   }
   UsablePhysicalResourceFetcher fetcher() {
     return UsablePhysicalResourceFetcher(
@@ -37,7 +37,7 @@ TEST_F(TestUsablePhysicalResourceFetcher, Memory) {
 
   // The memory limit is only effective when it's less than available RAM.
   uint64_t limit_mb = sys_mb - 1;  // Truncate the double
-  cgopts.subsystems_ref()->emplace_back("memory");
+  cgopts.subsystems()->emplace_back("memory");
   writeFilesToHierarchy(
     "memory/sl/ice", "memory.use_hierarchy", {{"1"}, {"0"}, {"0"}}
   );
@@ -53,7 +53,7 @@ TEST_F(TestUsablePhysicalResourceFetcher, Memory) {
 
   // When `cpuset` NUMA memory constraints are set, ignore system RAM.
   uint64_t numa_mb = sys_mb - 1;  // Truncate the double
-  cgopts.subsystems_ref()->emplace_back("cpuset");
+  cgopts.subsystems()->emplace_back("cpuset");
   writeNumaMeminfo("node0", numa_mb);
   writeFilesToHierarchy("cpuset/sl/ice", "cpuset.mems", {{""}, {""}, {"0"}});
   EXPECT_EQ(numa_mb, fetcher().memoryMB());
@@ -72,7 +72,7 @@ TEST_F(TestUsablePhysicalResourceFetcher, CpuCores) {
   EXPECT_LE(1, sys_cores);
 
   // `cpuset` takes precedence if available.
-  *cgopts.subsystems_ref() = {"cpuset"};
+  *cgopts.subsystems() = {"cpuset"};
   writeFilesToHierarchy(  // A range with 1 more core
     "cpuset/sl/ice", "cpuset.cpus", {folly::to<std::string>("0-", sys_cores)}
   );
@@ -94,14 +94,14 @@ TEST_F(TestUsablePhysicalResourceFetcher, Gpus) {
   FLAGS_nvidia_smi = "a";
   std::vector<cpp2::GPUInfo> gpus;
   gpus.emplace_back();
-  *gpus.back().pciBusID_ref() = "0000:28:00.0";
-  *gpus.back().name_ref() = "Tesla K40m";
-  *gpus.back().memoryMB_ref() = 11519;
-  *gpus.back().compute_ref() = 1.0;
+  *gpus.back().pciBusID() = "0000:28:00.0";
+  *gpus.back().name() = "Tesla K40m";
+  *gpus.back().memoryMB() = 11519;
+  *gpus.back().compute() = 1.0;
   gpus.emplace_back();
-  *gpus.back().pciBusID_ref() = "0000:0E:00.0";
-  *gpus.back().name_ref() = "Quadro M6000";
-  *gpus.back().memoryMB_ref() = 2287;
-  *gpus.back().compute_ref() = 1.0;
+  *gpus.back().pciBusID() = "0000:0E:00.0";
+  *gpus.back().name() = "Quadro M6000";
+  *gpus.back().memoryMB() = 2287;
+  *gpus.back().compute() = 1.0;
   EXPECT_EQ(gpus, fetcher().gpus(5000));  // 5s timeout to avoid flaky tests.
 }

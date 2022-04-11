@@ -79,10 +79,10 @@ void TaskStatuses::recordStatusUpdate(
     try {
       if (new_status.isDone()) {
         taskStore_->store(
-            *rt.job_ref(), *rt.node_ref(), TaskStore::TaskResult::DONE);
+            *rt.job(), *rt.node(), TaskStore::TaskResult::DONE);
       } else if (new_status.isFailed()) {
         taskStore_->store(
-            *rt.job_ref(), *rt.node_ref(), TaskStore::TaskResult::FAILED);
+            *rt.job(), *rt.node(), TaskStore::TaskResult::FAILED);
       }
     } catch (const exception& e) {
       // TODO: Add exponential backoff retry? Crashing doesn't actually
@@ -100,8 +100,8 @@ void TaskStatuses::updateStatus(
     TaskStatus&& status) noexcept {
 
   // Insert the IDs, because they might not exist yet.
-  const int job_id = Job::JobNameTable->insert(*rt.job_ref());
-  const int node_id = Node::NodeNameTable->insert(*rt.node_ref());
+  const int job_id = Job::JobNameTable->insert(*rt.job());
+  const int node_id = Node::NodeNameTable->insert(*rt.node());
   updateStatus(Job::ID(job_id), Node::ID(node_id), rt, std::move(status));
 }
 

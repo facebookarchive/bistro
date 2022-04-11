@@ -29,9 +29,9 @@ struct CGroupPaths {
        folly::Optional<boost::filesystem::path> task,
        // Let unit tests override this
        boost::filesystem::path numa_path = "/sys/devices/system/node/")
-       : root_(std::move(*cgopts.root_ref())),
-         slice_(std::move(*cgopts.slice_ref())),
-         subsystems_(std::move(*cgopts.subsystems_ref())),
+       : root_(std::move(*cgopts.root())),
+         slice_(std::move(*cgopts.slice())),
+         subsystems_(std::move(*cgopts.subsystems())),
          task_(std::move(task)),
          numaPath_(std::move(numa_path)) {
      if (task_.has_value() && ++task_->begin() != task_->end()) {

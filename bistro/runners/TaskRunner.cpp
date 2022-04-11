@@ -52,8 +52,8 @@ TaskRunnerResponse TaskRunner::runTask(
 
   // Capture the essential details for a task in a RunningTask struct.
   cpp2::RunningTask rt;
-  *rt.job_ref() = job->name();
-  *rt.node_ref() = node.name();
+  *rt.job() = job->name();
+  *rt.node() = node.name();
 
   // Record the resources used by this task, see comment on struct RunningTask.
   // Also prepare a dynamic version of the same data to pass to the task.
@@ -71,21 +71,21 @@ TaskRunnerResponse TaskRunner::runTask(
   }
 
   // rt.workerShard is set as needed by runTaskImpl.
-  *rt.invocationID_ref()->startTime_ref() = time(nullptr);
-  *rt.invocationID_ref()->rand_ref() =
+  *rt.invocationID()->startTime() = time(nullptr);
+  *rt.invocationID()->rand() =
       folly::Random::rand64(folly::ThreadLocalPRNG());
   if (prev_status) {
-    *rt.nextBackoffDuration_ref() = job->backoffSettings().getNext(
+    *rt.nextBackoffDuration() = job->backoffSettings().getNext(
         prev_status->configuredBackoffDuration() // **not** the effective one
     );
   } else {
     // Make up something. Or, should I leave this unset, and check in Snapshot?
     cpp2::BackoffDuration bd;
-    *bd.seconds_ref() = 0;
-    *bd.noMoreBackoffs_ref() = false;
-    *rt.nextBackoffDuration_ref() = job->backoffSettings().getNext(bd);
+    *bd.seconds() = 0;
+    *bd.noMoreBackoffs() = false;
+    *rt.nextBackoffDuration() = job->backoffSettings().getNext(bd);
   }
-  *rt.workerSuicideTaskKillWaitMs_ref() =
+  *rt.workerSuicideTaskKillWaitMs() =
       RemoteWorkerState::workerSuicideTaskKillWaitMs();
 
   return runTaskImpl(job, node, rt, job_args, cb);
@@ -105,21 +105,21 @@ cpp2::NodeResources* TaskRunner::addNodeResourcesToRunningTask(
     return nullptr;
   }
 
-  out_rt->nodeResources_ref()->emplace_back();
-  auto& nr = out_rt->nodeResources_ref()->back();
-  *nr.node_ref() = node_name;
+  out_rt->nodeResources()->emplace_back();
+  auto& nr = out_rt->nodeResources()->back();
+  *nr.node() = node_name;
 
   auto& node_resources =
-    ((*out_resources_by_node)[*nr.node_ref()] = folly::dynamic::object());
+    ((*out_resources_by_node)[*nr.node()] = folly::dynamic::object());
 
   for (int resource_id : resource_ids) {
     const auto& rsrc_name = config.resourceNames.lookup(resource_id);
     const auto rsrc_val = job_resources[resource_id];
-    nr.resources_ref()->emplace_back(apache::thrift::FRAGILE, rsrc_name, rsrc_val);
+    nr.resources()->emplace_back(apache::thrift::FRAGILE, rsrc_name, rsrc_val);
     node_resources[rsrc_name] = rsrc_val;
   }
 
-  return &out_rt->nodeResources_ref()->back();
+  return &out_rt->nodeResources()->back();
 }
 
 }}

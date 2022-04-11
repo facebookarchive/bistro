@@ -239,7 +239,7 @@ TEST_F(TestLocalRunner, HandleKill) {
   for (size_t i = 0; i < kNumNodes; ++i) {
     cpp2::RunningTask rt;
     SYNCHRONIZED(last_rt, rts[i]) {
-      ASSERT_EQ("job", *last_rt.job_ref()); // Was it even set?
+      ASSERT_EQ("job", *last_rt.job()); // Was it even set?
       rt = last_rt;
     }
     runner.killTask(rt, cpp2::KillRequest());
@@ -252,7 +252,7 @@ TEST_F(TestLocalRunner, HandleKill) {
     assertTaskOnNode(i, 1, "incomplete_backoff", [](const TaskStatus& status) {
       return status.bits() == kIncompleteBackoffBits
         // Third value from the default backoff in JobBackoffSettings.cpp
-        && *status.configuredBackoffDuration().seconds_ref() == 60
+        && *status.configuredBackoffDuration().seconds() == 60
         && status.dataThreadUnsafe()
         && status.dataThreadUnsafe()->at("exception")
           == "Task killed, no status returned";

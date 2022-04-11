@@ -97,21 +97,21 @@ void parsePhysicalResourceConfigs(
       auto& rcfg = rcfgs->back();
       const auto idx_of_rcfg = rcfgs->size() - 1;
 
-      *rcfg.physical_ref() = physicalResourceFromString(name);
+      *rcfg.physical() = physicalResourceFromString(name);
       p->required(kLogicalResource, [&](std::string&& logical) {
-        *rcfg.logical_ref() = std::move(logical);
-        *rcfg.logicalResourceID_ref() =
-            config.resourceNames.lookup(*rcfg.logical_ref());
-        if (*rcfg.logicalResourceID_ref() == StringTable::NotFound ||
-            *rcfg.logicalResourceID_ref() >= num_worker_resources) {
+        *rcfg.logical() = std::move(logical);
+        *rcfg.logicalResourceID() =
+            config.resourceNames.lookup(*rcfg.logical());
+        if (*rcfg.logicalResourceID() == StringTable::NotFound ||
+            *rcfg.logicalResourceID() >= num_worker_resources) {
           throw BistroException(
               "Physical resource maps to unknown resource ",
-              *rcfg.logical_ref());
+              *rcfg.logical());
         }
         // Make an inverted index by the string name of the logical
         // resource, since that's what workers report.  Do this at parse
         // time, so that errors are attached to the appropriate entry.
-        if (!logical_to_physical->emplace(*rcfg.logical_ref(), idx_of_rcfg)
+        if (!logical_to_physical->emplace(*rcfg.logical(), idx_of_rcfg)
                  .second) {
           throw BistroException(
             "Logical resource used in multiple physical_resources entries"
@@ -122,23 +122,23 @@ void parsePhysicalResourceConfigs(
         if (std::abs(mul) < 1e-12) {
           throw BistroException("Too close to 0 machine precision");
         }
-        *rcfg.multiplyLogicalBy_ref() = mul;
+        *rcfg.multiplyLogicalBy() = mul;
       });
       p->optional(kEnforcement, [&](const std::string& enforcement) {
-        *rcfg.enforcement_ref() =
+        *rcfg.enforcement() =
             physicalResourceEnforcementFromString(enforcement);
-        auto it = kResourceToSupportedEnforcements.find(*rcfg.physical_ref());
+        auto it = kResourceToSupportedEnforcements.find(*rcfg.physical());
         if (it == kResourceToSupportedEnforcements.end() ||
-            !it->second.count(*rcfg.enforcement_ref())) {
+            !it->second.count(*rcfg.enforcement())) {
           throw BistroException(
               "Resource ",
-              *rcfg.physical_ref(),
+              *rcfg.physical(),
               " does not support enforcement type");
         }
       });
       p->optional(kPhysicalReserveAmount, [&](double reserve) {
         // Allow negative values for now... maybe there is some use?
-        *rcfg.physicalReserveAmount_ref() = reserve;
+        *rcfg.physicalReserveAmount() = reserve;
       });
     });
   });

@@ -92,7 +92,7 @@ public:
   ) : startTime_(start_time),
       schedulerID_(std::move(scheduler_id)),
       workerPool_("all workers") {
-    *nonMustDieWorkerSetID_.schedulerID_ref() = schedulerID_;
+    *nonMustDieWorkerSetID_.schedulerID() = schedulerID_;
   }
 
   RemoteWorkers(const RemoteWorkers&) = delete;

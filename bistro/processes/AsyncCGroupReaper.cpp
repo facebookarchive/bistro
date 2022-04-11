@@ -94,8 +94,8 @@ private:
   }
 
   std::string cgroupDir(const std::string& subsystem) const {
-    return (boost::filesystem::path(*cgroupOpts_.root_ref()) / subsystem /
-            *cgroupOpts_.slice_ref() / cgroupName_)
+    return (boost::filesystem::path(*cgroupOpts_.root()) / subsystem /
+            *cgroupOpts_.slice() / cgroupName_)
         .native();
   }
 
@@ -107,7 +107,7 @@ private:
   folly::Optional<std::string> findNonEmptySubsystem() noexcept {
     // While checking /cgroup.procs files, keep in mind that the kernel
     // `release_agent` can remove a cgroup from under us at any time.
-    for (const auto& subsystem : *cgroupOpts_.subsystems_ref()) {
+    for (const auto& subsystem : *cgroupOpts_.subsystems()) {
       auto dir = cgroupDir(subsystem);
       boost::system::error_code ec;
       if (!boost::filesystem::is_directory(dir, ec) || ec) {
@@ -215,11 +215,11 @@ private:
     // Signaling cgroups without `freezer` is racy and dangerous, see the
     // docstring in AsyncCGroupReaper.h.
     if (std::find(
-            cgroupOpts_.subsystems_ref()->begin(),
-            cgroupOpts_.subsystems_ref()->end(),
-            "freezer") == cgroupOpts_.subsystems_ref()->end()) {
+            cgroupOpts_.subsystems()->begin(),
+            cgroupOpts_.subsystems()->end(),
+            "freezer") == cgroupOpts_.subsystems()->end()) {
       // The client wants a racy, un-frozen kill, so go for it.
-      if (*cgroupOpts_.killWithoutFreezer_ref()) {
+      if (*cgroupOpts_.killWithoutFreezer()) {
         killCGroupTasks(nonempty_subsys);
       } else {
         badFreezer(" is not enabled");

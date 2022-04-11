@@ -53,8 +53,8 @@ int main(int argc, char* argv[]) {
 
   cpp2::ServiceAddress scheduler_addr;
   // DO: It would be faster & more robust to pre-resolve the hostname here.
-  *scheduler_addr.ip_or_host_ref() = FLAGS_scheduler_host;
-  *scheduler_addr.port_ref() = FLAGS_scheduler_port;
+  *scheduler_addr.ip_or_host() = FLAGS_scheduler_host;
+  *scheduler_addr.port() = FLAGS_scheduler_port;
 
   auto my_socket_and_addr = getListeningServerSocketAndAddress();
   auto server = std::make_shared<apache::thrift::ThriftServer>();
@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
       FLAGS_worker_command,
       my_socket_and_addr.second, // Could change in the presence of proxies
       *my_socket_and_addr.second
-           .port_ref() // Actual local port the worker has locked
+           .port() // Actual local port the worker has locked
   );
   StopWorkerOnSignal signal_handler(
     folly::EventBaseManager::get()->getEventBase(),

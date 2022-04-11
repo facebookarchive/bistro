@@ -115,7 +115,7 @@ void ThriftMonitor::deleteJob(const string& job_name) {
 }
 
 void ThriftMonitor::saveJob(const cpp2::BistroJobConfig& job) {
-  configLoader_->saveJob(*job.name_ref(), toDynamic(job));
+  configLoader_->saveJob(*job.name(), toDynamic(job));
 }
 
 void ThriftMonitor::getLevels(vector<string>& levels) {
@@ -154,19 +154,19 @@ void ThriftMonitor::getJobHistograms(
     }
     histograms.emplace_back();
     auto& histogram = histograms.back();
-    *histogram.job_ref() = job->name();
+    *histogram.job() = job->name();
     for (const auto& pair : it->second) {
-      auto& s = histogram.statuses_ref()[pair.first];
+      auto& s = histogram.statuses()[pair.first];
       for (const auto& values : pair.second) {
         const auto key = static_cast<cpp2::BistroTaskStatusBits>(values.first);
-        *s[key].count_ref() = values.second.first;
+        *s[key].count() = values.second.first;
         if (values.second.second.size() > samples) {
           copy(
               values.second.second.begin(),
               values.second.second.begin() + samples,
-              back_inserter(*s[key].samples_ref()));
+              back_inserter(*s[key].samples()));
         } else {
-          *s[key].samples_ref() = values.second.second;
+          *s[key].samples() = values.second.second;
         }
       }
     }
@@ -217,9 +217,9 @@ void ThriftMonitor::getJobLogs(
     regex_filter
   );
   // TODO(#3885590): Get rid of these copies.
-  *thrift_out.nextLineID_ref() = out.nextLineID;
+  *thrift_out.nextLineID() = out.nextLineID;
   for (LogLine& l : out.lines) {
-    thrift_out.lines_ref()->emplace_back(
+    thrift_out.lines()->emplace_back(
         apache::thrift::FragileConstructor::FRAGILE,
         std::move(l.jobID),
         std::move(l.nodeID),

@@ -75,14 +75,14 @@ RemoteWorker::processHeartbeat(
   // We should never get here (since that means the worker is already added
   // to our pool), so CHECK instead of throwing.
   CHECK(checkWorkerSchedulerProtocolVersion(
-      *w_new.protocolVersion_ref(), cpp2::common_constants::kProtocolVersion()))
+      *w_new.protocolVersion(), cpp2::common_constants::kProtocolVersion()))
       << "Worker & scheduler protocol mismatch: "
-      << *w_new.protocolVersion_ref() << " vs "
+      << *w_new.protocolVersion() << " vs "
       << cpp2::common_constants::kProtocolVersion();
   const auto& w_cur = worker_;
   // We'll have to kill the old worker, unless the new process is running on
   // the same machine and listening on the same port as the old.
-  if (*w_cur.machineLock_ref() != *w_new.machineLock_ref()) {
+  if (*w_cur.machineLock() != *w_new.machineLock()) {
     // Bump the current worker if it's unhealthy or "must die".
     auto state_and_disallowed =
       computeState(update->curTime(), consensus_permits_becoming_healthy);
@@ -99,7 +99,7 @@ RemoteWorker::processHeartbeat(
     ) {
       if (state_and_disallowed.second) {
         LOG(INFO)
-            << "Current worker " << *w_cur.shard_ref() << " is unhealthy "
+            << "Current worker " << *w_cur.shard() << " is unhealthy "
             << "solely because it lacks WorkerSetID consensus. It will be "
             << "replaced by a new worker";
       }
@@ -131,19 +131,19 @@ RemoteWorker::processHeartbeat(
   // A new worker instance at the same IP & port. Easy to handle, since
   // we're pretty sure that the current one is dead -- no need to check
   // health, or tell anyone to commit suicide.
-  } else if (*w_cur.id_ref() != *w_new.id_ref()) {
+  } else if (*w_cur.id() != *w_new.id()) {
     // Ignore heartbeats coming from the dead worker (due to network lag?)
-    if (*w_cur.id_ref()->startTime_ref() > *w_new.id_ref()->startTime_ref()) {
+    if (*w_cur.id()->startTime() > *w_new.id()->startTime()) {
       LOG(WARNING) << "Ignored dead worker heartbeat: " << debugString(w_new);
       return folly::none;
     }
     // The worker has a deliberate 1-s startup delay, so start times
     // should never be equal for distinct worker instances on one machine.
-    if (*w_cur.id_ref()->startTime_ref() == *w_new.id_ref()->startTime_ref()) {
+    if (*w_cur.id()->startTime() == *w_new.id()->startTime()) {
       LOG(ERROR) << "Heartbeat error: same start time "
-                 << *w_cur.id_ref()->startTime_ref()
-                 << " but different rands: " << *w_cur.id_ref()->rand_ref()
-                 << ", " << *w_new.id_ref()->rand_ref();
+                 << *w_cur.id()->startTime()
+                 << " but different rands: " << *w_cur.id()->rand()
+                 << ", " << *w_new.id()->rand();
     }
     // Ignore consensus_permits_becoming_healthy since it's not relevant.
     updateNewWorker(update, w_new, worker_set_id);
@@ -171,7 +171,7 @@ void RemoteWorker::updateState(
     computeState(update->curTime(), consensus_permits_becoming_healthy);
   auto new_state = new_state_and_disallowed.first;
   if (new_state_and_disallowed.second) {
-    LOG(INFO) << "Worker " << *worker_.shard_ref()
+    LOG(INFO) << "Worker " << *worker_.shard()
               << " can be healthy but lacks "
               << "WorkerSetID consensus";
   }
@@ -188,7 +188,7 @@ void RemoteWorker::updateState(
   }
   if (new_state != RemoteWorkerState::State::HEALTHY
       && state_.state_ == RemoteWorkerState::State::HEALTHY) {
-    LOG(WARNING) << "Worker " << *worker_.shard_ref() << " became unhealthy";
+    LOG(WARNING) << "Worker " << *worker_.shard() << " became unhealthy";
     state_.timeBecameUnhealthy_ = update->curTime();
   }
   if (new_state == RemoteWorkerState::State::MUST_DIE) {
@@ -202,7 +202,7 @@ void RemoteWorker::updateState(
   }
   if (state_.state_ != RemoteWorkerState::State::HEALTHY
       && new_state == RemoteWorkerState::State::HEALTHY) {
-    LOG(INFO) << "Worker " << *worker_.shard_ref() << " became healthy";
+    LOG(INFO) << "Worker " << *worker_.shard() << " became healthy";
   }
   setState(new_state);
   // Send out a new healtcheck if we are due.
@@ -232,7 +232,7 @@ void RemoteWorker::recordRunningTaskStatus(
 
   CHECK(status.isRunning());
 
-  auto task_id = TaskID(*rt.job_ref(), *rt.node_ref());
+  auto task_id = TaskID(*rt.job(), *rt.node());
   // An "unsure if running" task should never be marked "running"
   CHECK(unsureIfRunningTasks_.count(task_id) == 0) << debugString(rt);
   // Unlike the analogous check in TaskStatusSnapshot::updateStatus, a task
@@ -260,39 +260,39 @@ bool RemoteWorker::recordNonRunningTaskStatus(
   CHECK(!status.isRunning());
 
   // Log and reject statuses from non-current workers.
-  if (worker_id != *worker_.id_ref()) {
+  if (worker_id != *worker_.id()) {
     throw BistroException(
         "Got status for ",
-        *rt.job_ref(),
+        *rt.job(),
         ", ",
-        *rt.node_ref(),
+        *rt.node(),
         " from an unexpected worker: ",
-        *worker_id.startTime_ref(),
+        *worker_id.startTime(),
         ", ",
-        *worker_id.rand_ref());
+        *worker_id.rand());
   }
 
   // Process healthcheck responses
-  if (*rt.job_ref() == kHealthcheckTaskJob) {
+  if (*rt.job() == kHealthcheckTaskJob) {
     // Update the "last good" time only for successful healthchecks
     if (status.isDone()) {
       state_.timeLastGoodHealthcheckSent_ =
-          max(*rt.invocationID_ref()->startTime_ref(),
+          max(*rt.invocationID()->startTime(),
               state_.timeLastGoodHealthcheckSent_);
       // TODO(#4813858): Improve FB_LOG_EVERY_MS, get rid of this conditional?
       if (FLAGS_log_healthchecks_every_ms) {
         FB_LOG_EVERY_MS(INFO, FLAGS_log_healthchecks_every_ms)
-            << "Good healthcheck from " << *rt.workerShard_ref() << " sent "
-            << *rt.invocationID_ref()->startTime_ref() << " (sampled every "
+            << "Good healthcheck from " << *rt.workerShard() << " sent "
+            << *rt.invocationID()->startTime() << " (sampled every "
             << FLAGS_log_healthchecks_every_ms << "ms)";
       } else {
-        LOG(INFO) << "Good healthcheck from " << *rt.workerShard_ref()
-                  << " sent " << *rt.invocationID_ref()->startTime_ref();
+        LOG(INFO) << "Good healthcheck from " << *rt.workerShard()
+                  << " sent " << *rt.invocationID()->startTime();
       }
     } else {
       LOG(ERROR) << "Unsuccessful healthcheck status " << status.toJson()
-                 << " from " << *rt.workerShard_ref() << " sent "
-                 << *rt.invocationID_ref()->startTime_ref();
+                 << " from " << *rt.workerShard() << " sent "
+                 << *rt.invocationID()->startTime();
     }
     // Neither this class nor TaskStatuses keeps track of outstanding
     // healthchecks.
@@ -321,7 +321,7 @@ bool RemoteWorker::recordNonRunningTaskStatus(
 bool RemoteWorker::recordNonRunningTaskStatusImpl(
     const cpp2::RunningTask& rt,
     const TaskStatus& status) noexcept {
-  auto task_id = TaskID(*rt.job_ref(), *rt.node_ref());
+  auto task_id = TaskID(*rt.job(), *rt.node());
   auto it = runningTasks_.find(task_id);
   if (it != runningTasks_.end()) {
     // It is possible that this updateStatus message does not refer to the
@@ -332,7 +332,7 @@ bool RemoteWorker::recordNonRunningTaskStatusImpl(
     // The correct response is to quietly drop the message, preventing
     // re-sends by the worker, and also not to record the update via
     // TaskStatuses (and hence TaskStatusObservers).
-    if (*it->second.invocationID_ref() != *rt.invocationID_ref()) {
+    if (*it->second.invocationID() != *rt.invocationID()) {
       LOG(WARNING) << "Ignoring severely delayed updateStatus message with "
         << "incorrect invocation ID, new task " << debugString(rt)
         << " vs new task " << debugString(it->second) << " with status "
@@ -394,7 +394,7 @@ void RemoteWorker::updateNewWorker(
     std::move(workerSetIDChangeCob_)
   );
   // Read the 'This should never happen' comment in updateCurrentWorker.
-  if (*worker_set_id.schedulerID_ref() == schedulerID_) {
+  if (*worker_set_id.schedulerID() == schedulerID_) {
     LOG(ERROR) << "The scheduler ID of the initial WorkerSetID of "
       << debugString(worker_) << " is the same as the current scheduler: "
       << debugString(worker_set_id);
@@ -415,7 +415,7 @@ void RemoteWorker::updateCurrentWorker(
   // This would wreak havoc, so avoid it.
   //
   // NB: This isn't called from BistroWorkerHandler, so no worries about that.
-  if (*worker_set_id.schedulerID_ref() == schedulerID_) {
+  if (*worker_set_id.schedulerID() == schedulerID_) {
     // This should never happen, but I cannot quite rule it out. Roughly
     // speaking, this means that the first time this worker instance
     // connected (as far as the scheduler is concerned), it was already
@@ -424,10 +424,10 @@ void RemoteWorker::updateCurrentWorker(
     // particular, that means we preserve the invariant that workerSetID_ is
     // always a later version than initialWorkerSetID_, and always contains
     // the present worker.
-    if (*worker_set_id.schedulerID_ref() ==
-            *initialWorkerSetID_.schedulerID_ref() &&
+    if (*worker_set_id.schedulerID() ==
+            *initialWorkerSetID_.schedulerID() &&
         !WorkerSetIDEarlierThan()(
-            *initialWorkerSetID_.version_ref(), *worker_set_id.version_ref())) {
+            *initialWorkerSetID_.version(), *worker_set_id.version())) {
       LOG(ERROR) << "The scheduler ID of the initial WorkerSetID of "
         << debugString(worker_) << " is the same as the current scheduler: "
         << debugString(initialWorkerSetID_) << " -- ignoring the current "
@@ -441,7 +441,7 @@ void RemoteWorker::updateCurrentWorker(
     } else if (
         !workerSetID_.has_value() ||
         WorkerSetIDEarlierThan()(
-            *workerSetID_->version_ref(), *worker_set_id.version_ref())) {
+            *workerSetID_->version(), *worker_set_id.version())) {
       workerSetIDChangeCob_(*this, worker_set_id);
       if (!firstAssociatedWorkerSetID_.has_value()) {
         CHECK(!workerSetID_.has_value());
@@ -451,7 +451,7 @@ void RemoteWorker::updateCurrentWorker(
         firstAssociatedWorkerSetID_ = worker_set_id;
       }
       workerSetID_ = worker_set_id;
-    } else if (*workerSetID_->version_ref() == *worker_set_id.version_ref()) {
+    } else if (*workerSetID_->version() == *worker_set_id.version()) {
       CHECK(*workerSetID_ == worker_set_id)
         << debugString(*workerSetID_) << " != " << debugString(worker_set_id);
     } else { // This can happen occasionally (e.g. under heavy load).
@@ -485,11 +485,11 @@ void RemoteWorker::initializeRunningTasks(
 
   runningTasks_.reserve(running_tasks.size());
   for (const auto& rt : running_tasks) {
-    CHECK(*rt.workerShard_ref() == *worker_.shard_ref())
-        << "Bad shard for new task " << *worker_.shard_ref() << ": "
+    CHECK(*rt.workerShard() == *worker_.shard())
+        << "Bad shard for new task " << *worker_.shard() << ": "
         << debugString(rt);
     CHECK(
-        runningTasks_.emplace(TaskID(*rt.job_ref(), *rt.node_ref()), rt).second)
+        runningTasks_.emplace(TaskID(*rt.job(), *rt.node()), rt).second)
         << "Duplicate new task for worker " << debugString(rt);
   }
 
@@ -550,7 +550,7 @@ void RemoteWorker::loseRunningTasks(RemoteWorkerUpdate* update) {
 }
 
 void RemoteWorker::addUnsureIfRunningTask(const cpp2::RunningTask& rt) {
-  CHECK(unsureIfRunningTasks_.emplace(TaskID(*rt.job_ref(), *rt.node_ref()), rt)
+  CHECK(unsureIfRunningTasks_.emplace(TaskID(*rt.job(), *rt.node()), rt)
             .second)
       << "Was already unsure about running status of task " << debugString(rt);
 }
@@ -561,16 +561,16 @@ void RemoteWorker::eraseUnsureIfRunningTasks(
   const std::vector<cpp2::RunningTask>& tasks) {
 
   for (const auto& rt : tasks) {
-    CHECK(*rt.workerShard_ref() == *worker_.shard_ref())
-        << "Bad shard for 'unsure if running' task " << *worker_.shard_ref()
+    CHECK(*rt.workerShard() == *worker_.shard())
+        << "Bad shard for 'unsure if running' task " << *worker_.shard()
         << ": " << debugString(rt);
-    auto it = unsureIfRunningTasks_.find(TaskID(*rt.job_ref(), *rt.node_ref()));
+    auto it = unsureIfRunningTasks_.find(TaskID(*rt.job(), *rt.node()));
     // The warnings should happen rarely; they could be due to a race
     // between updateStatus and notifyIfTasksNotRunning.
     if (it == unsureIfRunningTasks_.end()) {
       LOG(WARNING) << "Polled worker for an 'unsure if running' task, but "
         << "afterwards it was not in the list: " << debugString(rt);
-    } else if (*it->second.invocationID_ref() != *rt.invocationID_ref()) {
+    } else if (*it->second.invocationID() != *rt.invocationID()) {
       LOG(WARNING) << "Polled worker for one 'unsure if running' task, but "
         << "when the reply came, its invocation ID did not match, old "
         << debugString(rt) << " vs " << debugString(it->second);

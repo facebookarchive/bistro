@@ -59,14 +59,14 @@ TEST(TestCGroupSetup, TestSetup) {
   // Nothing happens until we specify some subsystems.
   std::string name = "nested/name";
   cpp2::CGroupOptions opts;
-  *opts.unitTestCreateFiles_ref() = true;
-  *opts.root_ref() = "root";
-  *opts.slice_ref() = "slice";
+  *opts.unitTestCreateFiles() = true;
+  *opts.root() = "root";
+  *opts.slice() = "slice";
   EXPECT_EQ(0, cgroupSetup(name, opts).size());
   EXPECT_TRUE(boost::filesystem::is_empty("."));
 
   // The slice directory must exist for this subsystem.
-  *opts.subsystems_ref() = {"sys1"};
+  *opts.subsystems() = {"sys1"};
   EXPECT_THROW([&]() {
     try { cgroupSetup(name, opts); } catch (const std::exception& ex) {
       EXPECT_PCRE_MATCH(".*root/subsystem/slice must be a dir.*", ex.what());
@@ -89,7 +89,7 @@ TEST(TestCGroupSetup, TestSetup) {
 
   auto check_cgroups_fn = [&]() {
     cgroupSetup(name, opts);
-    for (const auto& subsystem : *opts.subsystems_ref()) {
+    for (const auto& subsystem : *opts.subsystems()) {
       // Empty file created when cgroupSetup checks if it is writable.
       check_subsystem_file_fn(subsystem, "cgroup.procs", "");
       check_subsystem_file_fn(subsystem, "notify_on_release", "1");
@@ -129,7 +129,7 @@ TEST(TestCGroupSetup, TestSetup) {
 
   // Now check that when some the subsystems fail to create, we try to
   // remove any cgroups that were created successfully.
-  *opts.subsystems_ref() = {"sys2", "sys1", "sys3"};
+  *opts.subsystems() = {"sys2", "sys1", "sys3"};
   // sys2 will fail because the slice dir does not exist, but sys3 will fail
   // because the cgroup already exists -- and we will NOT try to remove it.
   auto cg3_dir = cg_dir_fn("sys3");
@@ -153,9 +153,9 @@ TEST(TestCGroupSetup, TestSetup) {
   EXPECT_TRUE(boost::filesystem::is_empty(cg3_dir));
 
   // Set some CPU and memory limits.
-  *opts.memoryLimitInBytes_ref() = 1337;
-  *opts.cpuShares_ref() = 3;
-  *opts.subsystems_ref() = {"memory", "cpu"};
+  *opts.memoryLimitInBytes() = 1337;
+  *opts.cpuShares() = 3;
+  *opts.subsystems() = {"memory", "cpu"};
   EXPECT_TRUE(boost::filesystem::create_directories("root/cpu/slice"));
   EXPECT_TRUE(boost::filesystem::create_directories("root/memory/slice"));
   check_cgroups_fn();

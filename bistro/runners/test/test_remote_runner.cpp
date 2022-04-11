@@ -40,16 +40,16 @@ struct TestRemoteRunner : public ::testing::Test {
 
 cpp2::BistroInstanceID randInstanceID() {
   cpp2::BistroInstanceID id;
-  *id.startTime_ref() = folly::Random::rand64();
-  *id.rand_ref() = folly::Random::rand64();
+  *id.startTime() = folly::Random::rand64();
+  *id.rand() = folly::Random::rand64();
   return id;
 }
 
 cpp2::WorkerSetID addToWorkerSetID(
     cpp2::WorkerSetID wsid,
     const FakeBistroWorkerThread& wt) {
-  addWorkerIDToHash(&(*wsid.hash_ref()), *wt.getBistroWorker().id_ref());
-  ++(*wsid.version_ref());
+  addWorkerIDToHash(&(*wsid.hash()), *wt.getBistroWorker().id());
+  ++(*wsid.version());
   return wsid;
 }
 
@@ -78,9 +78,9 @@ cpp2::WorkerSetID addFakeWorker(
     RemoteWorkerUpdate()
   );
   wsid = addToWorkerSetID(wsid, wt);
-  EXPECT_EQ(wsid, *res.workerSetID_ref())
+  EXPECT_EQ(wsid, *res.workerSetID())
       << apache::thrift::debugString(wsid)
-      << " != " << apache::thrift::debugString(*res.workerSetID_ref());
+      << " != " << apache::thrift::debugString(*res.workerSetID());
 
   // Wait the Runner to get running tasks & to request a healthcheck, in
   // either order.
@@ -95,15 +95,15 @@ cpp2::WorkerSetID addFakeWorker(
 
   // Fake a reply to the healthcheck -- does not run RemoteWorker::updateState.
   cpp2::RunningTask rt;
-  *rt.job_ref() = kHealthcheckTaskJob;
-  *rt.workerShard_ref() = wt.shard();
-  *rt.invocationID_ref()->startTime_ref() =
+  *rt.job() = kHealthcheckTaskJob;
+  *rt.workerShard() = wt.shard();
+  *rt.invocationID()->startTime() =
       cur_time; // For "time since healthcheck"
   runner->remoteUpdateStatus(
       rt,
       TaskStatus::done(),
       runner->getSchedulerID(),
-      *wt.getBistroWorker().id_ref());
+      *wt.getBistroWorker().id());
 
   // The minimum worker_check_interval is 1 second, so send heartbeats to
   // speed up the worker becoming healthy.  We need two -- the first sets
@@ -111,7 +111,7 @@ cpp2::WorkerSetID addFakeWorker(
   for (int i = 0; i < 2; ++i) {
     runner->processWorkerHeartbeat(
         wt.getBistroWorker(),
-        *res.workerSetID_ref(), // As if the worker echoed the ID
+        *res.workerSetID(), // As if the worker echoed the ID
         RemoteWorkerUpdate());
   }
 
@@ -141,7 +141,7 @@ TEST_F(TestRemoteRunner, HandleResources) {
   const auto worker_id = randInstanceID();
   FakeBistroWorkerThread worker(
       "test_worker",
-      [&worker_id](cpp2::BistroWorker* w) { *w->id_ref() = worker_id; });
+      [&worker_id](cpp2::BistroWorker* w) { *w->id() = worker_id; });
 
   const auto kConfig = std::make_shared<Config>(dynamic::object
     ("enabled", true)
@@ -175,7 +175,7 @@ TEST_F(TestRemoteRunner, HandleResources) {
   ASSERT_EQ(TaskRunnerResponse::DoNotRunMoreTasks, res);
 
   cpp2::WorkerSetID wsid;
-  *wsid.schedulerID_ref() = runner.getSchedulerID();
+  *wsid.schedulerID() = runner.getSchedulerID();
   addFakeWorker(&runner, kConfig, worker, wsid);
   waitToExitInitialWait(runner);
 
@@ -190,8 +190,8 @@ TEST_F(TestRemoteRunner, HandleResources) {
             node1,
             nullptr, // no previous status
             [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
-              ASSERT_EQ("foo_job", *rt.job_ref());
-              ASSERT_EQ("test_node1", *rt.node_ref());
+              ASSERT_EQ("foo_job", *rt.job());
+              ASSERT_EQ("test_node1", *rt.node());
               ASSERT_TRUE(status.isRunning());
               cob_ran.setValue();
             }));
@@ -214,11 +214,11 @@ struct FakeWorker {
       : workerID_(randInstanceID()),
         worker_(
             shard,
-            [&](cpp2::BistroWorker* w) { *w->id_ref() = workerID_; },
+            [&](cpp2::BistroWorker* w) { *w->id() = workerID_; },
             // Each FakeBistroWorker calls this just before a task's "done" cob.
             [&](const cpp2::RunningTask& rt,
                 const cpp2::TaskSubprocessOptions&) {
-              if (*rt.job_ref() == "foo_job") {
+              if (*rt.job() == "foo_job") {
                 CHECK(taskCobCob_.has_value());
                 taskCobCob_.value()(rt);
               }
@@ -237,13 +237,13 @@ struct FakeWorker {
           // permits this.
           workerMayReturnStatus_.getFuture().get(),
           runner->getSchedulerID(),
-          *worker_.getBistroWorker().id_ref());
+          *worker_.getBistroWorker().id());
       // Allows us to wait until a worker successfully marks the task done.
       workerReturnedStatus_.setValue();
     };
 
-    *wsid_.schedulerID_ref() = runner->getSchedulerID();
-    *wsid_.version_ref() = wsid_version;
+    *wsid_.schedulerID() = runner->getSchedulerID();
+    *wsid_.version() = wsid_version;
     wsid_ = addFakeWorker(runner.get(), config, worker_, wsid_, cur_time);
   }
 
@@ -323,8 +323,8 @@ struct TestRemoteRunnerWithOneTask : TestRemoteRunner {
             // The previous status, if any.
             status_snapshot.getPtr(job_->id(), node_.id()),
             [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
-              ASSERT_EQ(kOneTaskJobName, *rt.job_ref());
-              ASSERT_EQ(kOneTaskNodeName, *rt.node_ref());
+              ASSERT_EQ(kOneTaskJobName, *rt.job());
+              ASSERT_EQ(kOneTaskNodeName, *rt.node());
               ASSERT_TRUE(status.isRunning());
               ASSERT_EQ(outer_thread, std::this_thread::get_id());
               taskStatuses_->updateStatus(
@@ -519,8 +519,8 @@ TEST_F(TestRemoteRunnerWithOneTask, LostTasksHaveAMinimumBackoff) {
         status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
       );
       // The next backoff value is computed on the basis of this struct.
-      EXPECT_FALSE(*status.configuredBackoffDuration().noMoreBackoffs_ref());
-      EXPECT_EQ(kDefaultBackoff, *status.configuredBackoffDuration().seconds_ref());
+      EXPECT_FALSE(*status.configuredBackoffDuration().noMoreBackoffs());
+      EXPECT_EQ(kDefaultBackoff, *status.configuredBackoffDuration().seconds());
       // But the effective backoff duration is longer.
       auto expiration_time = status.timestamp() + kExtendedBackoff;
       EXPECT_TRUE(status.isInBackoff(expiration_time - 1));
@@ -564,9 +564,9 @@ TEST_F(TestRemoteRunnerWithOneTask, LostTasksHaveAMinimumBackoff) {
         status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
       );
       // The next backoff value is computed on the basis of this struct.
-      EXPECT_TRUE(*status.configuredBackoffDuration().noMoreBackoffs_ref());
+      EXPECT_TRUE(*status.configuredBackoffDuration().noMoreBackoffs());
       // No backoff, no duration (even though `60` was saved).
-      EXPECT_EQ(0, *status.configuredBackoffDuration().seconds_ref());
+      EXPECT_EQ(0, *status.configuredBackoffDuration().seconds());
       {
         // The effective backoff duration is intact.
         auto expiration_time = status.timestamp() + kExtendedBackoff;
@@ -595,8 +595,8 @@ TEST_F(TestRemoteRunnerWithOneTask, LostTasksHaveAMinimumBackoff) {
         new_status.dataThreadUnsafe()->at("__bistro_saved_backoff").getInt()
       );
       // The next backoff value is computed on the basis of this struct.
-      EXPECT_FALSE(*new_status.configuredBackoffDuration().noMoreBackoffs_ref());
-      EXPECT_EQ(0, *new_status.configuredBackoffDuration().seconds_ref());
+      EXPECT_FALSE(*new_status.configuredBackoffDuration().noMoreBackoffs());
+      EXPECT_EQ(0, *new_status.configuredBackoffDuration().seconds());
       {
         // The effective backoff duration is intact.
         auto expiration_time = new_status.timestamp() + kExtendedBackoff;
@@ -618,14 +618,14 @@ TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
   const auto worker_id = randInstanceID();
   FakeBistroWorkerThread worker(
       "test_worker",
-      [&worker_id](cpp2::BistroWorker* w) { *w->id_ref() = worker_id; },
+      [&worker_id](cpp2::BistroWorker* w) { *w->id() = worker_id; },
       [&](const cpp2::RunningTask& rt, const cpp2::TaskSubprocessOptions& tso) {
-        if (*rt.job_ref() == kHealthcheckTaskJob) {
+        if (*rt.job() == kHealthcheckTaskJob) {
           return;
         }
         EXPECT_EQ(
-            6, *tso.cgroupOptions_ref()->cpuShares_ref()); // Tests rounding
-        EXPECT_EQ(3072, *tso.cgroupOptions_ref()->memoryLimitInBytes_ref());
+            6, *tso.cgroupOptions()->cpuShares()); // Tests rounding
+        EXPECT_EQ(3072, *tso.cgroupOptions()->memoryLimitInBytes());
         tso_cob_ran.setValue();
       });
 
@@ -662,7 +662,7 @@ TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
   Node node("node");
 
   cpp2::WorkerSetID wsid;
-  *wsid.schedulerID_ref() = runner.getSchedulerID();
+  *wsid.schedulerID() = runner.getSchedulerID();
   addFakeWorker(&runner, kConfig, worker, wsid);
 
   waitToExitInitialWait(runner);
@@ -675,8 +675,8 @@ TEST_F(TestRemoteRunner, MapLogicalResourcesToCGroupPhysical) {
           node,
           nullptr, // no previous status
           [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
-            ASSERT_EQ("job", *rt.job_ref());
-            ASSERT_EQ("node", *rt.node_ref());
+            ASSERT_EQ("job", *rt.job());
+            ASSERT_EQ("node", *rt.node());
             ASSERT_TRUE(status.isRunning());
             status_cob_ran.setValue();
           }));
@@ -713,9 +713,9 @@ void checkTasksRunOnWorkersLeavingResources(
             Node("test_node"),
             nullptr, // no previous status
             [&](const cpp2::RunningTask& rt, TaskStatus&& status) {
-              ASSERT_EQ(std::get<0>(t), *rt.job_ref());
-              ASSERT_EQ("test_node", *rt.node_ref());
-              ASSERT_EQ(std::get<1>(t), *rt.workerShard_ref())
+              ASSERT_EQ(std::get<0>(t), *rt.job());
+              ASSERT_EQ("test_node", *rt.node());
+              ASSERT_EQ(std::get<1>(t), *rt.workerShard())
                   << std::get<0>(t);
               ASSERT_TRUE(status.isRunning());
               cob_ran.setValue();
@@ -768,17 +768,17 @@ TEST_F(TestRemoteRunner, TestBusiestSelector) {
   // Like in HandleResources, make the workers before making the runner.
   const auto w1_id = randInstanceID();
   FakeBistroWorkerThread worker1(
-      "w1", [&w1_id](cpp2::BistroWorker* w) { *w->id_ref() = w1_id; });
+      "w1", [&w1_id](cpp2::BistroWorker* w) { *w->id() = w1_id; });
   const auto w2_id = randInstanceID();
   FakeBistroWorkerThread worker2(
-      "w2", [&w2_id](cpp2::BistroWorker* w) { *w->id_ref() = w2_id; });
+      "w2", [&w2_id](cpp2::BistroWorker* w) { *w->id() = w2_id; });
 
   auto task_statuses =
     std::make_shared<TaskStatuses>(std::make_shared<NoOpTaskStore>());
   RemoteWorkerRunner runner(task_statuses, std::shared_ptr<Monitor>());
 
   cpp2::WorkerSetID wsid;
-  *wsid.schedulerID_ref() = runner.getSchedulerID();
+  *wsid.schedulerID() = runner.getSchedulerID();
   wsid = addFakeWorker(&runner, kConfig, worker1, wsid);
   // Fake that w1 knows about w2, for consensusPermitsBecomingHealthy.
   runner.processWorkerHeartbeat(
@@ -975,29 +975,29 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
   // Like in HandleResources, make the workers before making the runner.
   const auto w1_id = randInstanceID();
   FakeBistroWorkerThread worker1("w1", [&w1_id](cpp2::BistroWorker* w) {
-    *w->id_ref() = w1_id;
-    *w->usableResources_ref()->memoryMB_ref() = 10;
-    *w->usableResources_ref()->cpuCores_ref() = 2;
-    w->usableResources_ref()->gpus_ref()->emplace_back();
-    *w->usableResources_ref()->gpus_ref()->back().name_ref() = "a";
+    *w->id() = w1_id;
+    *w->usableResources()->memoryMB() = 10;
+    *w->usableResources()->cpuCores() = 2;
+    w->usableResources()->gpus()->emplace_back();
+    *w->usableResources()->gpus()->back().name() = "a";
   });
   const auto w2_id = randInstanceID();
   FakeBistroWorkerThread worker2("w2", [&w2_id](cpp2::BistroWorker* w) {
-    *w->id_ref() = w2_id;
-    *w->usableResources_ref()->memoryMB_ref() = 8;
-    *w->usableResources_ref()->cpuCores_ref() = 2;
-    w->usableResources_ref()->gpus_ref()->emplace_back();
-    *w->usableResources_ref()->gpus_ref()->back().name_ref() = "a";
+    *w->id() = w2_id;
+    *w->usableResources()->memoryMB() = 8;
+    *w->usableResources()->cpuCores() = 2;
+    w->usableResources()->gpus()->emplace_back();
+    *w->usableResources()->gpus()->back().name() = "a";
   });
   const auto w3_id = randInstanceID();
   FakeBistroWorkerThread worker3("w3", [&w3_id](cpp2::BistroWorker* w) {
-    *w->id_ref() = w3_id;
-    *w->usableResources_ref()->memoryMB_ref() =
+    *w->id() = w3_id;
+    *w->usableResources()->memoryMB() =
         5; // Minus 1 reserve, over 2 => 2 logical
-    *w->usableResources_ref()->cpuCores_ref() = 2;
-    w->usableResources_ref()->gpus_ref()->emplace_back();
+    *w->usableResources()->cpuCores() = 2;
+    w->usableResources()->gpus()->emplace_back();
     // We have no model-specific resource "GPU: b", so it won't show up.
-    *w->usableResources_ref()->gpus_ref()->back().name_ref() = "b";
+    *w->usableResources()->gpus()->back().name() = "b";
   });
 
   auto task_statuses =
@@ -1005,7 +1005,7 @@ TEST_F(TestRemoteRunner, WorkerPhysicalResources) {
   RemoteWorkerRunner runner(task_statuses, std::shared_ptr<Monitor>());
 
   cpp2::WorkerSetID wsid;
-  *wsid.schedulerID_ref() = runner.getSchedulerID();
+  *wsid.schedulerID() = runner.getSchedulerID();
   wsid = addFakeWorker(&runner, kConfig, worker1, wsid);
   // Fake that w1 knows about w2, for consensusPermitsBecomingHealthy.
   runner.processWorkerHeartbeat(

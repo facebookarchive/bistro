@@ -52,7 +52,7 @@ void printString(folly::StringPiece s) {
 // most tests use the default 0/0 schedulerID for less code.
 cpp2::WorkerSetID initialSetID() {
   cpp2::WorkerSetID wid;
-  *wid.schedulerID_ref()->startTime_ref() = 3141592654;
+  *wid.schedulerID()->startTime() = 3141592654;
   return wid;
 }
 
@@ -61,8 +61,8 @@ RemoteWorker initializeWorker(
     const std::vector<cpp2::RunningTask>& running_tasks) {
 
   cpp2::BistroWorker bw;
-  *bw.protocolVersion_ref() = cpp2::common_constants::kProtocolVersion();
-  *bw.id_ref()->startTime_ref() =
+  *bw.protocolVersion() = cpp2::common_constants::kProtocolVersion();
+  *bw.id()->startTime() =
       2718281828; // Make it easier to read WorkerSetIDs
 
   // RemoteWorkers creates a worker whenever it sees a new shard ID.
@@ -94,10 +94,10 @@ void successfulHealthcheck(int64_t test_time, RemoteWorker* worker) {
   // To predictably **not** be requesting a redundant healthcheck, you
   // should run this **after** a heartbeat with the current test_time.
   cpp2::RunningTask rt;
-  *rt.job_ref() = kHealthcheckTaskJob;
-  *rt.invocationID_ref()->startTime_ref() = test_time;
+  *rt.job() = kHealthcheckTaskJob;
+  *rt.invocationID()->startTime() = test_time;
   EXPECT_FALSE(worker->recordNonRunningTaskStatus(
-      rt, TaskStatus::done(), *worker->getBistroWorker().id_ref()));
+      rt, TaskStatus::done(), *worker->getBistroWorker().id()));
 }
 
 // If the update is mutated after construction, we throw.
@@ -146,12 +146,12 @@ void makeWorkerHealthy(int64_t test_time, RemoteWorker* worker) {
 
   // Just as above, but consensus_permits_becoming_healthy is true.
   // Drive-by test: make sure the worker set ID is echoed correctly.
-  EXPECT_NE(cpp2::BistroInstanceID(), *worker->getBistroWorker().id_ref());
+  EXPECT_NE(cpp2::BistroInstanceID(), *worker->getBistroWorker().id());
   ASSERT_TRUE(worker->workerSetID().has_value());
   EXPECT_EQ(wid, worker->workerSetID())
     << debugString(wid) << " != " << debugString(*worker->workerSetID());
-  addWorkerIDToHash(&(*wid.hash_ref()), *worker->getBistroWorker().id_ref());
-  ++(*wid.version_ref());
+  addWorkerIDToHash(&(*wid.hash()), *worker->getBistroWorker().id());
+  ++(*wid.version());
   EXPECT_TRUE(worker
                   ->processHeartbeat(
                       &update.update_, worker->getBistroWorker(), wid, true)
@@ -182,7 +182,7 @@ TEST(TestRemoteWorker, HandleNormal) {
   {
     // Add 1 because the code uses max(1, heartbeat period).
     test_time += FLAGS_heartbeat_grace_period +
-        *worker.getBistroWorker().heartbeatPeriodSec_ref() + 1;
+        *worker.getBistroWorker().heartbeatPeriodSec() + 1;
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
@@ -200,13 +200,13 @@ TEST(TestRemoteWorker, HandleNormal) {
 
   // Check that the next heartbeat updates the worker's metadata.
   auto bw = worker.getBistroWorker();
-  ++(*bw.heartbeatPeriodSec_ref());
+  ++(*bw.heartbeatPeriodSec());
   EXPECT_NE(bw, worker.getBistroWorker());
   // Another heartbeat, and it'll be healthy again.
   {
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     cpp2::WorkerSetID wid;  // Must increment version to avoid error logs.
-    *wid.version_ref() = *worker.workerSetID()->version_ref() + 1;
+    *wid.version() = *worker.workerSetID()->version() + 1;
     EXPECT_TRUE(worker
                     .processHeartbeat(
                         &update, bw, wid, /*permit_becoming_healthy =*/false)
@@ -233,7 +233,7 @@ TEST(TestRemoteWorker, DoNotDieDueToLackOfConsensus) {
 
     // Give our worker a running task (exercises running task tracking)
     cpp2::RunningTask rt;
-    *rt.job_ref() = "foobar";
+    *rt.job() = "foobar";
 
     auto worker = initializeWorker(
       // The worker has been unhealthy long enough that it's about to be lost.
@@ -279,7 +279,7 @@ TEST(TestRemoteWorker, DoNotDieDueToLackOfConsensus) {
         EXPECT_EQ(RemoteWorkerState::State::MUST_DIE, worker.getState());
         expected.requestSuicide(bw, "Current worker just became lost");
         expected.loseRunningTask(
-            std::make_pair(*rt.job_ref(), *rt.node_ref()), rt);
+            std::make_pair(*rt.job(), *rt.node()), rt);
       }
       expectUpdateEq(expected, update);
     }
@@ -292,7 +292,7 @@ TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {
   int64_t test_time = 0;
 
   cpp2::BistroWorker bw;
-  *bw.protocolVersion_ref() = cpp2::common_constants::kProtocolVersion();
+  *bw.protocolVersion() = cpp2::common_constants::kProtocolVersion();
   // The worker has been unhealthy long enough that it's about to be lost.
   RemoteWorker worker(
     test_time - FLAGS_lose_unhealthy_worker_after - 1,
@@ -304,7 +304,7 @@ TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {
 
   // Give it a running task (exercises running task tracking)
   cpp2::RunningTask rt;
-  *rt.job_ref() = "foobar";
+  *rt.job() = "foobar";
   worker.initializeRunningTasks({rt});
   // DO: Add some way to inspect this and confirm it was cleared after
   // the MUST_DIE state change?
@@ -320,7 +320,7 @@ TEST(TestRemoteWorker, HandleMustDieAndLostTasks) {
 
     RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     expected.requestSuicide(bw, "Current worker just became lost");
-    expected.loseRunningTask(std::make_pair(*rt.job_ref(), *rt.node_ref()), rt);
+    expected.loseRunningTask(std::make_pair(*rt.job(), *rt.node()), rt);
     expectUpdateEq(expected, update);
   }
 
@@ -345,7 +345,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
 
   // Make a worker with a running task
   cpp2::RunningTask rt;
-  *rt.job_ref() = "foobar";
+  *rt.job() = "foobar";
   auto worker = initializeWorker(test_time, {rt});
   makeWorkerHealthy(test_time, &worker);
 
@@ -358,7 +358,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   // Replace it via a heartbeat from a new worker with the same machineLock
   {
     auto bw_new = worker.getBistroWorker();
-    ++(*bw_new.id_ref()->startTime_ref());
+    ++(*bw_new.id()->startTime());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker
@@ -372,7 +372,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
     EXPECT_EQ(bw_new, worker.getBistroWorker());
 
     RemoteWorkerUpdate expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
-    expected.loseRunningTask(std::make_pair(*rt.job_ref(), *rt.node_ref()), rt);
+    expected.loseRunningTask(std::make_pair(*rt.job(), *rt.node()), rt);
     expected.addNewWorker(bw_new);
     expected.healthcheckWorker(bw_new);
     expectUpdateEq(expected, update);  // No suicide requests
@@ -386,7 +386,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   {
     auto bw_old = worker.getBistroWorker();
     auto bw_new = bw_old;
-    --(*bw_new.id_ref()->startTime_ref());
+    --(*bw_new.id()->startTime());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
@@ -410,7 +410,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   // it's newer or older than the one it currently has, and logs an error.
   {
     auto bw_new = worker.getBistroWorker();
-    ++(*bw_new.id_ref()->rand_ref());
+    ++(*bw_new.id()->rand());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
@@ -446,7 +446,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   {
     auto bw_old = worker.getBistroWorker();
     auto bw_new = bw_old;
-    ++(*bw_new.machineLock_ref()->port_ref());
+    ++(*bw_new.machineLock()->port());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_FALSE(worker
@@ -469,7 +469,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   {
     // Add 1 because the code uses max(1, heartbeat period).
     test_time += FLAGS_heartbeat_grace_period +
-        *worker.getBistroWorker().heartbeatPeriodSec_ref() + 1;
+        *worker.getBistroWorker().heartbeatPeriodSec() + 1;
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
@@ -490,7 +490,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   {
     auto bw_old = worker.getBistroWorker();
     auto bw_new = bw_old;
-    ++(*bw_new.machineLock_ref()->port_ref());
+    ++(*bw_new.machineLock()->port());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_FALSE(worker
@@ -514,7 +514,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   {
     auto bw_old = worker.getBistroWorker();
     auto bw_new = bw_old;
-    ++(*bw_new.machineLock_ref()->port_ref());
+    ++(*bw_new.machineLock()->port());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker
@@ -539,7 +539,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   {
     auto bw_old = worker.getBistroWorker();
     auto bw_new = bw_old;
-    ++(*bw_new.machineLock_ref()->port_ref());
+    ++(*bw_new.machineLock()->port());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker
@@ -600,7 +600,7 @@ TEST(TestRemoteWorker, WorkerReplacement) {
   {
     auto bw_old = worker.getBistroWorker();
     auto bw_new = bw_old;
-    ++(*bw_new.machineLock_ref()->port_ref());
+    ++(*bw_new.machineLock()->port());
 
     RemoteWorkerUpdate update(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
     EXPECT_TRUE(worker
@@ -632,12 +632,12 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
 
   // Make a worker with a running task
   cpp2::RunningTask rt;
-  *rt.job_ref() = "foobar";
+  *rt.job() = "foobar";
   auto worker = initializeWorker(test_time, {rt});
   makeWorkerHealthy(test_time, &worker);
   const auto& bw = worker.getBistroWorker();
   cpp2::WorkerSetID wid;  // The version can only increase
-  *wid.version_ref() = *worker.workerSetID()->version_ref() + 1;
+  *wid.version() = *worker.workerSetID()->version() + 1;
 
   int p = std::max(1, FLAGS_unsure_if_running_check_initial_period);
   for (int i = 0; i < 3; ++i) {  // Run through thrice to test 2 transitions
@@ -678,7 +678,7 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
         expected(RemoteWorkerUpdate::UNIT_TEST_TIME, test_time);
       if (delay_vs_check.second) {
         expected.checkUnsureIfRunningTasks(
-            bw, {{std::make_pair(*rt.job_ref(), *rt.node_ref()), rt}});
+            bw, {{std::make_pair(*rt.job(), *rt.node()), rt}});
       }
       if (update.workersToHealthcheck().size()) {
         expected.healthcheckWorker(bw);
@@ -691,7 +691,7 @@ TEST(TestRemoteWorker, UnsureIfRunning) {
       worker.eraseUnsureIfRunningTasks({rt});
     } else if (i == 1) {
       EXPECT_TRUE(worker.recordNonRunningTaskStatus(
-          rt, TaskStatus::errorBackoff("hi"), *bw.id_ref()));
+          rt, TaskStatus::errorBackoff("hi"), *bw.id()));
     }
 
     // Since there are no "unsure" tasks, this resets the backoff count
@@ -720,14 +720,14 @@ TEST(TestRemoteWorker, RecordStatuses) {
   // recordNonRunningTaskStatus throws if the worker is in the NEW state
   {
     cpp2::BistroWorker bw;
-    *bw.protocolVersion_ref() = cpp2::common_constants::kProtocolVersion();
+    *bw.protocolVersion() = cpp2::common_constants::kProtocolVersion();
     RemoteWorker worker(
       test_time, bw, initialSetID(), cpp2::BistroInstanceID()
     );
     EXPECT_EQ(RemoteWorkerState::State::NEW, worker.getState());
     EXPECT_THROW(
         worker.recordNonRunningTaskStatus(
-            cpp2::RunningTask(), TaskStatus::done(), *bw.id_ref()),
+            cpp2::RunningTask(), TaskStatus::done(), *bw.id()),
         std::runtime_error);
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
   }
@@ -740,15 +740,15 @@ TEST(TestRemoteWorker, RecordStatuses) {
   // Note: successfulHealthcheck already tested successful healthchecks
   {
     cpp2::RunningTask rt;
-    *rt.job_ref() = kHealthcheckTaskJob;
-    *rt.invocationID_ref()->startTime_ref() = test_time;
+    *rt.job() = kHealthcheckTaskJob;
+    *rt.invocationID()->startTime() = test_time;
     EXPECT_FALSE(worker.recordNonRunningTaskStatus(
-        rt, TaskStatus::failed(), *bw.id_ref()));
+        rt, TaskStatus::failed(), *bw.id()));
     EXPECT_PCRE_MATCH(glogErrorPattern(), stderr.readIncremental());
   }
 
   cpp2::RunningTask rt;
-  *rt.job_ref() = "foobar";
+  *rt.job() = "foobar";
 
   // Exercise recordRunningTaskStatus & recordFailedTask
   for (int i = 0; i < 2; ++i) {
@@ -759,8 +759,8 @@ TEST(TestRemoteWorker, RecordStatuses) {
   }
 
   // recordNonRunningTaskStatus throws on bad worker IDs
-  auto bad_id = *bw.id_ref();
-  ++(*bad_id.startTime_ref());
+  auto bad_id = *bw.id();
+  ++(*bad_id.startTime());
   EXPECT_THROW(
     worker.recordNonRunningTaskStatus(rt, TaskStatus::done(), bad_id),
     std::runtime_error
@@ -781,27 +781,27 @@ TEST(TestRemoteWorker, RecordStatuses) {
   }) {
     worker.recordRunningTaskStatus(rt, TaskStatus::running());
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
-    EXPECT_TRUE(worker.recordNonRunningTaskStatus(rt, status, *bw.id_ref()));
+    EXPECT_TRUE(worker.recordNonRunningTaskStatus(rt, status, *bw.id()));
     EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
   }
 
   // An incorrect invocation ID means that the "not running" status is ignored
   auto bad_rt = rt;
-  ++(*bad_rt.invocationID_ref()->startTime_ref());
+  ++(*bad_rt.invocationID()->startTime());
   worker.recordRunningTaskStatus(rt, TaskStatus::running());
   EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
   auto status = TaskStatus::done();
-  EXPECT_FALSE(worker.recordNonRunningTaskStatus(bad_rt, status, *bw.id_ref()));
+  EXPECT_FALSE(worker.recordNonRunningTaskStatus(bad_rt, status, *bw.id()));
   EXPECT_PCRE_MATCH(glogWarningPattern(), stderr.readIncremental());
-  EXPECT_TRUE(worker.recordNonRunningTaskStatus(rt, status, *bw.id_ref()));
+  EXPECT_TRUE(worker.recordNonRunningTaskStatus(rt, status, *bw.id()));
   EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 
   // Print an error & proceed, when saving one non-running status over another
-  EXPECT_TRUE(worker.recordNonRunningTaskStatus(rt, status, *bw.id_ref()));
+  EXPECT_TRUE(worker.recordNonRunningTaskStatus(rt, status, *bw.id()));
   EXPECT_PCRE_MATCH(glogErrorPattern(), stderr.readIncremental());
 
   // Ignore an overwriteable status on top of a non-overwriteable one
   EXPECT_FALSE(worker.recordNonRunningTaskStatus(
-      rt, overwriteable_status, *bw.id_ref()));
+      rt, overwriteable_status, *bw.id()));
   EXPECT_NO_PCRE_MATCH(glogErrOrWarnPattern(), stderr.readIncremental());
 }

@@ -129,11 +129,11 @@ TEST(TestDependencyScheduling, HandleAll) {
   EXPECT_TRUE(catcher.contains(make_pair<string, string>("job2", "db22")));
 
   cpp2::RunningTask rt;
-  *rt.job_ref() = "job2";
-  *rt.node_ref() = "db11";
+  *rt.job() = "job2";
+  *rt.node() = "db11";
   task_statuses.updateStatus(rt, TaskStatus::running());
   task_statuses.updateStatus(rt, TaskStatus::done());
-  *rt.node_ref() = "db12";
+  *rt.node() = "db12";
   task_statuses.updateStatus(rt, TaskStatus::running());
 
   catcher.tasks.clear();

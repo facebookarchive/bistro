@@ -61,22 +61,22 @@ JobBackoffSettings::JobBackoffSettings(const dynamic& d) : repeat_(false) {
 
 cpp2::BackoffDuration JobBackoffSettings::getNext(
     const cpp2::BackoffDuration& cur_backoff) const {
-  CHECK(!(*cur_backoff.noMoreBackoffs_ref()));
-  auto it = upper_bound(values_.begin(), values_.end(), *cur_backoff.seconds_ref());
+  CHECK(!(*cur_backoff.noMoreBackoffs()));
+  auto it = upper_bound(values_.begin(), values_.end(), *cur_backoff.seconds());
   cpp2::BackoffDuration new_backoff;
   if (it != values_.end()) {
-    *new_backoff.noMoreBackoffs_ref() = false;
-    *new_backoff.seconds_ref() = *it;
+    *new_backoff.noMoreBackoffs() = false;
+    *new_backoff.seconds() = *it;
   } else if (repeat_) {
-    *new_backoff.noMoreBackoffs_ref() = false;
-    *new_backoff.seconds_ref() = values_.back();
+    *new_backoff.noMoreBackoffs() = false;
+    *new_backoff.seconds() = values_.back();
   } else {
-    *new_backoff.noMoreBackoffs_ref() = true;
+    *new_backoff.noMoreBackoffs() = true;
     // This is only used when a job sets "backoff": ["fail"], and then
     // issues an "incomplete_backoff" status.  One minute seems
     // inoffensively short, but long enough that other tasks would generally
     // start running before this one retries.
-    *new_backoff.seconds_ref() = 60;
+    *new_backoff.seconds() = 60;
   }
   return new_backoff;
 }

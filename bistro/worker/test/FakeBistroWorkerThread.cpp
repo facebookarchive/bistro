@@ -37,12 +37,12 @@ void FakeBistroWorker::async_tm_getRunningTasks(
 
 cpp2::BistroWorker FakeBistroWorkerThread::getBistroWorker() const {
   cpp2::BistroWorker worker;
-  *worker.shard_ref() = shard_;
-  *worker.machineLock_ref()->hostname_ref() = getLocalHostName();
-  *worker.machineLock_ref()->port_ref() = ssit_.getPort();
-  *worker.addr_ref()->ip_or_host_ref() = ssit_.getAddress().getAddressStr();
-  *worker.addr_ref()->port_ref() = *worker.machineLock_ref()->port_ref();
-  *worker.protocolVersion_ref() = cpp2::common_constants::kProtocolVersion();
+  *worker.shard() = shard_;
+  *worker.machineLock()->hostname() = getLocalHostName();
+  *worker.machineLock()->port() = ssit_.getPort();
+  *worker.addr()->ip_or_host() = ssit_.getAddress().getAddressStr();
+  *worker.addr()->port() = *worker.machineLock()->port();
+  *worker.protocolVersion() = cpp2::common_constants::kProtocolVersion();
   customizeWorkerCob_(&worker);
   return worker;
 }

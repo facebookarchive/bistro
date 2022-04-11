@@ -167,26 +167,26 @@ std::pair<folly::AsyncServerSocket::UniquePtr, cpp2::ServiceAddress>
   // Pick the address to listen on
   cpp2::ServiceAddress addr;
   if (FLAGS_server_address.empty()) {
-    *addr.ip_or_host_ref() = guessPrimaryInterfaceAddress();
-    CHECK(!addr.ip_or_host_ref()->empty())
+    *addr.ip_or_host() = guessPrimaryInterfaceAddress();
+    CHECK(!addr.ip_or_host()->empty())
         << "Could not find an appropriate "
         << "network interface. Try specifying --server_inet_interface or "
         << "--server_address.";
   } else {
-    *addr.ip_or_host_ref() = FLAGS_server_address;
+    *addr.ip_or_host() = FLAGS_server_address;
   }
 
   // Pick the port
   folly::AsyncServerSocket::UniquePtr socket(new folly::AsyncServerSocket);
   if (FLAGS_server_port == 0) {
-    socket->bind(folly::SocketAddress(*addr.ip_or_host_ref(), 0));
+    socket->bind(folly::SocketAddress(*addr.ip_or_host(), 0));
     folly::SocketAddress address;
     socket->getAddress(&address);
-    *addr.port_ref() = address.getPort();
+    *addr.port() = address.getPort();
   } else {
-    *addr.port_ref() = FLAGS_server_port;
+    *addr.port() = FLAGS_server_port;
     socket->bind(
-        folly::SocketAddress(*addr.ip_or_host_ref(), *addr.port_ref()));
+        folly::SocketAddress(*addr.ip_or_host(), *addr.port()));
   }
 
   // Start listening on the socket right away because this guarantees that

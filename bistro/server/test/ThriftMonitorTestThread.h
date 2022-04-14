@@ -13,10 +13,15 @@ namespace folly {
   class EventBase;
 }
 
+namespace apache::thrift {
+template <class>
+class Client;
+} // namespace apache::thrift
+
 namespace facebook { namespace bistro {
 
 namespace cpp2 {
-  class BistroSchedulerAsyncClient;
+  class BistroScheduler;
   class ServiceAddress;
 }
 
@@ -29,7 +34,7 @@ class ThriftMonitorTestThread {
 public:
   ThriftMonitorTestThread();
 
-  std::shared_ptr<cpp2::BistroSchedulerAsyncClient> getClient(
+  std::shared_ptr<apache::thrift::Client<cpp2::BistroScheduler>> getClient(
     folly::EventBase* event_base
   );
 

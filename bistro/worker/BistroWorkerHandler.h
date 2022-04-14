@@ -27,7 +27,7 @@ namespace apache { namespace thrift { class ThriftServer; }}
 namespace facebook { namespace bistro {
 
 namespace cpp2 {
-  class BistroSchedulerAsyncClient;
+  class BistroScheduler;
 }
 class UsablePhysicalResourceMonitor;
 
@@ -35,7 +35,7 @@ class BistroWorkerHandler final : public cpp2::BistroWorkerSvIf,
                                   public fb303::FacebookBase2 {
 public:
   // Must be thread-safe.
-  typedef std::function<std::shared_ptr<cpp2::BistroSchedulerAsyncClient>(
+  typedef std::function<std::shared_ptr<apache::thrift::Client<cpp2::BistroScheduler>>(
     folly::EventBase* event_base
   )> SchedulerClientFn;
   // IMPORTANT: This logger MUST be thread-safe, noexcept, and fast.

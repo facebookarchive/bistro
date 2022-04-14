@@ -21,11 +21,15 @@ namespace folly {
   class dynamic;
 }
 
+namespace apache::thrift {
+template <class>
+class Client;
+} // namespace apache::thrift
+
 namespace facebook { namespace bistro {
 
 namespace cpp2 {
   class BistroWorker;
-  class BistroWorkerAsyncClient;
   class ServiceAddress;
 }
 
@@ -42,9 +46,11 @@ public:
   // Must be thread-safe.
   // The function will be executed in the loop of the eventBase passed in, and
   // the behavior of the eventBase should be sololy controlled by the caller.
-  typedef std::function<std::shared_ptr<cpp2::BistroWorkerAsyncClient>(
-    folly::EventBase* eventBase, const cpp2::ServiceAddress& addr
-  )> WorkerClientFn;
+ typedef std::function<
+     std::shared_ptr<apache::thrift::Client<cpp2::BistroWorker>>(
+         folly::EventBase* eventBase,
+         const cpp2::ServiceAddress& addr)>
+     WorkerClientFn;
 
   RemoteWorkerRunner(
     std::shared_ptr<TaskStatuses> task_statuses,

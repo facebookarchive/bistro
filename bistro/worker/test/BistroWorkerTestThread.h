@@ -16,7 +16,7 @@
 namespace facebook { namespace bistro {
 
 namespace cpp2 {
-  class BistroWorkerAsyncClient;
+  class BistroWorker;
 }
 
 class ThriftMonitorTestThread;
@@ -39,7 +39,7 @@ public:
     StateTransitionCob state_transition_cob = NoOpStateTransitionCob()
   );
 
-  std::shared_ptr<cpp2::BistroWorkerAsyncClient> getClient(
+  std::shared_ptr<apache::thrift::Client<cpp2::BistroWorker>> getClient(
     folly::EventBase* evb = nullptr  // Default to the current thread's evb
   );
 

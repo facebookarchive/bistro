@@ -135,8 +135,6 @@ jobs:
       run: python3 build/fbcode_builder/getdeps.py build --no-tests proxygen
     - name: Build bison
       run: python3 build/fbcode_builder/getdeps.py build --no-tests bison
-    - name: Build flex
-      run: python3 build/fbcode_builder/getdeps.py build --no-tests flex
     - name: Build libffi
       run: python3 build/fbcode_builder/getdeps.py build --no-tests libffi
     - name: Build ncurses

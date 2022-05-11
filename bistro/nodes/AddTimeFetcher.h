@@ -172,7 +172,7 @@ public:
     for (const auto& parent : my_level_and_parents.second) {
       for (const auto& tags_and_enabled : time_to_tags_and_enabled) {
         all_nodes->add(
-           fmt::format(format_str,
+           fmt::format(fmt::runtime(format_str),
             fmt::arg("parent",  parent->name()),
             fmt::arg("time",  folly::to<string>(tags_and_enabled.first))),
           my_level_and_parents.first,

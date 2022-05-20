@@ -126,6 +126,4 @@ It includes a 15-line C++ style guide, and explains Facebook's streamlined
 ## License
 
 Bistro is
-[BSD-licensed](https://github.com/facebookarchive/bistro/blob/main/LICENSE).  We
-also provide an [additional patent
-grant](https://github.com/facebookarchive/bistro/blob/main/PATENTS).
+[MIT-licensed](https://github.com/facebookarchive/bistro/blob/main/LICENSE).

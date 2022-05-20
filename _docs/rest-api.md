@@ -60,4 +60,4 @@ The response will be a matching JSON hash-map with keys corresponding to your su
 }
 ```
 
-To see the list of available handlers, and their behavior, take a look at [bistro/server/HTTPMonitor.cpp](https://github.com/facebook/bistro/blob/master/bistro/server/HTTPMonitor.cpp).
+To see the list of available handlers, and their behavior, take a look at [bistro/server/HTTPMonitor.cpp](https://github.com/facebookarchive/bistro/blob/main/bistro/server/HTTPMonitor.cpp).

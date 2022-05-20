@@ -7,14 +7,14 @@ permalink: /docs/getting-started/
 
 ### Leap into action
 
-The [README](https://github.com/facebook/bistro/blob/master/README.md) gives
+The [README](https://github.com/facebookarchive/bistro/blob/main/README.md) gives
 the fast path to getting Bistro up and running.  If you cannot wait to get
 your hands dirty, go ahead, and start that compile.  I'll wait.
 
 ### What just happened? --- a crash course on Bistro
 
 After the installation, the
-[README](https://github.com/facebook/bistro/blob/master/README.md) tells you
+[README](https://github.com/facebookarchive/bistro/blob/main/README.md) tells you
 to:
 
 * Make a `demo_bistro_task.sh`, which Bistro will run for you.
@@ -40,12 +40,12 @@ Although this is just a toy example, we can learn a lot from it:
     * `--http_server_port` provides an HTTP REST API, used for monitoring and
       control.
 * The scheduler is configured via a
-  [file](https://github.com/facebook/bistro/blob/master/bistro/scripts/test_configs/simple),
+  [file](https://github.com/facebookarchive/bistro/blob/main/bistro/scripts/test_configs/simple),
   further discussed below.
     * Configuration is constantly refreshed. Bistro polls the file every
       `--config_update_ms` milliseconds.
     * Configuration is
-      [pluggable](https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h):
+      [pluggable](https://github.com/facebookarchive/bistro/blob/main/bistro/config/FileConfigLoader.h):
       you could use any kind of database instead.
 * The other scheduler settings are specific to the demo, but also clarify
   some of Bistro's design:
@@ -53,7 +53,7 @@ Although this is just a toy example, we can learn a lot from it:
       fairly long time for remote workers to connect, before starting to run
       tasks.  This prevents double-starting tasks in the event that the
       scheduler restarts during a network partition.  Read the [protocol
-      documentation](https://github.com/facebook/bistro/blob/master/bistro/if/README.worker_protocol)
+      documentation](https://github.com/facebookarchive/bistro/blob/main/bistro/if/README.worker_protocol)
       for the details.  For demo purposes, we abandon safety and shrink the
       wait to just 1 second.
     * Every Bistro scheduler has a root "instance" node, named after the
@@ -68,7 +68,7 @@ Although this is just a toy example, we can learn a lot from it:
       identify the scheduler instance, and the worker registers itself.
     * `--worker_command` is invoked for every new task, although Bistro's
       [task execution is also
-      pluggable](https://github.com/facebook/bistro/blob/master/bistro/runners/),
+      pluggable](https://github.com/facebookarchive/bistro/blob/main/bistro/runners/),
       so if you want your tasks to be custom RPC or even HTTP requests, all it
       takes is a few lines of C++.
     * `--data_dir` is required for two reasons:
@@ -100,13 +100,13 @@ Although this is just a toy example, we can learn a lot from it:
       since job configuration is polled frequently, new tasks are always
       started with the latest `"config"`.  You can use `"prev_status"` as a
       non-durable checkpoint (but [open an
-      issue](https://github.com/facebook/bistro/issues/new) if you want to
+      issue](https://github.com/facebookarchive/bistro/issues/new) if you want to
       improve its durability).
 
 ### Understanding the configuration file
 
 Let's go through the demo's [JSON configuration
-file](https://github.com/facebook/bistro/blob/master/bistro/scripts/test_configs/simple),
+file](https://github.com/facebookarchive/bistro/blob/main/bistro/scripts/test_configs/simple),
 line by line.  We start with the `"nodes"` in the `"bistro_settings"`
 section --- this is the part that configures the scheduler.
 
@@ -206,7 +206,7 @@ not set in stone.  Configuration and plugins let you:
  * Persist task statuses in different ways.
  * Select a variety of job / task / resource data models.
  * Choose, or implement [your own scheduling
-   heuristic](https://github.com/facebook/bistro/blob/master/bistro/scheduler/RoundRobinSchedulerPolicy.cpp)
+   heuristic](https://github.com/facebookarchive/bistro/blob/main/bistro/scheduler/RoundRobinSchedulerPolicy.cpp)
  * Tune the task log storage.
 
 In all, Bistro's flexible architecture can implement a great variety of

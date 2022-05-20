@@ -34,7 +34,7 @@ It is impossible to reliably kill subprocess trees using POSIX system calls. Bis
 * using cgroups to reliably contain all processes in the task
 
 More detailed discussion of non-cgroup killing strategies can be found in
-[README.task_termination](https://github.com/facebook/bistro/blob/master/bistro/processes/README.task_termination).
+[README.task_termination](https://github.com/facebookarchive/bistro/blob/main/bistro/processes/README.task_termination).
 
 All the non-cgroup strategies can be configured using just `bistro_settings`
 (see `parseTaskSubprocessOptions`, `parseKillRequest`).  Using the `cgroups`
@@ -42,7 +42,7 @@ setting also requires a properly configured cgroup slice, such that Bistro
 has write access to the cgroup directory subtrees that it needs.
 
 You will want to review the copiously-documented structures in
-[common.thrift](https://github.com/facebook/bistro/blob/master/bistro/if/common.thrift):
+[common.thrift](https://github.com/facebookarchive/bistro/blob/main/bistro/if/common.thrift):
 `TaskSubprocessOptions`, `CGroupOptions`, `KillRequest`.
 
 It is not too hard to set up the system so that `cgroups` works — make a slice on `systemd` distributions, or manually make a directory on others -- and set permissions appropriately.

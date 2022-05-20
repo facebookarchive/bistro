@@ -18,7 +18,7 @@ Loaders may implement the `saveJob` (create or update a job) and `deleteJob` met
 
 Bistro ships with:
 
-- [FileConfigLoader](https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h): Reads a file containing a JSON dict with keys as above. Does not currently implement job mutations.
+- [FileConfigLoader](https://github.com/facebookarchive/bistro/blob/main/bistro/config/FileConfigLoader.h): Reads a file containing a JSON dict with keys as above. Does not currently implement job mutations.
 
 # Command-line arguments
 
@@ -33,11 +33,11 @@ The only key required to be present in the config is `bistro_settings`. This det
 - `enabled`: If set to `false` then Bistro will not run any jobs. Default: **true**.
 - `working_wait`: The time in seconds for Bistro to wait between scheduler iterations if it has running tasks. Default: **0.5** seconds.
 - `idle_wait`: The time in seconds for Bistro to wait between scheduler iterations if it does not have running tasks. Default: **5** seconds.
-- `scheduler`: The scheduler policy to use. Default: **"roundrobin"**. The full list is [here](https://github.com/facebook/bistro/blob/master/bistro/scheduler/SchedulerPolicies.cpp) (check [Config.h](https://github.com/facebook/bistro/blob/master/bistro/config/Config.h#L169) for the strings).
+- `scheduler`: The scheduler policy to use. Default: **"roundrobin"**. The full list is [here](https://github.com/facebookarchive/bistro/blob/main/bistro/scheduler/SchedulerPolicies.cpp) (check [Config.h](https://github.com/facebookarchive/bistro/blob/main/bistro/config/Config.h#L169) for the strings).
 - `backoff`: The default backoff settings to use for each job. The format is a list of integer values that represent the backoff time in seconds. For example: [5, 15, 60] would mean that a task backs off for 5 seconds after one failure, 15 seconds after two, and 60 seconds after 3 failures. After 4 or more failures the task fails permanently. Optionally, the last entry of the array can be the string "repeat", which will repeat the last backoff value for all additional failures (thus there can never be a permanent failure). *Note:* backoff times must be distinct integers in increasing order. Default: **[15, 30, 60, 300, 900, 3600, 7200, 21600, 86400, "repeat"]**. Search [Overview of Concepts](https://facebook.github.io/bistro/docs/overview-of-concepts/) for a note on `forgive_jobs`, which allows you to get out of backoff or permanent failure.
 - `nodes` *(required)*: See "Node and Resource Settings" below.
 - `resources` *(required)*: See "Node and Resource Settings" below.
-- `node_order`: For each job, the scheduler sequentially checks each node to see if a task can be run on it. This setting determines the order of these checks. Defaults to **"random"**. Other options are [here](https://github.com/facebook/bistro/blob/master/bistro/config/NodeOrderType.h).
+- `node_order`: For each job, the scheduler sequentially checks each node to see if a task can be run on it. This setting determines the order of these checks. Defaults to **"random"**. Other options are [here](https://github.com/facebookarchive/bistro/blob/main/bistro/config/NodeOrderType.h).
 - `level_for_tasks`: See "Running Jobs on Different Levels" below.
 - `physical_resources`: See [Physical resources](https://facebook.github.io/bistro/docs/physical-resources/).
 - `remote_worker_selector`, `worker_resources_override`, `CAUTION_exit_initial_wait_before_timestamp`: These settings control resource control and execution for Bistro's remote worker pool. To learn more, you will want to start with [Overview of concepts: RemoteWorkerRunner](https://facebook.github.io/bistro/docs/overview-of-concepts/#remoteworkerrunner), and then proceed to read the code.
@@ -49,7 +49,7 @@ Sometimes, you want one task to run before another. If this is a preference, but
 
 If certain tasks must **definitely not run**, then you should look at job-level configs of `"filter"`, `"depends_on"`, and `"run_only_after_all_nodes_are_done_for"`.
 
-If you want tasks to run at certain times / on a schedule, check out the ["add_time" node source](https://github.com/facebook/bistro/blob/master/bistro/nodes/AddTimeFetcher.h#L25).
+If you want tasks to run at certain times / on a schedule, check out the ["add_time" node source](https://github.com/facebookarchive/bistro/blob/main/bistro/nodes/AddTimeFetcher.h#L25).
 
 ## Node and Resource Settings
 
@@ -152,7 +152,7 @@ In addition to the `bistro_settings` key, each Bistro config can support 0 or mo
         - It is "done" in the current configuration -- if Bistro was reconfigured, "done"-ness is always evaluated relative to the latest configuration.
 - `level_for_tasks`: *(overrides `bistro_settings`)* See "Running Jobs on Different Levels" below.
 - `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: *(overrides `bistro_settings`)* See [Supervising and killing tasks](snarkmaster.github.io/bistro/docs/supervising-and-killing-tasks) for the details.
-- `host_placement`, `level_for_host_placement`:  *CAUTION* — these options are likely to change significantly in the future. Allows scheduling a job on specific hosts, primarily useful for scheduling tasks on the hosts that contain the data. Note that both options use the actual hostname of the worker process (from the structure [MachinePortLock](https://github.com/facebook/bistro/blob/master/bistro/if/common.thrift)), not the worker's ID. If both `host_placement` and `level_for_host_placement` are set, the former prevails since it is more specific.
+- `host_placement`, `level_for_host_placement`:  *CAUTION* — these options are likely to change significantly in the future. Allows scheduling a job on specific hosts, primarily useful for scheduling tasks on the hosts that contain the data. Note that both options use the actual hostname of the worker process (from the structure [MachinePortLock](https://github.com/facebookarchive/bistro/blob/main/bistro/if/common.thrift)), not the worker's ID. If both `host_placement` and `level_for_host_placement` are set, the former prevails since it is more specific.
 - `errors`: If you the `ConfigLoader` contains an invalid job, or if the  `save_job` REST call received an invalid job, Bistro will do a best-effort parse of the JSON, and record any bad data in the `errors` key — see [DynamicParser.h](https://github.com/facebook/folly/blob/master/folly/experimental/DynamicParser.h) for a description of its format.
 
 ## Running Jobs on Different Levels

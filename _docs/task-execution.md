@@ -32,7 +32,7 @@ command node_name status_pipe config_JSON
   {"result": "done", "data": {"your data up to a few KB"}}
   ```
 
-  Instead of `result`, you could also use `result_bits`, see [bits.thrift](https://github.com/facebook/bistro/blob/master/bistro/if/bits.thrift).
+  Instead of `result`, you could also use `result_bits`, see [bits.thrift](https://github.com/facebookarchive/bistro/blob/main/bistro/if/bits.thrift).
 
   For example, Bistro always marks the task done if `command` is the
   following script:
@@ -58,9 +58,9 @@ rate-limits (see
 and writes to a SQLite database on the local disk.
 
 To retrieve the logs, send the scheduler a `task_logs`
-[REST request](https://facebook.github.io/bistro/docs/rest-api/), 
+[REST request](https://facebook.github.io/bistro.io/docs/rest-api/), 
 read 
-[handleTaskLogs() for the details](https://github.com/facebook/bistro/blob/master/bistro/server/HTTPMonitor.cpp).
+[handleTaskLogs() for the details](https://github.com/facebookarchive/bistro/blob/main/bistro/server/HTTPMonitor.cpp).
 
 # Working directory
 

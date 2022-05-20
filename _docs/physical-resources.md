@@ -10,11 +10,11 @@ permalink: /docs/physical-resources/
 These are advanced features, which require some familiarity with Linux
 process management to use well.  For this reason, this documentation is
 intentionally sparse.  You will want to review the code in
-[bistro/physical](https://github.com/facebook/bistro/tree/master/bistro/physical)
+[bistro/physical](https://github.com/facebookarchive/bistro/tree/master/bistro/physical)
 when enabling these features.
 
 The mentions of physical resources in
-[RemoteWorkerRunner.cpp](https://github.com/facebook/bistro/blob/master/bistro/runners/RemoteWorkerRunner.cpp)
+[RemoteWorkerRunner.cpp](https://github.com/facebookarchive/bistro/blob/main/bistro/runners/RemoteWorkerRunner.cpp)
 are responsible for integrating the capability to query resources with
 actual scheduling and enforcement.
 

@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/facebook/bistro.svg?branch=master)](https://travis-ci.org/facebook/bistro)
 
 This README is a very abbreviated introduction to Bistro. Visit
-http://facebook.github.io/bistro for a more structured introduction, and for the docs.
+http://facebook.github.io/bistro for a more structured introduction, and the docs.
 
 Bistro is a toolkit for making distributed computation systems. It can
 schedule and run distributed tasks, including data-parallel jobs.  It
@@ -46,10 +46,10 @@ very similar steps on most modern Linux distributions.
 
 If you run into dependency problems, look at `bistro/cmake/setup.cmake` for
 a full list of Bistro's external dependencies (direct and indirect).  We
-gratefully accept patches that improve Bistro's builds, or add support for
+gratefully accept patches that improve Bistro's builds or add support for
 various flavors of Linux and Mac OS.
 
-The binaries will be in `bistro/cmake/{Debug,Release}`.  Available build
+The binaries will be in `bistro/cmake/{Debug, Release}`.  Available build
 targets are explained here:
    http://cmake.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools
 You can start Bistro's unit tests by running `ctest` in those directories.

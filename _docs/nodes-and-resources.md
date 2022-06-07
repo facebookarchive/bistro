@@ -11,7 +11,7 @@ Your first step in using Bistro will likely be to figure out the node & resource
 
 ## `nodes` describe the structure of your computation
 
-Most Bistro use-cases have a set of shards, on which the computation needs to run. To represent these in Bistro, you will use `nodes`, which are a slight generalization of a typical data-sharded computation. If reading academic papers is your thing, the rationale for this model is explained in the [Bistro USENIX ATC paper](https://facebook.github.io/bistro/static/bistro_ATC_final.pdf).
+Most Bistro use-cases have a set of shards, on which the computation needs to run. To represent these in Bistro, you will use `nodes`, which are a slight generalization of a typical data-sharded computation. If reading academic papers is your thing, the rationale for this model is explained in the [Bistro USENIX ATC paper](https://bistro.io/static/bistro_ATC_final.pdf).
 
 When processing several shards is bottlenecked on a common resource (e.g. databases residing on the same host), the nodes representing those shards will share a `parent` node. Of course, parent nodes can have further parent nodes to represent resource bottlenecks of a larger scope (e.g. a rack switch or a QPS-limited service).
 
@@ -165,4 +165,4 @@ Combining the two preceding ideas, you can make it so that your special jobs, an
 
 ## Advanced resource configuration: automatically discovering physical worker resources
 
-See [Physical resources: discovering and enforcing](https://facebook.github.io/bistro/docs/physical-resources/).
+See [Physical resources: discovering and enforcing](https://bistro.io/docs/physical-resources/).

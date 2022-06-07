@@ -17,7 +17,7 @@ It can be set to:
  * number: Kill after this many seconds (to cope with transiently deleted jobs or nodes). Can be fractional.
 
 Also refer to 
-[Physical Resources](https://facebook.github.io/bistro/docs/physical-resources/)
+[Physical Resources](https://bistro.io/docs/physical-resources/)
 for notes on RAM & CPU enforcement.
 
 **Caveat:** If the resources available on nodes decrease or disappear,

@@ -1,4 +1,4 @@
-This provides guidance on how to contribute various content to `facebook.github.io/bistro`.
+This provides guidance on how to contribute various content to `bistro.io`.
 
 ## Getting started
 

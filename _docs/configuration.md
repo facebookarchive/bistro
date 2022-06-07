@@ -34,13 +34,13 @@ The only key required to be present in the config is `bistro_settings`. This det
 - `working_wait`: The time in seconds for Bistro to wait between scheduler iterations if it has running tasks. Default: **0.5** seconds.
 - `idle_wait`: The time in seconds for Bistro to wait between scheduler iterations if it does not have running tasks. Default: **5** seconds.
 - `scheduler`: The scheduler policy to use. Default: **"roundrobin"**. The full list is [here](https://github.com/facebookarchive/bistro/blob/main/bistro/scheduler/SchedulerPolicies.cpp) (check [Config.h](https://github.com/facebookarchive/bistro/blob/main/bistro/config/Config.h#L169) for the strings).
-- `backoff`: The default backoff settings to use for each job. The format is a list of integer values that represent the backoff time in seconds. For example: [5, 15, 60] would mean that a task backs off for 5 seconds after one failure, 15 seconds after two, and 60 seconds after 3 failures. After 4 or more failures the task fails permanently. Optionally, the last entry of the array can be the string "repeat", which will repeat the last backoff value for all additional failures (thus there can never be a permanent failure). *Note:* backoff times must be distinct integers in increasing order. Default: **[15, 30, 60, 300, 900, 3600, 7200, 21600, 86400, "repeat"]**. Search [Overview of Concepts](https://facebook.github.io/bistro/docs/overview-of-concepts/) for a note on `forgive_jobs`, which allows you to get out of backoff or permanent failure.
+- `backoff`: The default backoff settings to use for each job. The format is a list of integer values that represent the backoff time in seconds. For example: [5, 15, 60] would mean that a task backs off for 5 seconds after one failure, 15 seconds after two, and 60 seconds after 3 failures. After 4 or more failures the task fails permanently. Optionally, the last entry of the array can be the string "repeat", which will repeat the last backoff value for all additional failures (thus there can never be a permanent failure). *Note:* backoff times must be distinct integers in increasing order. Default: **[15, 30, 60, 300, 900, 3600, 7200, 21600, 86400, "repeat"]**. Search [Overview of Concepts](https://bistro.io/docs/overview-of-concepts/) for a note on `forgive_jobs`, which allows you to get out of backoff or permanent failure.
 - `nodes` *(required)*: See "Node and Resource Settings" below.
 - `resources` *(required)*: See "Node and Resource Settings" below.
 - `node_order`: For each job, the scheduler sequentially checks each node to see if a task can be run on it. This setting determines the order of these checks. Defaults to **"random"**. Other options are [here](https://github.com/facebookarchive/bistro/blob/main/bistro/config/NodeOrderType.h).
 - `level_for_tasks`: See "Running Jobs on Different Levels" below.
-- `physical_resources`: See [Physical resources](https://facebook.github.io/bistro/docs/physical-resources/).
-- `remote_worker_selector`, `worker_resources_override`, `CAUTION_exit_initial_wait_before_timestamp`: These settings control resource control and execution for Bistro's remote worker pool. To learn more, you will want to start with [Overview of concepts: RemoteWorkerRunner](https://facebook.github.io/bistro/docs/overview-of-concepts/#remoteworkerrunner), and then proceed to read the code.
+- `physical_resources`: See [Physical resources](https://bistro.io/docs/physical-resources/).
+- `remote_worker_selector`, `worker_resources_override`, `CAUTION_exit_initial_wait_before_timestamp`: These settings control resource control and execution for Bistro's remote worker pool. To learn more, you will want to start with [Overview of concepts: RemoteWorkerRunner](https://bistro.io/docs/overview-of-concepts/#remoteworkerrunner), and then proceed to read the code.
 - `kill_orphan_tasks_after_sec`, `task_subprocess`, `kill_subprocess`: See [Supervising and killing tasks](snarkmaster.github.io/bistro/docs/supervising-and-killing-tasks) for the details.
 
 ## Determining which tasks run (or do not run), when
@@ -53,7 +53,7 @@ If you want tasks to run at certain times / on a schedule, check out the ["add_t
 
 ## Node and Resource Settings
 
-Read [Nodes and Resources](facebook.github.io/bistro/docs/nodes-and-resources/) to learn these concepts in depth.
+Read [Nodes and Resources](bistro.io/docs/nodes-and-resources/) to learn these concepts in depth.
 
 ### Nodes
 
@@ -66,7 +66,7 @@ The `resources` in `bistro_settings` key restricts the tasks that can run concur
 This key is required, although it's possible to set it to an empty object to have no resource constraints (be careful!). This object describes resources available at each node level. It has the form `{"level name": {"resource_name": {...}}`. A resource object has these keys:
  * `default` *(required)*: excepting jobs that customize how much of this resource they require, every task of every job will need consume this much of the resource whenever it uses a node of this level.
  * `limit` *(required)*: the number of slots of that resource that is available at each node on that level (`bistro_settings → worker_resources_override` can change this for workers).
- * `weight` *(optional)*: How important is this resource when `remote_worker_selector` is set to `busiest`? The mechanism is documented in [Overview of concepts: RemoteWorkerRunner](https://facebook.github.io/bistro/docs/overview-of-concepts/#remoteworkerrunner).
+ * `weight` *(optional)*: How important is this resource when `remote_worker_selector` is set to `busiest`? The mechanism is documented in [Overview of concepts: RemoteWorkerRunner](https://bistro.io/docs/overview-of-concepts/#remoteworkerrunner).
 
 ## Example `bistro_settings`
 
@@ -136,7 +136,7 @@ In addition to the `bistro_settings` key, each Bistro config can support 0 or mo
 
 - `enabled`: A boolean that determines whether we will run the job. Default: **true**. See also `kill_orphan_tasks_after_sec`.
 - `owner` *(required)*: A string representing the owner of the job. 
-- `command`: An array of `["command", "initial", "args"]`. The job will run this command instead of the `--worker_command` passed to `bistro_scheduler` (with `LocalRunner`) or `bistro_worker` (with `RemoteWorkerRunner`).  Also see [Task execution](https://facebook.github.io/bistro/docs/task-execution).
+- `command`: An array of `["command", "initial", "args"]`. The job will run this command instead of the `--worker_command` passed to `bistro_scheduler` (with `LocalRunner`) or `bistro_worker` (with `RemoteWorkerRunner`).  Also see [Task execution](https://bistro.io/docs/task-execution).
 - `priority`: A floating-point priority value, higher values are usually more important. Its effect depends on the scheduler policy used. Defaults to **1.0**.
 - `config`: This is an arbitrary JSON object that will be passed to each task. This is where custom configuration per-job should go. Defaults to **{}**.
 - `resources`: *(overrides `bistro_settings`)* A JSON object that determines how much of each resource a job uses (overriding the defaults set in the `bistro_settings`). The format is `{"RESOURCE_NAME": amount_used}`.

@@ -17,11 +17,11 @@ Bistro maintains the list of data shards, and executes the task against them in 
 
 # Resource Model
 
-This is a brief summary of [Nodes and Resources](https://facebook.github.io/bistro/docs/nodes-and-resources/). You will want to read the full guide while setting up your Bistro deployment. 
+This is a brief summary of [Nodes and Resources](https://bistro.io/docs/nodes-and-resources/). You will want to read the full guide while setting up your Bistro deployment. 
 
 Bistro models data resources hierarchically, usually as a tree, though other structures are possible. For example: the children of a database host are the databases it serves, an HBase host contains regions, a Hive table splits into partitions, which in turn consists of files.
 
-> ![Cartoon illustration of resource tree](https://facebook.github.io/bistro/static/resource_cartoon.jpg)
+> ![Cartoon illustration of resource tree](https://bistro.io/static/resource_cartoon.jpg)
 >
 > *A three-level node tree, with resource constraints on:*
 >* *Rack switch bandwidth at the top (capacity of 10 Gbps),*
@@ -51,9 +51,9 @@ Each task has a *status*. Bistro remembers the last status of each task. This pr
 - `error_backoff`: This task failed on its previous run, and is currently waiting for its back-off period to expire before trying again.
 - `failed`: This task failed permanently and Bistro should not try to run it again. 
 
-*Note*: the [REST API](https://facebook.github.io/bistro/docs/rest-api/) has a `forgive_jobs` handler, which will immediately release any tasks from back-off, and will also allow permanently failed tasks to retry. This is useful if you are rolling out a fix that caused your task to crash on a portion of the data. See [HTTPMonitor.cpp](https://github.com/facebookarchive/bistro/blob/main/bistro/server/HTTPMonitor.cpp)) for handler usage.
+*Note*: the [REST API](https://bistro.io/docs/rest-api/) has a `forgive_jobs` handler, which will immediately release any tasks from back-off, and will also allow permanently failed tasks to retry. This is useful if you are rolling out a fix that caused your task to crash on a portion of the data. See [HTTPMonitor.cpp](https://github.com/facebookarchive/bistro/blob/main/bistro/server/HTTPMonitor.cpp)) for handler usage.
 
-Shell-command can write their status to their `argv[2]` as one of the above strings, or as a JSON string with extra metadata (see [Task execution](https://facebook.github.io/bistro/docs/task-execution)). A task that fails to emit a status is taken to be in ["error_backoff", unless it was killed by Bistro](https://github.com/facebookarchive/bistro/blob/main/bistro/processes/TaskSubprocessQueue.cpp#L64). In rare cases, you might use other [status codes not listed above](https://github.com/facebookarchive/bistro/blob/main/bistro/statuses/TaskStatus.h).
+Shell-command can write their status to their `argv[2]` as one of the above strings, or as a JSON string with extra metadata (see [Task execution](https://bistro.io/docs/task-execution)). A task that fails to emit a status is taken to be in ["error_backoff", unless it was killed by Bistro](https://github.com/facebookarchive/bistro/blob/main/bistro/processes/TaskSubprocessQueue.cpp#L64). In rare cases, you might use other [status codes not listed above](https://github.com/facebookarchive/bistro/blob/main/bistro/statuses/TaskStatus.h).
 
 Depending on its settings, the scheduler may persist the status only in memory, or in some kind of database (e.g. [local SQLite](https://github.com/facebookarchive/bistro/blob/main/bistro/statuses/SQLiteTaskStore.h)). In either case, if the worker host or scheduler host goes down at an inopportune time, it is entirely possible for a status to be lost between the time that your task writes it, and when the scheduler records it. Therefore, please **do not treat statuses as reliable checkpoints**. However, for [idempotent](https://en.wikipedia.org/wiki/Idempotence) tasks, you can use statuses to pass small amounts of state from one invocation of your task to the next.
 
@@ -68,7 +68,7 @@ Furthermore, in Bistro, you can:
 
 Bistro also provides a wide range of `filters` (specified per level) so you can run tasks against only a subset of nodes.
 
-Search the [Configuration](https://facebook.github.io/bistro/docs/configuration/) guide to learn more about the settings mentioned above.
+Search the [Configuration](https://bistro.io/docs/configuration/) guide to learn more about the settings mentioned above.
 
 # Scheduler Policy
 
@@ -100,7 +100,7 @@ We use this type of worker to place tasks on data hosts directly, avoiding netwo
 
 The scheduler dispatches tasks to a pool of hosts running a `bistro_worker` process.  
 
-We support worker resource constraints so you can control how tasks are allocated to worker hosts. This lets us run fewer heavy-weight tasks per worker host, or to schedule more work on bigger hosts — see [Nodes and Resources](https://facebook.github.io/bistro/docs/nodes-and-resources/) for many more details.
+We support worker resource constraints so you can control how tasks are allocated to worker hosts. This lets us run fewer heavy-weight tasks per worker host, or to schedule more work on bigger hosts — see [Nodes and Resources](https://bistro.io/docs/nodes-and-resources/) for many more details.
 
 By default, Bistro will assign tasks to workers in a round-robin fashion, subject to worker resource availability. This can be changed by setting `bistro_settings → remote_worker_selector` to one of these values:
   - [busiest](https://github.com/facebook/bistro/blob/master/bistro/remote/BusiestRemoteWorkerSelector.h): For the task to be scheduled, iterate through the workers in *increasing* order of their "remaining capacity", defined as `sum(r.weight * r.slots_remaining for r in worker.resources)`, where 

@@ -69,25 +69,25 @@ XXX Linkify these headings once written --
 own code is a cinch:
  
  * Can't find the right scheduling policy? Write your own <a
-   href="https://github.com/facebook/bistro/blob/master/bistro/scheduler/LongTailSchedulerPolicy.cpp">
+   href="https://github.com/facebookarchive/bistro/blob/main/bistro/scheduler/LongTailSchedulerPolicy.cpp">
    in about 50 lines of C++</a>.
- * <a href="https://github.com/facebook/bistro/blob/master/bistro/statuses/SQLiteTaskStore.h">
+ * <a href="https://github.com/facebookarchive/bistro/blob/main/bistro/statuses/SQLiteTaskStore.h">
    Need a different DB</a>?
-   <a href="https://github.com/facebook/bistro/blob/master/bistro/nodes/ScriptFetcher.h">
+   <a href="https://github.com/facebookarchive/bistro/blob/main/bistro/nodes/ScriptFetcher.h">
    Shard source</a>?
-   <a href="https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h">
+   <a href="https://github.com/facebookarchive/bistro/blob/main/bistro/config/FileConfigLoader.h">
    Configuration source</a>?
 
 Every plugin you <a
-href="https://github.com/facebook/bistro/blob/master/CONTRIBUTING.md">
+href="https://github.com/facebookarchive/bistro/blob/main/CONTRIBUTING.md">
 contribute back to the community</a> makes the next person's customization
 easier.
 
 **3. Embedding**: Or, link just the pieces you want into your custom
 application.  Need a <a
-href="https://github.com/facebook/bistro/tree/master/bistro/cron"> C++ cron
+href="https://github.com/facebookarchive/bistro/tree/master/bistro/cron"> C++ cron
 library</a>?  An optionally-persistent <a
-href="https://github.com/facebook/bistro/tree/master/bistro/statuses">task
+href="https://github.com/facebookarchive/bistro/tree/master/bistro/statuses">task
 status store</a>?
 
 ## Getting help, and helping out
@@ -96,7 +96,7 @@ status store</a>?
 
 To <a href="support.html">contact the maintainers</a>, post in <a
 href="https://www.facebook.com/groups/bistro.scheduler">this Facebook
-Group</a> or <a href="https://github.com/facebook/bistro/issues/new">file a
+Group</a> or <a href="https://github.com/facebookarchive/bistro/issues/new">file a
 Github Issue</a>.
 
 {% capture help_tips %}{% include help-tips.md %}{% endcapture %}
@@ -106,14 +106,14 @@ Github Issue</a>.
 
 We gladly welcome contributions to both code and documentation --- whether
 you refactor a whole module, or fix one misspelling.  Please send <a
-href="https://github.com/facebook/bistro/compare/">pull requests</a> for
+href="https://github.com/facebookarchive/bistro/compare/">pull requests</a> for
 code against the <a
-href="https://github.com/facebook/bistro/tree/master">master branch</a> and
+href="https://github.com/facebookarchive/bistro/tree/master">master branch</a> and
 for the website or documentation against the <a
-href="https://github.com/facebook/bistro/tree/gh-pages">gh-pages branch</a>.
+href="https://github.com/facebookarchive/bistro/tree/gh-pages">gh-pages branch</a>.
 
 Our <a
-href="https://github.com/facebook/bistro/blob/master/CONTRIBUTING.md">
+href="https://github.com/facebookarchive/bistro/blob/main/CONTRIBUTING.md">
 CONTRIBUTING.md</a> aims to expedite the acceptance of your pull request. 
 It includes a 15-line C++ style guide, and explains Facebook's streamlined
 <a href="https://code.facebook.com/cla">contributor license agreement</a>.
@@ -126,6 +126,4 @@ It includes a 15-line C++ style guide, and explains Facebook's streamlined
 ## License
 
 Bistro is
-[BSD-licensed](https://github.com/facebook/bistro/blob/master/LICENSE).  We
-also provide an [additional patent
-grant](https://github.com/facebook/bistro/blob/master/PATENTS).
+[MIT-licensed](https://github.com/facebookarchive/bistro/blob/main/LICENSE).

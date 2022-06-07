@@ -11,7 +11,7 @@ Your first step in using Bistro will likely be to figure out the node & resource
 
 ## `nodes` describe the structure of your computation
 
-Most Bistro use-cases have a set of shards, on which the computation needs to run. To represent these in Bistro, you will use `nodes`, which are a slight generalization of a typical data-sharded computation. If reading academic papers is your thing, the rationale for this model is explained in the [Bistro USENIX ATC paper](https://facebook.github.io/bistro/static/bistro_ATC_final.pdf).
+Most Bistro use-cases have a set of shards, on which the computation needs to run. To represent these in Bistro, you will use `nodes`, which are a slight generalization of a typical data-sharded computation. If reading academic papers is your thing, the rationale for this model is explained in the [Bistro USENIX ATC paper](https://bistro.io/static/bistro_ATC_final.pdf).
 
 When processing several shards is bottlenecked on a common resource (e.g. databases residing on the same host), the nodes representing those shards will share a `parent` node. Of course, parent nodes can have further parent nodes to represent resource bottlenecks of a larger scope (e.g. a rack switch or a QPS-limited service).
 
@@ -103,14 +103,14 @@ Besides specifying `node_sources`, `bistro -> nodes` must contain `"levels": ["t
 
 ### Open-source node sources
 
-Bistro provides the following node sources -- peek at their code in [bistro/nodes/](https://github.com/facebook/bistro/blob/master/bistro/nodes) for the configuration options. Most are super-simple, while `add_time` provides detailed documentation in a docblock.
+Bistro provides the following node sources -- peek at their code in [bistro/nodes/](https://github.com/facebookarchive/bistro/blob/main/bistro/nodes) for the configuration options. Most are super-simple, while `add_time` provides detailed documentation in a docblock.
 
 Most node sources support a `parent_level` setting, which also implicitly sets the level at which it emits new nodes -- look for a call to `getMyLevelAndParents` in their `.cpp` files.
 
-- `manual`: This source allows describing arbitrary node trees. It is great for not-too-large fixed workloads. See the docblock at the top of [ManualFetcher.h](https://github.com/facebook/bistro/blob/master/bistro/nodes/ManualFetcher.h).
-- `range_label`: Bistro's analog of the `for` loop. For each node of a parent level, makes child nodes labeled with integers `start` through `end` (the name format is customizable via `format`). Good for breaking up data into finer shards. Details in [RangeLabelFetcher.cpp](https://github.com/facebook/bistro/blob/master/bistro/nodes/RangeLabelFetcher.cpp).
+- `manual`: This source allows describing arbitrary node trees. It is great for not-too-large fixed workloads. See the docblock at the top of [ManualFetcher.h](https://github.com/facebookarchive/bistro/blob/main/bistro/nodes/ManualFetcher.h).
+- `range_label`: Bistro's analog of the `for` loop. For each node of a parent level, makes child nodes labeled with integers `start` through `end` (the name format is customizable via `format`). Good for breaking up data into finer shards. Details in [RangeLabelFetcher.cpp](https://github.com/facebookarchive/bistro/blob/main/bistro/nodes/RangeLabelFetcher.cpp).
 - `script`: For each `parent_level` node, runs `script` with the parent node name as its only argument. Each output line becomes a child node name.
-- `add_time`: Given a parent level of data nodes, creates periodic work items for each of these nodes. Supports sophisticated `cron`-style scheduling, as well as simple "run every N seconds" workloads. Read [the detailed docblock for AddTimeFetcher](https://github.com/facebook/bistro/blob/master/bistro/nodes/AddTimeFetcher.h#L25).
+- `add_time`: Given a parent level of data nodes, creates periodic work items for each of these nodes. Supports sophisticated `cron`-style scheduling, as well as simple "run every N seconds" workloads. Read [the detailed docblock for AddTimeFetcher](https://github.com/facebookarchive/bistro/blob/main/bistro/nodes/AddTimeFetcher.h#L25).
 
 Most applications' initial needs can be satisfied with `manual`, `range_label`, and `script` sources. For periodic scheduling, other node sources may be combined with the `add_time` source. Once better performance or customization is required, it is easy to add a new node sources -- Bistro provides a simple plugin interface for this purpose. If you make something generally useful (e.g. a DB-backed workqueue), send us a patch!
 
@@ -165,4 +165,4 @@ Combining the two preceding ideas, you can make it so that your special jobs, an
 
 ## Advanced resource configuration: automatically discovering physical worker resources
 
-See [Physical resources: discovering and enforcing](https://facebook.github.io/bistro/docs/physical-resources/).
+See [Physical resources: discovering and enforcing](https://bistro.io/docs/physical-resources/).

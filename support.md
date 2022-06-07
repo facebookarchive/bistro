@@ -25,5 +25,5 @@ and otherwise interact with the community.
 ### Bugs, questions, suggestions
 
 If you've found a bug, or just feel more comfortable with Github, please <a
-href="https://github.com/facebook/bistro/issues/new">file an issue</a>.
+href="https://github.com/facebookarchive/bistro/issues/new">file an issue</a>.
 

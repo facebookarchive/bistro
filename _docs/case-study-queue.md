@@ -51,10 +51,10 @@ When does this make sense? Any of the below options might be good reasons.
 
 One caveat is that Bistro's current public release only supports loading job
 configurations [from a
-file](https://github.com/facebook/bistro/blob/master/bistro/config/FileConfigLoader.h).
+file](https://github.com/facebookarchive/bistro/blob/main/bistro/config/FileConfigLoader.h).
 Our high-performance MySQL-based `ConfigLoader` has too many unreleased
 dependencies to make it into the initial release.  However, we would be glad
 to guide you in implementing a high-performance, read-write `ConfigLoader`
 --- describe your needs in [an
-issue](https://github.com/facebook/bistro/issues/new), and we'll help you
+issue](https://github.com/facebookarchive/bistro/issues/new), and we'll help you
 out.

@@ -5,9 +5,9 @@ tagline: A toolkit for making services that schedule and execute tasks.
 fbappid: ""
 gacode: "UA-44373548-11"
 description: Bistro is an engineer's tool &mdash; your clients need to do large amounts of computation, and your goal is to make a system that handles them easily, performantly, and reliably.
-baseurl: /bistro
-url: https://facebook.github.io
-ghrepo: "facebook/bistro"
+baseurl:
+url: https://bistro.io
+ghrepo: "facebookarchive/bistro"
 
 # Blog posts are built into Jekyll by default, with the `_posts` directory.
 # Here you can specify other types of documentation. The names here are `docs`
